@@ -1,0 +1,14 @@
+{
+  "name": "alfred-workflow",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "filter": "node src/filter.js",
+    "action": "node src/action.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.5.2"
+}
