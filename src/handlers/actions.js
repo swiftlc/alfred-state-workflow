@@ -6,13 +6,32 @@ const { execSync } = require('child_process');
  */
 module.exports = (app) => {
 
-  // 动作：租户泳道登录
-  app.onAction('login', async (context) => {
-    const { tenant, swimlane } = context.data;
-    const msg = `登录成功！\n租户: ${tenant.name}\n泳道: ${swimlane.name}`;
+  // 动作：租户泳道登录 (耗时操作，使用后台任务)
+  app.onAction('login', async (context, wf) => {
+    // 启动后台任务，并自动跳转到进度展示界面
+    wf.startTask('login_task', context);
+  });
 
-    // 模拟执行登录逻辑
-    execSync(`osascript -e 'display notification "${msg}" with title "Workflow"'`);
+  // 注册后台任务的具体执行逻辑
+  app.onTask('login_task', async (task, context) => {
+    const { tenant, swimlane } = context.data;
+
+    task.update(10, '正在连接租户服务...');
+    await new Promise(r => setTimeout(r, 1000)); // 模拟耗时
+
+    task.update(30, `正在验证租户 [${tenant.name}] 权限...`);
+    await new Promise(r => setTimeout(r, 1500));
+
+    task.update(60, `正在切换至泳道 [${swimlane.name}]...`);
+    await new Promise(r => setTimeout(r, 1500));
+
+    task.update(90, '正在初始化工作区...');
+    await new Promise(r => setTimeout(r, 1000));
+
+    task.update(100, `成功登录 ${tenant.name} - ${swimlane.name}`);
+
+    // 任务完成后，也可以选择发送系统通知
+    execSync(`osascript -e 'display notification "登录成功！" with title "Alfred Workflow"'`);
   });
 
   // 动作：跳转泳道控制台

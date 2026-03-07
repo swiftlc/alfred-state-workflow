@@ -1,5 +1,8 @@
 const dictService = require('../services/dictService');
 const features = require('../config/features');
+const TaskManager = require('../core/TaskManager');
+
+const SPINNERS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 /**
  * 检查某个功能还缺少哪些字典上下文
@@ -9,6 +12,43 @@ function getMissingKeys(feature, data) {
 }
 
 module.exports = (app) => {
+  /**
+   * 状态：任务进度展示 (progress)
+   * 使用 Alfred 的 rerun 特性动态刷新进度
+   */
+  app.onState('progress', async (context, wf) => {
+    const { jobId } = context;
+    const task = TaskManager.getTask(jobId);
+
+    if (!task) {
+      return [wf.createRerunItem('❌ 错误', '找不到任务信息', 'home')];
+    }
+
+    if (task.status === 'running') {
+      const spinner = SPINNERS[task.spinnerIdx % SPINNERS.length];
+      TaskManager.updateTask(jobId, { spinnerIdx: (task.spinnerIdx || 0) + 1 });
+
+      return {
+        rerun: 0.2, // 告诉 Alfred 0.2 秒后重新执行此 Script Filter
+        items: [
+          {
+            title: `${spinner} ${task.progress}% - ${task.message}`,
+            subtitle: '任务执行中，请稍候...',
+            valid: false // 禁止用户按回车打断
+          }
+        ]
+      };
+    } else if (task.status === 'done') {
+      return [
+        wf.createRerunItem(`✅ ${task.message || '执行完成'}`, '按回车返回主菜单', 'home')
+      ];
+    } else {
+      return [
+        wf.createRerunItem(`❌ 执行失败: ${task.message}`, '按回车返回主菜单', 'home')
+      ];
+    }
+  });
+
   /**
    * 状态：主页 (home)
    * 展示当前已选的字典上下文，以及可用的功能矩阵

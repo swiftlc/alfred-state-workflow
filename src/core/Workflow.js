@@ -1,5 +1,7 @@
 const { encodeContext, decodeContext } = require('./utils');
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
+const path = require('path');
+const TaskManager = require('./TaskManager');
 
 class Workflow {
   constructor(options = {}) {
@@ -7,6 +9,7 @@ class Workflow {
     this.triggerName = options.triggerName || 'flow';
     this.states = {};
     this.actions = {};
+    this.tasks = {};
   }
 
   /**
@@ -25,6 +28,38 @@ class Workflow {
    */
   onAction(actionName, handler) {
     this.actions[actionName] = handler;
+  }
+
+  /**
+   * 注册一个后台任务
+   * @param {string} taskName 任务名称
+   * @param {Function} handler 处理函数
+   */
+  onTask(taskName, handler) {
+    this.tasks[taskName] = handler;
+  }
+
+  /**
+   * 启动一个后台任务并跳转到进度展示状态
+   */
+  startTask(taskName, context) {
+    const jobId = `job_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    TaskManager.initTask(jobId, taskName);
+
+    // 启动独立的后台进程执行任务
+    const workerPath = path.join(__dirname, '../worker.js');
+    const contextStr = encodeContext(context);
+
+    const child = spawn(process.execPath, [workerPath, taskName, jobId, contextStr], {
+      detached: true,
+      stdio: 'ignore'
+    });
+    child.unref();
+
+    // 触发 Alfred 重新打开 Script Filter 并进入 progress 状态
+    const nextArg = encodeContext({ state: 'progress', jobId });
+    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${this.triggerName}" in workflow "${this.bundleId}" with argument "${nextArg}"`;
+    execSync(`osascript -e '${script}'`);
   }
 
   /**
@@ -63,8 +98,15 @@ class Workflow {
 
     try {
       // 支持异步 handler
-      const items = await handler(context, this);
-      console.log(JSON.stringify({ items }));
+      const result = await handler(context, this);
+      if (Array.isArray(result)) {
+        console.log(JSON.stringify({ items: result }));
+      } else if (result && result.items) {
+        // 支持返回 { items: [...], rerun: 0.2 } 这种格式
+        console.log(JSON.stringify(result));
+      } else {
+        console.log(JSON.stringify({ items: [] }));
+      }
     } catch (err) {
       console.log(JSON.stringify({
         items: [{ title: 'Error', subtitle: err.message }]
