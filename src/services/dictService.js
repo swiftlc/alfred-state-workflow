@@ -11,6 +11,8 @@
  *    返回: [{ id: 't-001', name: '美团外卖' }, { id: 't-002', name: '大众点评' }, ...]
  */
 
+const CacheManager = require('../core/CacheManager');
+
 const DICTS = [
   { key: 'tenant', name: '租户' },
   { key: 'swimlane', name: '泳道' },
@@ -19,9 +21,9 @@ const DICTS = [
 
 const DICT_ITEMS = {
   tenant: [
-    { id: 't-001', name: ' (t-001)' },
-    { id: 't-002', name: ' (t-002)' },
-    { id: 't-003', name: ' (t-003)' }
+    { id: 't-001', name: '美团外卖 (t-001)' },
+    { id: 't-002', name: '大众点评 (t-002)' },
+    { id: 't-003', name: '美团优选 (t-003)' }
   ],
   swimlane: [
     { id: 'base', name: '基础泳道 (base)' },
@@ -40,8 +42,15 @@ class DictService {
    * 获取所有字典类型
    */
   async getDictionaries() {
-    // 模拟网络延迟
-    return Promise.resolve(DICTS);
+    return CacheManager.get(
+      'dicts_list',
+      async () => {
+        // 模拟网络延迟
+        await new Promise(r => setTimeout(r, 200));
+        return DICTS;
+      },
+      24 * 60 * 60 * 1000 // 缓存 24 小时
+    );
   }
 
   /**
@@ -49,7 +58,15 @@ class DictService {
    * @param {string} dictKey 字典的 key，例如 'tenant'
    */
   async getDictionaryItems(dictKey) {
-    return Promise.resolve(DICT_ITEMS[dictKey] || []);
+    return CacheManager.get(
+      `dict_items_${dictKey}`,
+      async () => {
+        // 模拟网络延迟
+        await new Promise(r => setTimeout(r, 200));
+        return DICT_ITEMS[dictKey] || [];
+      },
+      5 * 60 * 1000 // 缓存 5 分钟
+    );
   }
 }
 

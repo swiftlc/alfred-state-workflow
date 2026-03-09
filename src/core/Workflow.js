@@ -3,6 +3,7 @@ const { execSync, spawn } = require('child_process');
 const path = require('path');
 const TaskManager = require('./TaskManager');
 const HistoryManager = require('./HistoryManager');
+const Logger = require('./Logger');
 
 class Workflow {
   constructor(options = {}) {
@@ -66,19 +67,31 @@ class Workflow {
   /**
    * 创建一个普通的选项
    */
-  createItem(title, subtitle, actionName, payload = {}) {
-    return {
+  createItem(title, subtitle, actionName, payload = {}, mods = {}) {
+    const item = {
       title,
       subtitle,
       arg: encodeContext({ action: actionName, ...payload })
     };
+
+    if (Object.keys(mods).length > 0) {
+      item.mods = {};
+      for (const [key, mod] of Object.entries(mods)) {
+        item.mods[key] = {
+          subtitle: mod.subtitle,
+          arg: encodeContext({ action: mod.action, ...mod.payload })
+        };
+      }
+    }
+
+    return item;
   }
 
   /**
    * 创建一个触发循环状态机的选项
    */
-  createRerunItem(title, subtitle, nextState, payload = {}) {
-    return this.createItem(title, subtitle, 'rerun', { nextState, ...payload });
+  createRerunItem(title, subtitle, nextState, payload = {}, mods = {}) {
+    return this.createItem(title, subtitle, 'rerun', { nextState, ...payload }, mods);
   }
 
   /**
@@ -87,11 +100,12 @@ class Workflow {
   async runFilter(arg, query = '') {
     const context = decodeContext(arg) || { state: 'home', data: {} };
     context.query = query.trim();
-    console.error("filter上下文",context);
+
     const stateName = context.state || 'home';
     const handler = this.states[stateName];
 
     if (!handler) {
+      Logger.error(`State not found: ${stateName}`, null, { context });
       console.log(JSON.stringify({
         items: [{ title: 'Error', subtitle: `State '${stateName}' not found` }]
       }));
@@ -110,8 +124,11 @@ class Workflow {
         console.log(JSON.stringify({ items: [] }));
       }
     } catch (err) {
+      Logger.error(`Filter execution failed in state: ${stateName}`, err, { context });
       console.log(JSON.stringify({
-        items: [{ title: 'Error', subtitle: err.message }]
+        items: [
+          this.createItem('⚠️ 发生错误', err.message, 'open_log', { error: err.message })
+        ]
       }));
     }
   }
@@ -121,9 +138,9 @@ class Workflow {
    */
   async runAction(arg) {
     const context = decodeContext(arg);
-    console.error("上下文",context);
+
     if (!context || !context.action) {
-      console.error('Invalid action context');
+      Logger.error('Invalid action context', null, { arg });
       process.exit(1);
     }
 
@@ -158,10 +175,12 @@ class Workflow {
 
         await handler(context, this);
       } catch (err) {
-        console.error('Action execution failed:', err);
+        Logger.error(`Action execution failed: ${action}`, err, { context });
+        const { sendNotification } = require('./utils');
+        sendNotification(`执行失败: ${err.message}`, 'Workflow Error');
       }
     } else {
-      console.error('Unknown action:', action);
+      Logger.error(`Unknown action: ${action}`, null, { context });
     }
   }
 }

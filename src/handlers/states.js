@@ -62,9 +62,15 @@ module.exports = (app) => {
 
     // 0. 历史记录区 (History)
     const history = HistoryManager.getHistory();
-    if (history.length > 0) {
-      for (const record of history) {
-        const title = `🕒 历史: ${record.title}`;
+    // 主页展示所有固定的历史，以及最多3条未固定的历史
+    const pinnedHistory = history.filter(h => h.isPinned);
+    const unpinnedHistory = history.filter(h => !h.isPinned).slice(0, 3);
+    const displayHistory = [...pinnedHistory, ...unpinnedHistory];
+
+    if (displayHistory.length > 0) {
+      for (const record of displayHistory) {
+        const icon = record.isPinned ? '📌' : '🕒';
+        const title = `${icon} 历史: ${record.title}`;
         const subtitle = record.subtitle || '点击重新执行';
 
         if (matchQuery(query, title, subtitle)) {
@@ -74,8 +80,14 @@ module.exports = (app) => {
             copyName: record.copyName,
             historyTitle: record.title,
             historySubtitle: record.subtitle
+          }, {
+            cmd: { subtitle: record.isPinned ? '取消固定' : '固定此记录', action: 'toggle_pin', payload: { id: record.id } }
           }));
         }
+      }
+
+      if (matchQuery(query, '管理历史记录')) {
+        items.push(wf.createRerunItem('📚 管理历史记录', `查看全部 ${history.length} 条历史记录`, 'history_manage'));
       }
     }
 
@@ -128,12 +140,22 @@ module.exports = (app) => {
 
       const missingKeys = getMissingKeys(feature, data);
       if (missingKeys.length === 0) {
-        // 满足条件，可直接执行
-        items.push(wf.createItem(`🚀 执行: ${feature.name}`, feature.description, feature.action, {
-          data,
-          historyTitle: `执行: ${feature.name}`,
-          historySubtitle: feature.description
-        }));
+        if (feature.requiredInputs && feature.requiredInputs.length > 0) {
+          // 字典上下文已齐备，但还需要手动输入参数
+          const nextInput = feature.requiredInputs[0];
+          items.push(wf.createRerunItem(`⚙️ 配置: ${feature.name}`, `需要输入: ${nextInput.label} (点击开始配置)`, 'input_state', {
+            data,
+            pendingAction: feature.id,
+            inputIndex: 0
+          }));
+        } else {
+          // 满足条件，可直接执行
+          items.push(wf.createItem(`🚀 执行: ${feature.name}`, feature.description, feature.action, {
+            data,
+            historyTitle: `执行: ${feature.name}`,
+            historySubtitle: feature.description
+          }));
+        }
       } else {
         // 缺少上下文，引导配置
         const missingNames = dicts.filter(d => missingKeys.includes(d.key)).map(d => d.name).join(', ');
@@ -145,11 +167,50 @@ module.exports = (app) => {
       }
     }
 
-    // 3. 上下文管理
+    // 3. 上下文管理与缓存管理
     if (Object.keys(data).length > 0 && matchQuery(query, '清空上下文')) {
       items.push(wf.createRerunItem('🗑️ 清空上下文', '清除所有已选择的字典数据，重新开始', 'home', { data: {} }));
     }
 
+    if (matchQuery(query, '刷新缓存')) {
+      items.push(wf.createItem('🔄 强制刷新缓存', '清除本地字典缓存并重新获取', 'refresh_cache'));
+    }
+
+    return items;
+  });
+
+  /**
+   * 状态：历史记录管理 (history_manage)
+   */
+  app.onState('history_manage', async (context, wf) => {
+    const query = context.query || '';
+    const items = [];
+    const history = HistoryManager.getHistory();
+
+    for (const record of history) {
+      const icon = record.isPinned ? '📌' : '🕒';
+      const title = `${icon} ${record.title}`;
+      const subtitle = `[回车]执行 [Cmd]${record.isPinned ? '取消固定' : '固定'} [Alt]删除`;
+
+      if (matchQuery(query, title, record.subtitle)) {
+        items.push(wf.createItem(title, subtitle, record.action, {
+          data: record.data,
+          copyValue: record.copyValue,
+          copyName: record.copyName,
+          historyTitle: record.title,
+          historySubtitle: record.subtitle
+        }, {
+          cmd: { subtitle: record.isPinned ? '取消固定' : '固定此记录', action: 'toggle_pin', payload: { id: record.id, returnState: 'history_manage' } },
+          alt: { subtitle: '删除此记录', action: 'delete_history', payload: { id: record.id, returnState: 'history_manage' } }
+        }));
+      }
+    }
+
+    if (history.length > 0 && matchQuery(query, '清空历史')) {
+      items.push(wf.createItem('🗑️ 清空所有历史记录', '删除所有未固定的历史记录', 'clear_history'));
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home'));
     return items;
   });
 
@@ -195,6 +256,15 @@ module.exports = (app) => {
             data: newData,
             pendingAction
           }));
+        } else if (feature.requiredInputs && feature.requiredInputs.length > 0) {
+          // 字典上下文已齐备，但还需要手动输入参数
+          const nextInput = feature.requiredInputs[0];
+          subtitle = `继续配置 ${feature.name} (下一步: 输入${nextInput.label})`;
+          items.push(wf.createRerunItem(title, subtitle, 'input_state', {
+            data: newData,
+            pendingAction,
+            inputIndex: 0
+          }));
         } else {
           // 上下文已齐备，直接提供执行选项
           subtitle = `配置完成，按回车直接执行 [${feature.name}]`;
@@ -215,6 +285,51 @@ module.exports = (app) => {
       items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }));
     }
 
+    return items;
+  });
+
+  /**
+   * 状态：手动输入参数 (input_state)
+   */
+  app.onState('input_state', async (context, wf) => {
+    const { data = {}, pendingAction, inputIndex = 0 } = context;
+    const query = context.query || '';
+    const items = [];
+
+    const feature = features.find(f => f.id === pendingAction);
+    if (!feature || !feature.requiredInputs || !feature.requiredInputs[inputIndex]) {
+      return [wf.createRerunItem('❌ 错误', '找不到需要输入的配置项', 'home')];
+    }
+
+    const currentInput = feature.requiredInputs[inputIndex];
+    const isLastInput = inputIndex === feature.requiredInputs.length - 1;
+
+    if (query) {
+      const newData = { ...data, [currentInput.key]: query };
+
+      if (isLastInput) {
+        items.push(wf.createItem(`✅ 确认输入: ${query}`, `配置完成，按回车直接执行 [${feature.name}]`, feature.action, {
+          data: newData,
+          historyTitle: `执行: ${feature.name}`,
+          historySubtitle: feature.description
+        }));
+      } else {
+        const nextInput = feature.requiredInputs[inputIndex + 1];
+        items.push(wf.createRerunItem(`✅ 确认输入: ${query}`, `继续配置 ${feature.name} (下一步: 输入${nextInput.label})`, 'input_state', {
+          data: newData,
+          pendingAction,
+          inputIndex: inputIndex + 1
+        }));
+      }
+    } else {
+      items.push({
+        title: `✏️ 请输入 ${currentInput.label}`,
+        subtitle: currentInput.placeholder || `在搜索框中输入内容后按回车`,
+        valid: false
+      });
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }));
     return items;
   });
 };

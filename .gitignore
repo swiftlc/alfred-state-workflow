@@ -1,4 +1,4 @@
 .idea/
 node_modules
 pnpm-lock.yaml
-history.json
+data

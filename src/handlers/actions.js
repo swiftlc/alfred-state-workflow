@@ -1,4 +1,7 @@
-const { copyToClipboard, sendNotification, openUrl } = require('../core/utils');
+const { copyToClipboard, sendNotification, openUrl, encodeContext } = require('../core/utils');
+const CacheManager = require('../core/CacheManager');
+const HistoryManager = require('../core/HistoryManager');
+const { execSync } = require('child_process');
 
 /**
  * 注册所有的执行动作 (Actions)
@@ -45,8 +48,11 @@ module.exports = (app) => {
 
   // 动作：切换环境
   app.onAction('switch_env', async (context) => {
-    const { env } = context.data;
-    const msg = `已切换到环境: ${env.name}`;
+    const { env, branch } = context.data;
+    let msg = `已切换到环境: ${env.name}`;
+    if (branch) {
+      msg += `\n分支: ${branch}`;
+    }
 
     sendNotification(msg, 'Workflow');
   });
@@ -58,6 +64,56 @@ module.exports = (app) => {
       copyToClipboard(copyValue);
       sendNotification(`已复制 ${copyName}: ${copyValue}`, '复制成功');
     }
+  });
+
+  // 动作：强制刷新缓存
+  app.onAction('refresh_cache', async (context, wf) => {
+    CacheManager.clearAll();
+    sendNotification('缓存已清空，下次查询将重新获取数据', '刷新成功');
+
+    // 重新触发 home 状态
+    const nextArg = encodeContext({ state: 'home' });
+    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
+    execSync(`osascript -e '${script}'`);
+  });
+
+  // 动作：固定/取消固定历史记录
+  app.onAction('toggle_pin', async (context, wf) => {
+    if (context.id) {
+      HistoryManager.togglePin(context.id);
+    }
+    const nextState = context.returnState || 'home';
+    const nextArg = encodeContext({ state: nextState });
+    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
+    execSync(`osascript -e '${script}'`);
+  });
+
+  // 动作：删除单条历史记录
+  app.onAction('delete_history', async (context, wf) => {
+    if (context.id) {
+      HistoryManager.deleteHistory(context.id);
+    }
+    const nextState = context.returnState || 'home';
+    const nextArg = encodeContext({ state: nextState });
+    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
+    execSync(`osascript -e '${script}'`);
+  });
+
+  // 动作：清空所有未固定的历史记录
+  app.onAction('clear_history', async (context, wf) => {
+    HistoryManager.clearAll();
+    sendNotification('未固定的历史记录已清空');
+
+    const nextArg = encodeContext({ state: 'home' });
+    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
+    execSync(`osascript -e '${script}'`);
+  });
+
+  // 动作：打开日志文件
+  app.onAction('open_log', async () => {
+    const Logger = require('../core/Logger');
+    const logFile = Logger.getLogFilePath();
+    execSync(`open "${logFile}"`);
   });
 
 };
