@@ -1,9 +1,12 @@
 const { encodeContext, decodeContext } = require('./utils');
 const { execSync, spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const TaskManager = require('./TaskManager');
 const HistoryManager = require('./HistoryManager');
 const Logger = require('./Logger');
+
+const CONTEXT_FILE = path.join(__dirname, '../../data/context.json');
 
 class Workflow {
   constructor(options = {}) {
@@ -12,6 +15,41 @@ class Workflow {
     this.states = {};
     this.actions = {};
     this.tasks = {};
+    this.ensureContextFileExists();
+  }
+
+  ensureContextFileExists() {
+    const dir = path.dirname(CONTEXT_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(CONTEXT_FILE)) {
+      fs.writeFileSync(CONTEXT_FILE, JSON.stringify({ state: 'home', data: {} }), 'utf8');
+    }
+  }
+
+  saveContext(context) {
+    try {
+      // 不保存 query，只保存状态和数据
+      const contextToSave = {
+        state: context.state || 'home',
+        data: context.data || {},
+        pendingAction: context.pendingAction,
+        inputIndex: context.inputIndex
+      };
+      fs.writeFileSync(CONTEXT_FILE, JSON.stringify(contextToSave, null, 2), 'utf8');
+    } catch (e) {
+      Logger.error('Failed to save context', e);
+    }
+  }
+
+  loadContext() {
+    try {
+      const data = fs.readFileSync(CONTEXT_FILE, 'utf8');
+      return JSON.parse(data);
+    } catch (e) {
+      return { state: 'home', data: {} };
+    }
   }
 
   /**
@@ -98,7 +136,16 @@ class Workflow {
    * 执行 Script Filter 逻辑
    */
   async runFilter(arg, query = '') {
-    const context = decodeContext(arg) || { state: 'home', data: {} };
+    // 如果没有传入 arg，说明是用户刚打开 Alfred，此时加载上次保存的上下文
+    let context;
+    if (!arg) {
+      context = this.loadContext();
+    } else {
+      context = decodeContext(arg) || { state: 'home', data: {} };
+      // 每次状态流转时保存上下文
+      this.saveContext(context);
+    }
+
     context.query = query.trim();
 
     const stateName = context.state || 'home';
@@ -149,7 +196,12 @@ class Workflow {
     // 内置的 rerun 动作，用于触发循环状态机
     if (action === 'rerun') {
       const nextState = context.nextState || 'home';
-      const nextArg = encodeContext({ state: nextState, ...context });
+      const nextContext = { state: nextState, ...context };
+
+      // 保存即将跳转的上下文
+      this.saveContext(nextContext);
+
+      const nextArg = encodeContext(nextContext);
 
       // 调用 External Trigger
       const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${this.triggerName}" in workflow "${this.bundleId}" with argument "${nextArg}"`;
@@ -174,7 +226,13 @@ class Workflow {
         }
 
         await handler(context, this);
-      } catch (err) {
+
+        // 动作执行完成后，如果不是跳转状态，通常意味着流程结束，重置上下文到 home
+        if (action !== 'toggle_pin' && action !== 'delete_history' && action !== 'refresh_cache') {
+           this.saveContext({ state: 'home', data: {} });
+        }
+      } 
+      catch (err) {
         Logger.error(`Action execution failed: ${action}`, err, { context });
         const { sendNotification } = require('./utils');
         sendNotification(`执行失败: ${err.message}`, 'Workflow Error');
