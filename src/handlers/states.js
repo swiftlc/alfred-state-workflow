@@ -1,6 +1,7 @@
 const dictService = require('../services/dictService');
 const features = require('../config/features');
 const TaskManager = require('../core/TaskManager');
+const HistoryManager = require('../core/HistoryManager');
 const { matchQuery } = require('../core/utils');
 
 const SPINNERS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -59,6 +60,25 @@ module.exports = (app) => {
     const query = context.query || '';
     const items = [];
 
+    // 0. 历史记录区 (History)
+    const history = HistoryManager.getHistory();
+    if (history.length > 0) {
+      for (const record of history) {
+        const title = `🕒 历史: ${record.title}`;
+        const subtitle = record.subtitle || '点击重新执行';
+
+        if (matchQuery(query, title, subtitle)) {
+          items.push(wf.createItem(title, subtitle, record.action, {
+            data: record.data,
+            copyValue: record.copyValue,
+            copyName: record.copyName,
+            historyTitle: record.title,
+            historySubtitle: record.subtitle
+          }));
+        }
+      }
+    }
+
     // 1. 字典选择区 (Context)
     const dicts = await dictService.getDictionaries();
     for (const dict of dicts) {
@@ -85,7 +105,9 @@ module.exports = (app) => {
               items.push(wf.createItem(title, subtitle, feature.action, {
                 data,
                 copyValue: selected.name,
-                copyName: dict.name
+                copyName: dict.name,
+                historyTitle: title,
+                historySubtitle: subtitle
               }));
             }
           }
@@ -107,7 +129,11 @@ module.exports = (app) => {
       const missingKeys = getMissingKeys(feature, data);
       if (missingKeys.length === 0) {
         // 满足条件，可直接执行
-        items.push(wf.createItem(`🚀 执行: ${feature.name}`, feature.description, feature.action, { data }));
+        items.push(wf.createItem(`🚀 执行: ${feature.name}`, feature.description, feature.action, {
+          data,
+          historyTitle: `执行: ${feature.name}`,
+          historySubtitle: feature.description
+        }));
       } else {
         // 缺少上下文，引导配置
         const missingNames = dicts.filter(d => missingKeys.includes(d.key)).map(d => d.name).join(', ');
@@ -172,7 +198,11 @@ module.exports = (app) => {
         } else {
           // 上下文已齐备，直接提供执行选项
           subtitle = `配置完成，按回车直接执行 [${feature.name}]`;
-          items.push(wf.createItem(title, subtitle, feature.action, { data: newData }));
+          items.push(wf.createItem(title, subtitle, feature.action, {
+            data: newData,
+            historyTitle: `执行: ${feature.name}`,
+            historySubtitle: feature.description
+          }));
         }
       } else {
         // 普通的选择字典，选完回到主页

@@ -2,6 +2,7 @@ const { encodeContext, decodeContext } = require('./utils');
 const { execSync, spawn } = require('child_process');
 const path = require('path');
 const TaskManager = require('./TaskManager');
+const HistoryManager = require('./HistoryManager');
 
 class Workflow {
   constructor(options = {}) {
@@ -143,6 +144,18 @@ class Workflow {
     const handler = this.actions[action];
     if (handler) {
       try {
+        // 记录历史
+        if (context.historyTitle) {
+          HistoryManager.addHistory({
+            title: context.historyTitle,
+            subtitle: context.historySubtitle,
+            action: action,
+            data: context.data,
+            copyValue: context.copyValue,
+            copyName: context.copyName
+          });
+        }
+
         await handler(context, this);
       } catch (err) {
         console.error('Action execution failed:', err);
