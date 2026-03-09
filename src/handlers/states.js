@@ -1,6 +1,7 @@
 const dictService = require('../services/dictService');
 const features = require('../config/features');
 const TaskManager = require('../core/TaskManager');
+const { matchQuery } = require('../core/utils');
 
 const SPINNERS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
@@ -55,6 +56,7 @@ module.exports = (app) => {
    */
   app.onState('home', async (context, wf) => {
     const data = context.data || {};
+    const query = context.query || '';
     const items = [];
 
     // 1. 字典选择区 (Context)
@@ -64,7 +66,9 @@ module.exports = (app) => {
       const title = selected ? `🏷️ [${dict.name}] ${selected.name}` : `📁 [${dict.name}] 未选择`;
       const subtitle = selected ? '点击重新选择' : '点击选择';
 
-      items.push(wf.createRerunItem(title, subtitle, 'select_dict', { dictKey: dict.key, data }));
+      if (matchQuery(query, dict.name, selected?.name)) {
+        items.push(wf.createRerunItem(title, subtitle, 'select_dict', { dictKey: dict.key, data }));
+      }
     }
 
     // 2. 功能矩阵区 (Features)
@@ -74,6 +78,10 @@ module.exports = (app) => {
 
       if (!hasRelevantContext) {
         continue; // 上下文完全不匹配时不展示该功能
+      }
+
+      if (!matchQuery(query, feature.name, feature.description)) {
+        continue;
       }
 
       const missingKeys = getMissingKeys(feature, data);
@@ -92,7 +100,7 @@ module.exports = (app) => {
     }
 
     // 3. 上下文管理
-    if (Object.keys(data).length > 0) {
+    if (Object.keys(data).length > 0 && matchQuery(query, '清空上下文')) {
       items.push(wf.createRerunItem('🗑️ 清空上下文', '清除所有已选择的字典数据，重新开始', 'home', { data: {} }));
     }
 
@@ -105,17 +113,28 @@ module.exports = (app) => {
    */
   app.onState('select_dict', async (context, wf) => {
     const { dictKey, data = {}, pendingAction } = context;
+    const query = context.query || '';
     const items = [];
 
-    const dictItems = await dictService.getDictionaryItems(dictKey);
+    let dictItems = await dictService.getDictionaryItems(dictKey);
     const dicts = await dictService.getDictionaries();
     const dictName = dicts.find(d => d.key === dictKey)?.name || dictKey;
+
+    if (query) {
+      dictItems = dictItems.filter(item => matchQuery(query, item.name));
+      // 增加手动输入结果
+      dictItems.unshift({
+        id: `manual_${query}`,
+        name: query,
+        isManual: true
+      });
+    }
 
     for (const item of dictItems) {
       const newData = { ...data, [dictKey]: item };
 
-      let title = `选择 ${item.name}`;
-      let subtitle = `设置为当前 ${dictName}`;
+      let title = item.isManual ? `✏️ 手动输入: ${item.name}` : `选择 ${item.name}`;
+      let subtitle = item.isManual ? `将 ${item.name} 设置为当前 ${dictName} (手动输入)` : `设置为当前 ${dictName}`;
 
       if (pendingAction) {
         const feature = features.find(f => f.id === pendingAction);
@@ -142,7 +161,9 @@ module.exports = (app) => {
     }
 
     // 返回上一级
-    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }));
+    if (matchQuery(query, '返回')) {
+      items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }));
+    }
 
     return items;
   });

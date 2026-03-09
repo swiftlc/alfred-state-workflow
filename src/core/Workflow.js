@@ -83,8 +83,9 @@ class Workflow {
   /**
    * 执行 Script Filter 逻辑
    */
-  async runFilter(arg) {
+  async runFilter(arg, query = '') {
     const context = decodeContext(arg) || { state: 'home', data: {} };
+    context.query = query.trim();
     console.error("filter上下文",context);
     const stateName = context.state || 'home';
     const handler = this.states[stateName];
