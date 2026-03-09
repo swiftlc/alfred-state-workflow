@@ -1,4 +1,5 @@
 const pinyinMatch = require('pinyin-match');
+const { execSync } = require('child_process');
 
 function encodeContext(obj) {
   return Buffer.from(JSON.stringify(obj)).toString('base64');
@@ -24,9 +25,45 @@ function matchQuery(query, ...targets) {
   return targets.some(target => target && pinyinMatch.match(target, query));
 }
 
+/**
+ * 复制内容到剪切板
+ * @param {string} text 要复制的文本
+ */
+function copyToClipboard(text) {
+  if (!text) return;
+  // 转义双引号和反斜杠，防止命令注入
+  const safeText = text.replace(/(["\\])/g, '\\$1');
+  execSync(`echo "${safeText}" | pbcopy`);
+}
+
+/**
+ * 发送系统通知
+ * @param {string} message 通知内容
+ * @param {string} [title="Alfred Workflow"] 通知标题
+ */
+function sendNotification(message, title = "Alfred Workflow") {
+  if (!message) return;
+  const safeMessage = message.replace(/(["\\])/g, '\\$1');
+  const safeTitle = title.replace(/(["\\])/g, '\\$1');
+  execSync(`osascript -e 'display notification "${safeMessage}" with title "${safeTitle}"'`);
+}
+
+/**
+ * 在默认浏览器中打开 URL
+ * @param {string} url 要打开的链接
+ */
+function openUrl(url) {
+  if (!url) return;
+  const safeUrl = url.replace(/(["\\])/g, '\\$1');
+  execSync(`open "${safeUrl}"`);
+}
+
 module.exports = {
   encodeContext,
   decodeContext,
-  matchQuery
+  matchQuery,
+  copyToClipboard,
+  sendNotification,
+  openUrl
 };
 

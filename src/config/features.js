@@ -7,6 +7,7 @@
  * - description: 功能描述
  * - requiredKeys: 该功能依赖的字典上下文（例如需要租户和泳道才能执行）
  * - action: 对应的执行动作名称（在 src/handlers/actions.js 中注册）
+ * - type: 功能类型，默认为普通功能。如果为 'global_dict_action'，则表示这是一个针对所有已选字典项的全局操作。
  */
 module.exports = [
   {
@@ -29,6 +30,14 @@ module.exports = [
     description: '切换当前工作环境',
     requiredKeys: ['env'],
     action: 'switch_env'
+  },
+  {
+    id: 'copy_dict_value',
+    name: '复制到剪切板',
+    description: '将选中的字典值复制到剪切板',
+    requiredKeys: [], // 全局字典操作不需要特定的 requiredKeys，它会根据当前已选的字典动态生成
+    action: 'copy_to_clipboard',
+    type: 'global_dict_action'
   }
 ];
 

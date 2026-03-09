@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+const { copyToClipboard, sendNotification, openUrl } = require('../core/utils');
 
 /**
  * 注册所有的执行动作 (Actions)
@@ -31,7 +31,7 @@ module.exports = (app) => {
     task.update(100, `成功登录 ${tenant.name} - ${swimlane.name}`);
 
     // 任务完成后，也可以选择发送系统通知
-    execSync(`osascript -e 'display notification "登录成功！" with title "Alfred Workflow"'`);
+    sendNotification('登录成功！');
   });
 
   // 动作：跳转泳道控制台
@@ -40,7 +40,7 @@ module.exports = (app) => {
     const url = `https://baidu.com`;
 
     // 模拟打开浏览器
-    execSync(`open "${url}"`);
+    openUrl(url);
   });
 
   // 动作：切换环境
@@ -48,7 +48,16 @@ module.exports = (app) => {
     const { env } = context.data;
     const msg = `已切换到环境: ${env.name}`;
 
-    execSync(`osascript -e 'display notification "${msg}" with title "Workflow"'`);
+    sendNotification(msg, 'Workflow');
+  });
+
+  // 动作：复制到剪切板
+  app.onAction('copy_to_clipboard', async (context) => {
+    const { copyValue, copyName } = context;
+    if (copyValue) {
+      copyToClipboard(copyValue);
+      sendNotification(`已复制 ${copyName}: ${copyValue}`, '复制成功');
+    }
   });
 
 };

@@ -73,6 +73,26 @@ module.exports = (app) => {
 
     // 2. 功能矩阵区 (Features)
     for (const feature of features) {
+      if (feature.type === 'global_dict_action') {
+        // 处理全局字典操作类型的 feature
+        for (const dict of dicts) {
+          const selected = data[dict.key];
+          if (selected) {
+            const title = `📋 复制 ${dict.name}: ${selected.name}`;
+            const subtitle = `将 ${dict.name} [${selected.name}] 复制到剪切板`;
+
+            if (matchQuery(query, title, subtitle)) {
+              items.push(wf.createItem(title, subtitle, feature.action, {
+                data,
+                copyValue: selected.name,
+                copyName: dict.name
+              }));
+            }
+          }
+        }
+        continue;
+      }
+
       // 规则：如果该功能不需要任何上下文，或者当前上下文中至少包含一个该功能所需的上下文，则展示
       const hasRelevantContext = feature.requiredKeys.length === 0 || feature.requiredKeys.some(key => data[key]);
 
