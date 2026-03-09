@@ -1,6 +1,7 @@
 const { copyToClipboard, sendNotification, openUrl, encodeContext } = require('../core/utils');
 const CacheManager = require('../core/CacheManager');
 const HistoryManager = require('../core/HistoryManager');
+const TaskManager = require('../core/TaskManager');
 const { execSync } = require('child_process');
 
 /**
@@ -51,7 +52,7 @@ module.exports = (app) => {
     const { env, branch } = context.data;
     let msg = `已切换到环境: ${env.name}`;
     if (branch) {
-      msg += `\n分支: ${branch}`;
+      msg += `，分支: ${branch}`;
     }
 
     sendNotification(msg, 'Workflow');
@@ -114,6 +115,20 @@ module.exports = (app) => {
     const Logger = require('../core/Logger');
     const logFile = Logger.getLogFilePath();
     execSync(`open "${logFile}"`);
+  });
+
+  // 动作：取消后台任务
+  app.onAction('cancel_task', async (context, wf) => {
+    const { jobId } = context;
+    if (jobId) {
+      TaskManager.updateTask(jobId, { status: 'cancelled', message: '任务已取消' });
+      sendNotification('后台任务已取消');
+    }
+
+    // 返回主页
+    const nextArg = encodeContext({ state: 'home' });
+    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
+    execSync(`osascript -e '${script}'`);
   });
 
 };

@@ -35,8 +35,15 @@ module.exports = (app) => {
         items: [
           {
             title: `${spinner} ${task.progress}% - ${task.message}`,
-            subtitle: '任务执行中，请稍候...',
-            valid: false // 禁止用户按回车打断
+            subtitle: '任务执行中，请稍候... (按 Cmd+Enter 取消任务)',
+            valid: false, // 禁止用户按回车打断
+            mods: {
+              cmd: {
+                subtitle: '🛑 取消任务',
+                arg: wf.createItem('', '', 'cancel_task', { jobId }).arg,
+                valid: true
+              }
+            }
           }
         ]
       };
