@@ -23,7 +23,7 @@ module.exports = (app) => {
     const task = TaskManager.getTask(jobId);
 
     if (!task) {
-      return [wf.createRerunItem('❌ 错误', '找不到任务信息', 'home')];
+      return [wf.createRerunItem('❌ 错误', '找不到任务信息', 'home', { data: context.data })];
     }
 
     if (task.status === 'running') {
@@ -40,7 +40,7 @@ module.exports = (app) => {
             mods: {
               cmd: {
                 subtitle: '🛑 取消任务',
-                arg: wf.createItem('', '', 'cancel_task', { jobId }).arg,
+                arg: wf.createItem('', '', 'cancel_task', { jobId, data: context.data }).arg,
                 valid: true
               }
             }
@@ -49,11 +49,11 @@ module.exports = (app) => {
       };
     } else if (task.status === 'done') {
       return [
-        wf.createRerunItem(`✅ ${task.message || '执行完成'}`, '按回车返回主菜单', 'home')
+        wf.createRerunItem(`✅ ${task.message || '执行完成'}`, '按回车返回主菜单', 'home', { data: context.data })
       ];
     } else {
       return [
-        wf.createRerunItem(`❌ 执行失败: ${task.message}`, '按回车返回主菜单', 'home')
+        wf.createRerunItem(`❌ 执行失败: ${task.message}`, '按回车返回主菜单', 'home', { data: context.data })
       ];
     }
   });
@@ -217,7 +217,7 @@ module.exports = (app) => {
       items.push(wf.createItem('🗑️ 清空所有历史记录', '删除所有未固定的历史记录', 'clear_history'));
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home'));
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data: context.data }));
     return items;
   });
 

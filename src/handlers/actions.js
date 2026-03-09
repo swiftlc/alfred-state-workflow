@@ -73,7 +73,7 @@ module.exports = (app) => {
     sendNotification('缓存已清空，下次查询将重新获取数据', '刷新成功');
 
     // 重新触发 home 状态
-    const nextArg = encodeContext({ state: 'home' });
+    const nextArg = encodeContext({ state: 'home', data: context.data });
     const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
     execSync(`osascript -e '${script}'`);
   });
@@ -84,7 +84,7 @@ module.exports = (app) => {
       HistoryManager.togglePin(context.id);
     }
     const nextState = context.returnState || 'home';
-    const nextArg = encodeContext({ state: nextState });
+    const nextArg = encodeContext({ state: nextState, data: context.data });
     const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
     execSync(`osascript -e '${script}'`);
   });
@@ -95,7 +95,7 @@ module.exports = (app) => {
       HistoryManager.deleteHistory(context.id);
     }
     const nextState = context.returnState || 'home';
-    const nextArg = encodeContext({ state: nextState });
+    const nextArg = encodeContext({ state: nextState, data: context.data });
     const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
     execSync(`osascript -e '${script}'`);
   });
@@ -105,7 +105,7 @@ module.exports = (app) => {
     HistoryManager.clearAll();
     sendNotification('未固定的历史记录已清空');
 
-    const nextArg = encodeContext({ state: 'home' });
+    const nextArg = encodeContext({ state: 'home', data: context.data });
     const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
     execSync(`osascript -e '${script}'`);
   });
@@ -126,7 +126,7 @@ module.exports = (app) => {
     }
 
     // 返回主页
-    const nextArg = encodeContext({ state: 'home' });
+    const nextArg = encodeContext({ state: 'home', data: context.data });
     const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
     execSync(`osascript -e '${script}'`);
   });

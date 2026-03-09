@@ -35,7 +35,8 @@ class Workflow {
         state: context.state || 'home',
         data: context.data || {},
         pendingAction: context.pendingAction,
-        inputIndex: context.inputIndex
+        inputIndex: context.inputIndex,
+        jobId: context.jobId
       };
       fs.writeFileSync(CONTEXT_FILE, JSON.stringify(contextToSave, null, 2), 'utf8');
     } catch (e) {
@@ -83,6 +84,7 @@ class Workflow {
    * 启动一个后台任务并跳转到进度展示状态
    */
   startTask(taskName, context) {
+    this._stateChanged = true;
     const jobId = `job_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     TaskManager.initTask(jobId, taskName);
 
@@ -97,7 +99,7 @@ class Workflow {
     child.unref();
 
     // 触发 Alfred 重新打开 Script Filter 并进入 progress 状态
-    const nextArg = encodeContext({ state: 'progress', jobId });
+    const nextArg = encodeContext({ state: 'progress', jobId, data: context.data });
     const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${this.triggerName}" in workflow "${this.bundleId}" with argument "${nextArg}"`;
     execSync(`osascript -e '${script}'`);
   }
@@ -227,9 +229,9 @@ class Workflow {
 
         await handler(context, this);
 
-        // 动作执行完成后，如果不是跳转状态，通常意味着流程结束，重置上下文到 home
-        if (action !== 'toggle_pin' && action !== 'delete_history' && action !== 'refresh_cache') {
-           this.saveContext({ state: 'home', data: {} });
+        // 动作执行完成后，如果不是跳转状态，通常意味着流程结束，重置状态到 home，但保留已选的数据上下文
+        if (!this._stateChanged && action !== 'toggle_pin' && action !== 'delete_history' && action !== 'refresh_cache') {
+           this.saveContext({ state: 'home', data: context.data || {} });
         }
       } 
       catch (err) {
