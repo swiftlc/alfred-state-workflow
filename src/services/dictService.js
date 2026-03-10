@@ -21,9 +21,9 @@ const DICTS = [
 
 const DICT_ITEMS = {
   tenant: [
-    { id: 't-001', name: '美团外卖 (t-001)' },
-    { id: 't-002', name: '大众点评 (t-002)' },
-    { id: 't-003', name: '美团优选 (t-003)' }
+    { id: 't-001', name: '租户张三 (t-001)' },
+    { id: 't-002', name: '租户李四 (t-002)' },
+    { id: 't-003', name: '租户王五 (t-003)' }
   ],
   swimlane: [
     { id: 'base', name: '基础泳道 (base)' },

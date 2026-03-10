@@ -1,3 +1,5 @@
+const PluginManager = require('../core/PluginManager');
+
 /**
  * 功能矩阵配置
  *
@@ -9,7 +11,7 @@
  * - action: 对应的执行动作名称（在 src/handlers/actions.js 中注册）
  * - type: 功能类型，默认为普通功能。如果为 'global_dict_action'，则表示这是一个针对所有已选字典项的全局操作。
  */
-module.exports = [
+const builtInFeatures = [
     {
         id: 'tenant_swimlane_login',
         name: '租户泳道登录',
@@ -44,4 +46,7 @@ module.exports = [
         type: 'global_dict_action'
     }
 ];
+
+// 合并内置功能和插件功能
+module.exports = [...builtInFeatures, ...PluginManager.getFeatures()];
 
