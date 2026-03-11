@@ -74,8 +74,7 @@ module.exports = (app) => {
 
     // 重新触发 home 状态
     const nextArg = encodeContext({ state: 'home', data: context.data });
-    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
-    execSync(`osascript -e '${script}'`);
+    wf.triggerAlfred(nextArg);
   });
 
   // 动作：固定/取消固定历史记录
@@ -85,8 +84,7 @@ module.exports = (app) => {
     }
     const nextState = context.returnState || 'home';
     const nextArg = encodeContext({ state: nextState, data: context.data });
-    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
-    execSync(`osascript -e '${script}'`);
+    wf.triggerAlfred(nextArg);
   });
 
   // 动作：删除单条历史记录
@@ -96,8 +94,7 @@ module.exports = (app) => {
     }
     const nextState = context.returnState || 'home';
     const nextArg = encodeContext({ state: nextState, data: context.data });
-    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
-    execSync(`osascript -e '${script}'`);
+    wf.triggerAlfred(nextArg);
   });
 
   // 动作：清空所有未固定的历史记录
@@ -106,8 +103,7 @@ module.exports = (app) => {
     sendNotification('未固定的历史记录已清空');
 
     const nextArg = encodeContext({ state: 'home', data: context.data });
-    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
-    execSync(`osascript -e '${script}'`);
+    wf.triggerAlfred(nextArg);
   });
 
   // 动作：打开日志文件
@@ -127,8 +123,7 @@ module.exports = (app) => {
 
     // 返回主页
     const nextArg = encodeContext({ state: 'home', data: context.data });
-    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${wf.triggerName}" in workflow "${wf.bundleId}" with argument "${nextArg}"`;
-    execSync(`osascript -e '${script}'`);
+    wf.triggerAlfred(nextArg);
   });
 
 };

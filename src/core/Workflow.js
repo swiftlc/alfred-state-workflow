@@ -18,6 +18,19 @@ class Workflow {
     this.ensureContextFileExists();
   }
 
+  /**
+   * 触发 Alfred 的 External Trigger
+   * @param {string} arg 传递给 Alfred 的参数
+   */
+  triggerAlfred(arg) {
+    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${this.triggerName}" in workflow "${this.bundleId}" with argument "${arg}"`;
+    try {
+      execSync(`osascript -e '${script}'`);
+    } catch (e) {
+      Logger.error('Failed to trigger Alfred', e);
+    }
+  }
+
   ensureContextFileExists() {
     const dir = path.dirname(CONTEXT_FILE);
     if (!fs.existsSync(dir)) {
@@ -100,8 +113,7 @@ class Workflow {
 
     // 触发 Alfred 重新打开 Script Filter 并进入 progress 状态
     const nextArg = encodeContext({ state: 'progress', jobId, data: context.data });
-    const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${this.triggerName}" in workflow "${this.bundleId}" with argument "${nextArg}"`;
-    execSync(`osascript -e '${script}'`);
+    this.triggerAlfred(nextArg);
   }
 
   /**
@@ -206,8 +218,7 @@ class Workflow {
       const nextArg = encodeContext(nextContext);
 
       // 调用 External Trigger
-      const script = `tell application id "com.runningwithcrayons.Alfred" to run trigger "${this.triggerName}" in workflow "${this.bundleId}" with argument "${nextArg}"`;
-      execSync(`osascript -e '${script}'`);
+      this.triggerAlfred(nextArg);
       return;
     }
 
