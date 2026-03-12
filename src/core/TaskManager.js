@@ -34,6 +34,48 @@ class TaskManager {
     }
     return null;
   }
+
+  static getAllTasks() {
+    const tasks = [];
+    const files = fs.readdirSync(JOBS_DIR);
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        try {
+          const data = JSON.parse(fs.readFileSync(path.join(JOBS_DIR, file), 'utf8'));
+          tasks.push(data);
+        } catch (e) {
+          // Ignore invalid files
+        }
+      }
+    }
+    // Sort by creation time (extracted from jobId: job_timestamp_random)
+    return tasks.sort((a, b) => {
+      const timeA = parseInt(a.id.split('_')[1]) || 0;
+      const timeB = parseInt(b.id.split('_')[1]) || 0;
+      return timeB - timeA; // Newest first
+    });
+  }
+
+  static clearTasks(statusFilter = null) {
+    const files = fs.readdirSync(JOBS_DIR);
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        try {
+          if (statusFilter) {
+            const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            if (data.status === statusFilter || (Array.isArray(statusFilter) && statusFilter.includes(data.status))) {
+              fs.unlinkSync(filePath);
+            }
+          } else {
+            fs.unlinkSync(filePath);
+          }
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+    }
+  }
 }
 
 module.exports = TaskManager;

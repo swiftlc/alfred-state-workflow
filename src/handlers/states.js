@@ -35,8 +35,9 @@ module.exports = (app) => {
         items: [
           {
             title: `${spinner} ${task.progress}% - ${task.message}`,
-            subtitle: '任务执行中，请稍候... (按 Cmd+Enter 取消任务)',
-            valid: false, // 禁止用户按回车打断
+            subtitle: '任务执行中，请稍候... (按回车后台执行，按 Cmd+Enter 取消任务)',
+            arg: wf.createItem('', '', 'rerun', { nextState: 'home', data: context.data }).arg,
+            valid: true, // 允许用户按回车打断并返回主页
             mods: {
               cmd: {
                 subtitle: '🛑 取消任务',
@@ -67,7 +68,18 @@ module.exports = (app) => {
     const query = context.query || '';
     const items = [];
 
-    // 0. 历史记录区 (History)
+    // 0. 任务中心入口 (如果有任务)
+    const tasks = TaskManager.getAllTasks();
+    if (tasks.length > 0) {
+      const runningCount = tasks.filter(t => t.status === 'running').length;
+      const title = runningCount > 0 ? `⏳ 任务中心 (${runningCount}个运行中)` : `📋 任务中心 (${tasks.length}个历史任务)`;
+      const subtitle = '查看和管理后台任务';
+      if (matchQuery(query, '任务中心', 'task')) {
+        items.push(wf.createRerunItem(title, subtitle, 'task_manage', { data }));
+      }
+    }
+
+    // 1. 历史记录区 (History)
     const history = HistoryManager.getHistory();
     // 主页展示所有固定的历史，以及最多3条未固定的历史
     const pinnedHistory = history.filter(h => h.isPinned);
@@ -219,6 +231,72 @@ module.exports = (app) => {
 
     items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data: context.data }));
     return items;
+  });
+
+  /**
+   * 状态：任务管理 (task_manage)
+   */
+  app.onState('task_manage', async (context, wf) => {
+    const query = context.query || '';
+    const items = [];
+    const tasks = TaskManager.getAllTasks();
+
+    if (tasks.length === 0) {
+      return [wf.createRerunItem('暂无后台任务', '按回车返回主菜单', 'home', { data: context.data })];
+    }
+
+    let hasRunning = false;
+    let hasDoneOrError = false;
+
+    for (const task of tasks) {
+      let icon = '⏳';
+      let subtitle = '';
+      let action = 'rerun';
+      let payload = { nextState: 'progress', jobId: task.id, data: context.data };
+      let mods = {};
+
+      if (task.status === 'running') {
+        hasRunning = true;
+        const spinner = SPINNERS[(task.spinnerIdx || 0) % SPINNERS.length];
+        icon = spinner;
+        subtitle = `[运行中] ${task.progress}% - ${task.message} (回车查看进度，Cmd取消)`;
+        mods = {
+          cmd: { subtitle: '🛑 取消任务', action: 'cancel_task', payload: { jobId: task.id, returnState: 'task_manage' } }
+        };
+      } else if (task.status === 'done') {
+        hasDoneOrError = true;
+        icon = '✅';
+        subtitle = `[已完成] ${task.message} (回车清除记录)`;
+        action = 'clear_task';
+        payload = { jobId: task.id, returnState: 'task_manage' };
+      } else if (task.status === 'error') {
+        hasDoneOrError = true;
+        icon = '❌';
+        subtitle = `[失败] ${task.message} (回车清除记录)`;
+        action = 'clear_task';
+        payload = { jobId: task.id, returnState: 'task_manage' };
+      } else if (task.status === 'cancelled') {
+        hasDoneOrError = true;
+        icon = '🛑';
+        subtitle = `[已取消] ${task.message} (回车清除记录)`;
+        action = 'clear_task';
+        payload = { jobId: task.id, returnState: 'task_manage' };
+      }
+
+      const title = `${icon} 任务: ${task.name}`;
+
+      if (matchQuery(query, title, subtitle)) {
+        items.push(wf.createItem(title, subtitle, action, payload, mods));
+      }
+    }
+
+    if (hasDoneOrError && matchQuery(query, '清除已完成任务')) {
+      items.push(wf.createItem('🧹 清除所有已结束任务', '清除所有已完成、失败或取消的任务记录', 'clear_all_tasks', { returnState: 'task_manage' }));
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data: context.data }));
+
+    return hasRunning ? { rerun: 1, items } : items;
   });
 
   /**

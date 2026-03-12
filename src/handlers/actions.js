@@ -115,14 +115,40 @@ module.exports = (app) => {
 
   // 动作：取消后台任务
   app.onAction('cancel_task', async (context, wf) => {
-    const { jobId } = context;
+    const { jobId, returnState } = context;
     if (jobId) {
       TaskManager.updateTask(jobId, { status: 'cancelled', message: '任务已取消' });
       sendNotification('后台任务已取消');
     }
 
-    // 返回主页
-    const nextArg = encodeContext({ state: 'home', data: context.data });
+    const nextState = returnState || 'home';
+    const nextArg = encodeContext({ state: nextState, data: context.data });
+    wf.triggerAlfred(nextArg);
+  });
+
+  // 动作：清除单条任务记录
+  app.onAction('clear_task', async (context, wf) => {
+    const { jobId, returnState } = context;
+    if (jobId) {
+      const fs = require('fs');
+      const file = TaskManager.getJobFile(jobId);
+      if (fs.existsSync(file)) {
+        fs.unlinkSync(file);
+      }
+    }
+
+    const nextState = returnState || 'task_manage';
+    const nextArg = encodeContext({ state: nextState, data: context.data });
+    wf.triggerAlfred(nextArg);
+  });
+
+  // 动作：清除所有已结束的任务记录
+  app.onAction('clear_all_tasks', async (context, wf) => {
+    TaskManager.clearTasks(['done', 'error', 'cancelled']);
+    sendNotification('已清除所有结束的任务记录');
+
+    const nextState = context.returnState || 'task_manage';
+    const nextArg = encodeContext({ state: nextState, data: context.data });
     wf.triggerAlfred(nextArg);
   });
 
