@@ -3,6 +3,8 @@ const CacheManager = require('../core/CacheManager');
 const HistoryManager = require('../core/HistoryManager');
 const TaskManager = require('../core/TaskManager');
 const {execSync} = require('child_process');
+const {http} = require('../core/HttpClient');
+const Logger = require('../core/Logger');
 
 /**
  * 注册所有的执行动作 (Actions)
@@ -16,32 +18,48 @@ module.exports = (app) => {
         wf.startTask('login_task', context);
     });
 
+    const ssoUrl = 'http://www.swiftlc.com/api/sso';
+
     // 注册后台任务的具体执行逻辑
     app.onTask('login_task', async (task, context) => {
         const {tenant, swimlane} = context.data;
+        Logger.info('执行后台任务: login_task', context)
 
-        task.update(10, '正在连接租户服务...');
-        await new Promise(r => setTimeout(r, 1000)); // 模拟耗时
+        const proxyDest = `https://${swimlane.value}-sl-management.shangou.test.meituan.com/api/sac/account/createManagerAndRelTenant?u2dhn6k=7c5a6586a4650cdbf81a6858dd3cffad&yodaReady=h5&csecplatform=4&csecversion=4.2.0`;
+        task.update(10, `配置sso账号关联...`);
+        const data = await http.post(ssoUrl, {tenantId: tenant.value}, {
+            headers: {
+                'Content-Type': 'application/json',
+                'x-proxy-dest': proxyDest
+            }
+        })
 
-        task.update(30, `正在验证租户 [${tenant.name}] 权限...`);
-        await new Promise(r => setTimeout(r, 1500));
-
-        task.update(60, `正在切换至泳道 [${swimlane.name}]...`);
-        await new Promise(r => setTimeout(r, 1500));
-
-        task.update(90, '正在初始化工作区...');
-        await new Promise(r => setTimeout(r, 1000));
-
-        task.update(100, `成功登录 ${tenant.name} - ${swimlane.name}`);
-
-        // 任务完成后，也可以选择发送系统通知
-        sendNotification('登录成功！');
+        if (data.code === 0) {
+            const targetUrl = `https://${swimlane.value}-sl-qnh.shangou.test.meituan.com/api/v1/sso/loginRedirect`;
+            task.update(100, `执行跳转 ${tenant.value} - ${swimlane.value}`);
+            await openUrl(targetUrl);
+            // 任务完成后，也可以选择发送系统通知
+            sendNotification('登录成功！');
+        } else {
+            task.update(100, `登录失败: ${data.message || '未知错误'}`);
+        }
     });
 
-    // 动作：跳转泳道控制台
-    app.onAction('open_console', async (context) => {
+    // 动作：跳转牵牛花管理
+    app.onAction('jump_qnh_management', async (context) => {
         const {swimlane} = context.data;
-        const url = `https://baidu.com`;
+
+        const url = `https://${swimlane.value}-sl-management.shangou.test.meituan.com/`;
+
+        // 模拟打开浏览器
+        openUrl(url);
+    });
+
+    // 动作：跳转牵牛花管理
+    app.onAction('jump_qnh', async (context) => {
+        const {swimlane} = context.data;
+
+        const url = `https://${swimlane.value}-sl-qnh.shangou.test.meituan.com/`;
 
         // 模拟打开浏览器
         openUrl(url);

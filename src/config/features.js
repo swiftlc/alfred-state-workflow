@@ -14,17 +14,24 @@ const PluginManager = require('../core/PluginManager');
 const builtInFeatures = [
     {
         id: 'tenant_swimlane_login',
-        name: '租户泳道登录',
-        description: '登录到指定的租户和泳道',
+        name: '🚀租户泳道登录',
+        description: '',
         requiredKeys: ['tenant', 'swimlane'],
         action: 'login'
     },
     {
-        id: 'jump_console',
-        name: '跳转泳道控制台',
-        description: '打开当前泳道的控制台页面',
+        id: 'jump_qnh_management',
+        name: '🌐 牵牛花M端跳转',
+        description: '',
         requiredKeys: ['swimlane'],
-        action: 'open_console'
+        action: 'jump_qnh_management'
+    },
+    {
+        id: 'jump_qnh',
+        name: '🌐 牵牛花跳转',
+        description: '',
+        requiredKeys: ['swimlane'],
+        action: 'jump_qnh'
     },
     {
         id: 'switch_env',
@@ -54,7 +61,6 @@ const builtInFeatures = [
     {
         id: 'copy_dict_value',
         name: '复制到剪切板',
-        description: '将选中的字典值复制到剪切板',
         requiredKeys: [], // 全局字典操作不需要特定的 requiredKeys，它会根据当前已选的字典动态生成
         action: 'copy_to_clipboard',
         type: 'global_dict_action',
