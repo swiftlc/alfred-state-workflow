@@ -46,9 +46,22 @@ class DictService {
     return CacheManager.get(
       'dicts_list',
       async () => {
-        // 模拟网络延迟
-        await new Promise(r => setTimeout(r, 200));
-        return DICTS;
+        try {
+          const response = await http.get('http://127.0.0.1:8083/categories');
+          if (response && response.code === 0 && Array.isArray(response.data)) {
+            // 将 ["泳道", "租户"] 映射为 [{ key: '泳道', name: '泳道' }, ...]
+            // 注意：这里为了兼容旧代码，如果 API 返回的是中文，key 和 name 都使用中文
+            // 如果需要映射为英文 key，可以在这里做转换
+            return response.data.map(category => ({
+              key: category.key,
+              name: category.name,
+            }));
+          }
+          return DICTS; // 降级使用本地数据
+        } catch (error) {
+          console.error('Failed to fetch dictionaries:', error);
+          return DICTS; // 降级使用本地数据
+        }
       },
       24 * 60 * 60 * 1000 // 缓存 24 小时
     );
@@ -62,9 +75,29 @@ class DictService {
     return CacheManager.get(
       `dict_items_${dictKey}`,
       async () => {
-        // 模拟网络延迟
-        await new Promise(r => setTimeout(r, 200));
-        return DICT_ITEMS[dictKey] || [];
+        try {
+          // 注意：如果 dictKey 是中文，axios 会自动进行 urlencode
+          const response = await http.get('http://127.0.0.1:8083/dictionaries', {
+            params: { categoryKey: dictKey }
+          });
+
+          if (response && response.code === 0 && Array.isArray(response.data)) {
+            // 将 API 返回的格式映射为工作流需要的格式
+            // API: { id, category, title, description, value, ... }
+            // Workflow: { id, name, description, value }
+            return response.data.map(item => ({
+              id: item.id,
+              name: item.title || item.value, // 优先使用 title 作为展示名称
+              description: item.description || item.value, // 补充描述信息
+              value: item.value, // 保留原始 value 供后续使用
+              raw: item // 保留原始数据
+            }));
+          }
+          return DICT_ITEMS[dictKey] || []; // 降级使用本地数据
+        } catch (error) {
+          console.error(`Failed to fetch items for ${dictKey}:`, error);
+          return DICT_ITEMS[dictKey] || []; // 降级使用本地数据
+        }
       },
       5 * 60 * 1000 // 缓存 5 分钟
     );

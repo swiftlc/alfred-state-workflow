@@ -325,8 +325,8 @@ module.exports = (app) => {
     for (const item of dictItems) {
       const newData = { ...data, [dictKey]: item };
 
-      let title = item.isManual ? `✏️ 手动输入: ${item.name}` : `选择 ${item.name}`;
-      let subtitle = item.isManual ? `将 ${item.name} 设置为当前 ${dictName} (手动输入)` : `设置为当前 ${dictName}`;
+      let title = item.isManual ? `✏️ 手动输入: ${item.name}` : `${item.name}`;
+      let subtitle = item.isManual ? `将 ${item.name} 设置为当前 ${dictName} (手动输入)` : `${item.value}  ${item.description}`;
 
       if (pendingAction) {
         const feature = features.find(f => f.id === pendingAction);
