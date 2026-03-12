@@ -234,15 +234,16 @@ class Workflow {
     const handler = this.actions[action];
     if (handler) {
       try {
-        // 记录历史
-        if (context.historyTitle) {
+        // 记录历史 (如果 context.recordHistory 不为 false)
+        if (context.historyTitle && context.recordHistory !== false) {
           HistoryManager.addHistory({
             title: context.historyTitle,
             subtitle: context.historySubtitle,
             action: action,
             data: context.data,
             copyValue: context.copyValue,
-            copyName: context.copyName
+            copyName: context.copyName,
+            copyKey: context.copyKey
           });
         }
 

@@ -137,7 +137,8 @@ module.exports = (app) => {
                 data,
                 copyKey: dict.key,
                 historyTitle: title,
-                historySubtitle: subtitle
+                historySubtitle: subtitle,
+                recordHistory: feature.recordHistory !== false // 默认支持历史记录
               }));
             }
           }
@@ -171,7 +172,8 @@ module.exports = (app) => {
           items.push(wf.createItem(`🚀 执行: ${feature.name}`, feature.description, feature.action, {
             data,
             historyTitle: `执行: ${feature.name}`,
-            historySubtitle: feature.description
+            historySubtitle: feature.description,
+            recordHistory: feature.recordHistory !== false // 默认支持历史记录
           }));
         }
       } else {
@@ -355,7 +357,8 @@ module.exports = (app) => {
           items.push(wf.createItem(title, subtitle, feature.action, {
             data: newData,
             historyTitle: `执行: ${feature.name}`,
-            historySubtitle: feature.description
+            historySubtitle: feature.description,
+            recordHistory: feature.recordHistory !== false // 默认支持历史记录
           }));
         }
       } else {
@@ -418,7 +421,8 @@ module.exports = (app) => {
               items.push(wf.createItem(title, `配置完成，按回车直接执行 [${feature.name}] - ${subtitle}`, feature.action, {
                 data: newData,
                 historyTitle: `执行: ${feature.name}`,
-                historySubtitle: feature.description
+                historySubtitle: feature.description,
+                recordHistory: feature.recordHistory !== false // 默认支持历史记录
               }));
             } else {
               const nextInput = feature.requiredInputs[inputIndex + 1];
@@ -442,7 +446,8 @@ module.exports = (app) => {
           items.push(wf.createItem(`✅ 确认输入: ${query}`, `配置完成，按回车直接执行 [${feature.name}]`, feature.action, {
             data: newData,
             historyTitle: `执行: ${feature.name}`,
-            historySubtitle: feature.description
+            historySubtitle: feature.description,
+            recordHistory: feature.recordHistory !== false // 默认支持历史记录
           }));
         } else {
           const nextInput = feature.requiredInputs[inputIndex + 1];

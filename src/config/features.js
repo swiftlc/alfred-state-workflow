@@ -57,7 +57,8 @@ const builtInFeatures = [
         description: '将选中的字典值复制到剪切板',
         requiredKeys: [], // 全局字典操作不需要特定的 requiredKeys，它会根据当前已选的字典动态生成
         action: 'copy_to_clipboard',
-        type: 'global_dict_action'
+        type: 'global_dict_action',
+        recordHistory: false // 不记录到历史中
     }
 ];
 
