@@ -409,7 +409,9 @@ module.exports = (app) => {
           });
         } else {
           for (const opt of options) {
-            const newData = { ...data, [currentInput.key]: opt.name };
+            // 如果是手动输入，构造一个基本的对象；如果是接口返回的，直接使用整个对象
+            const optValue = opt.isManual ? { name: opt.name, value: opt.name, isManual: true } : opt;
+            const newData = { ...data, [currentInput.key]: optValue };
             const title = opt.isManual ? `✏️ 手动输入: ${opt.name}` : `选择: ${opt.name}`;
             const subtitle = opt.description || `设置为 ${currentInput.label}`;
 
@@ -435,7 +437,7 @@ module.exports = (app) => {
     } else {
       // 纯手动输入模式
       if (query) {
-        const newData = { ...data, [currentInput.key]: query };
+        const newData = { ...data, [currentInput.key]: { name: query, value: query, isManual: true } };
 
         if (isLastInput) {
           items.push(wf.createItem(`✅ 确认输入: ${query}`, `配置完成，按回车直接执行 [${feature.name}]`, feature.action, {

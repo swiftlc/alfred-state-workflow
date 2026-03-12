@@ -82,15 +82,14 @@ class DictService {
           });
 
           if (response && response.code === 0 && Array.isArray(response.data)) {
-            // 将 API 返回的格式映射为工作流需要的格式
-            // API: { id, category, title, description, value, ... }
-            // Workflow: { id, name, description, value }
+            // 将 API 返回的格式映射为工作流需要的格式，同时保留所有原始字段
+            // 这样在后续的 action 中可以直接通过 context.data[dictKey].xxx 访问原始数据
             return response.data.map(item => ({
+              ...item, // 展开所有原始字段
               id: item.id,
               name: item.title || item.value, // 优先使用 title 作为展示名称
               description: item.description || item.value, // 补充描述信息
-              value: item.value, // 保留原始 value 供后续使用
-              raw: item // 保留原始数据
+              value: item.value // 保留原始 value 供后续使用
             }));
           }
           return DICT_ITEMS[dictKey] || []; // 降级使用本地数据
