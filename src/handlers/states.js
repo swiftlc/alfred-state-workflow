@@ -90,7 +90,24 @@ module.exports = (app) => {
       for (const record of displayHistory) {
         const icon = record.isPinned ? '📌' : '🕒';
         const title = `${icon} 历史: ${record.title}`;
-        const subtitle = record.subtitle || '点击重新执行';
+
+        // 格式化上下文信息作为副标题
+        let contextInfo = '';
+        if (record.data && Object.keys(record.data).length > 0) {
+          const parts = [];
+          for (const [key, value] of Object.entries(record.data)) {
+            if (value && value.name) {
+              parts.push(value.name);
+            } else if (typeof value === 'string') {
+              parts.push(value);
+            }
+          }
+          if (parts.length > 0) {
+            contextInfo = `[${parts.join(', ')}]`;
+          }
+        }
+
+        const subtitle = contextInfo || '点击重新执行';
 
         if (matchQuery(query, title, subtitle)) {
           items.push(wf.createItem(title, subtitle, record.action, {
@@ -210,7 +227,24 @@ module.exports = (app) => {
     for (const record of history) {
       const icon = record.isPinned ? '📌' : '🕒';
       const title = `${icon} ${record.title}`;
-      const subtitle = `[回车]执行 [Cmd]${record.isPinned ? '取消固定' : '固定'} [Alt]删除`;
+
+      // 格式化上下文信息作为副标题
+      let contextInfo = '';
+      if (record.data && Object.keys(record.data).length > 0) {
+        const parts = [];
+        for (const [key, value] of Object.entries(record.data)) {
+          if (value && value.name) {
+            parts.push(value.name);
+          } else if (typeof value === 'string') {
+            parts.push(value);
+          }
+        }
+        if (parts.length > 0) {
+          contextInfo = `[${parts.join(', ')}] `;
+        }
+      }
+
+      const subtitle = contextInfo + `[回车]执行 [Cmd]${record.isPinned ? '取消固定' : '固定'} [Alt]删除`;
 
       if (matchQuery(query, title, record.subtitle)) {
         items.push(wf.createItem(title, subtitle, record.action, {
