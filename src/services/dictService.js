@@ -12,6 +12,7 @@
  */
 
 const CacheManager = require('../core/CacheManager');
+const { http } = require('../core/HttpClient');
 
 const DICTS = [
   { key: 'tenant', name: '租户' },
