@@ -135,8 +135,7 @@ module.exports = (app) => {
             if (matchQuery(query, title, subtitle)) {
               items.push(wf.createItem(title, subtitle, feature.action, {
                 data,
-                copyValue: selected.name,
-                copyName: dict.name,
+                copyKey: dict.key,
                 historyTitle: title,
                 historySubtitle: subtitle
               }));
