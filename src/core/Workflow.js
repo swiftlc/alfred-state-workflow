@@ -49,7 +49,8 @@ class Workflow {
         data: context.data || {},
         pendingAction: context.pendingAction,
         inputIndex: context.inputIndex,
-        jobId: context.jobId
+        jobId: context.jobId,
+        timestamp: Date.now()
       };
       fs.writeFileSync(CONTEXT_FILE, JSON.stringify(contextToSave, null, 2), 'utf8');
     } catch (e) {
@@ -60,7 +61,14 @@ class Workflow {
   loadContext() {
     try {
       const data = fs.readFileSync(CONTEXT_FILE, 'utf8');
-      return JSON.parse(data);
+      const context = JSON.parse(data);
+
+      // 如果上下文保存时间超过 1 分钟 (60000 毫秒)，则清空数据
+      if (context.timestamp && (Date.now() - context.timestamp > 60000)) {
+        return { state: 'home', data: {} };
+      }
+
+      return context;
     } catch (e) {
       return { state: 'home', data: {} };
     }

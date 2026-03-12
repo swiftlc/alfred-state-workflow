@@ -32,7 +32,21 @@ const builtInFeatures = [
         description: '切换当前工作环境',
         requiredKeys: ['env'],
         requiredInputs: [
-            {key: 'ak', label: 'appkey', placeholder: '请输入appkey'},
+            {
+                key: 'ak',
+                label: 'appkey',
+                placeholder: '请输入或选择appkey',
+                // 支持动态获取选项列表
+                fetchOptions: async (query, contextData) => {
+                    // 模拟从接口获取数据
+                    const mockData = [
+                        { name: 'com.sankuai.waimai.app', description: '外卖主App' },
+                        { name: 'com.sankuai.meituan.app', description: '美团主App' },
+                        { name: 'com.sankuai.dianping.app', description: '点评主App' }
+                    ];
+                    return mockData;
+                }
+            },
             {key: 'branch', label: '分支名', placeholder: '请输入要切换的分支名'}
         ],
         action: 'switch_env'

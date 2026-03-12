@@ -15,14 +15,24 @@ function decodeContext(str) {
 }
 
 /**
- * 检查查询字符串是否匹配目标字符串（支持拼音）
- * @param {string} query 查询字符串
+ * 检查查询字符串是否匹配目标字符串（支持拼音，支持空格多条件搜索）
+ * @param {string} query 查询字符串，多个条件用空格分隔
  * @param {...string} targets 目标字符串列表，任意一个匹配即返回 true
  * @returns {boolean}
  */
 function matchQuery(query, ...targets) {
   if (!query) return true;
-  return targets.some(target => target && pinyinMatch.match(target, query));
+
+  // 将查询字符串按空格分割成多个条件，并过滤掉空字符串
+  const terms = query.split(/\s+/).filter(t => t.trim() !== '');
+
+  if (terms.length === 0) return true;
+
+  // 必须所有条件都满足（AND 逻辑）
+  return terms.every(term => {
+    // 对于单个条件，只要 targets 中有一个匹配即可（OR 逻辑）
+    return targets.some(target => target && pinyinMatch.match(target, term));
+  });
 }
 
 /**

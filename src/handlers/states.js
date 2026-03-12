@@ -389,29 +389,75 @@ module.exports = (app) => {
     const currentInput = feature.requiredInputs[inputIndex];
     const isLastInput = inputIndex === feature.requiredInputs.length - 1;
 
-    if (query) {
-      const newData = { ...data, [currentInput.key]: query };
+    // 如果配置了 fetchOptions，则动态获取选项列表
+    if (currentInput.fetchOptions) {
+      try {
+        let options = await currentInput.fetchOptions(query, data);
 
-      if (isLastInput) {
-        items.push(wf.createItem(`✅ 确认输入: ${query}`, `配置完成，按回车直接执行 [${feature.name}]`, feature.action, {
-          data: newData,
-          historyTitle: `执行: ${feature.name}`,
-          historySubtitle: feature.description
-        }));
-      } else {
-        const nextInput = feature.requiredInputs[inputIndex + 1];
-        items.push(wf.createRerunItem(`✅ 确认输入: ${query}`, `继续配置 ${feature.name} (下一步: 输入${nextInput.label})`, 'input_state', {
-          data: newData,
-          pendingAction,
-          inputIndex: inputIndex + 1
-        }));
+        // 如果有查询词，进行过滤
+        if (query) {
+          options = options.filter(opt => matchQuery(query, opt.name, opt.description));
+          // 允许用户手动输入不在列表中的值
+          options.unshift({ name: query, description: '手动输入', isManual: true });
+        }
+
+        if (options.length === 0) {
+          items.push({
+            title: `未找到匹配的 ${currentInput.label}`,
+            subtitle: '请尝试其他搜索词',
+            valid: false
+          });
+        } else {
+          for (const opt of options) {
+            const newData = { ...data, [currentInput.key]: opt.name };
+            const title = opt.isManual ? `✏️ 手动输入: ${opt.name}` : `选择: ${opt.name}`;
+            const subtitle = opt.description || `设置为 ${currentInput.label}`;
+
+            if (isLastInput) {
+              items.push(wf.createItem(title, `配置完成，按回车直接执行 [${feature.name}] - ${subtitle}`, feature.action, {
+                data: newData,
+                historyTitle: `执行: ${feature.name}`,
+                historySubtitle: feature.description
+              }));
+            } else {
+              const nextInput = feature.requiredInputs[inputIndex + 1];
+              items.push(wf.createRerunItem(title, `继续配置 ${feature.name} (下一步: 输入${nextInput.label}) - ${subtitle}`, 'input_state', {
+                data: newData,
+                pendingAction,
+                inputIndex: inputIndex + 1
+              }));
+            }
+          }
+        }
+      } catch (err) {
+        items.push(wf.createItem('❌ 获取选项失败', err.message, 'open_log'));
       }
     } else {
-      items.push({
-        title: `✏️ 请输入 ${currentInput.label}`,
-        subtitle: currentInput.placeholder || `在搜索框中输入内容后按回车`,
-        valid: false
-      });
+      // 纯手动输入模式
+      if (query) {
+        const newData = { ...data, [currentInput.key]: query };
+
+        if (isLastInput) {
+          items.push(wf.createItem(`✅ 确认输入: ${query}`, `配置完成，按回车直接执行 [${feature.name}]`, feature.action, {
+            data: newData,
+            historyTitle: `执行: ${feature.name}`,
+            historySubtitle: feature.description
+          }));
+        } else {
+          const nextInput = feature.requiredInputs[inputIndex + 1];
+          items.push(wf.createRerunItem(`✅ 确认输入: ${query}`, `继续配置 ${feature.name} (下一步: 输入${nextInput.label})`, 'input_state', {
+            data: newData,
+            pendingAction,
+            inputIndex: inputIndex + 1
+          }));
+        }
+      } else {
+        items.push({
+          title: `✏️ 请输入 ${currentInput.label}`,
+          subtitle: currentInput.placeholder || `在搜索框中输入内容后按回车`,
+          valid: false
+        });
+      }
     }
 
     items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }));
