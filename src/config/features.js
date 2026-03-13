@@ -2,6 +2,7 @@ const PluginManager = require("../core/PluginManager");
 const { http } = require("../core/HttpClient");
 const Logger = require("../core/Logger");
 const CacheManager = require("../core/CacheManager");
+const { sendNotification,openUrl } = require("../core/utils");
 
 /**
  * 功能矩阵配置
@@ -81,7 +82,7 @@ const builtInFeatures = [
         requiredKeys: [],
         action: "inline_action_test_action",
         actionHandler: async (context, wf) => {
-            const { sendNotification } = require("../core/utils");
+            const { sendNotification, openUrl } = require("../core/utils");
             sendNotification("内联动作执行成功！", "测试成功");
         },
     },
@@ -199,12 +200,8 @@ const builtInFeatures = [
         ],
         action: "view_swimlane_machines_action",
         actionHandler: async (context, wf) => {
-            const { sendNotification } = require("../core/utils");
             const machine = context.data.machine.value;
-            sendNotification(
-                `已选择机器: ${machine.appkey}`,
-                `IP: ${machine.ip} | 状态: ${machine.status}`,
-            );
+            openUrl(`https://jumper.mws.sankuai.com/terminal?hostIp=${machine.ip}`);
         },
     },
 ];
