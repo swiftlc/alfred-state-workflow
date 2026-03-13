@@ -67,10 +67,10 @@ module.exports = (app) => {
 
     // 动作：切换环境
     app.onAction('switch_env', async (context) => {
-        const {env, branch} = context.data;
-        let msg = `已切换到环境: ${env.name}`;
+        const {swimlane, branch} = context.data;
+        let msg = `已切换到环境: ${swimlane.name}`;
         if (branch) {
-            msg += `，分支: ${branch}`;
+            msg += `，分支: ${branch.name}`;
         }
 
         sendNotification(msg, 'Workflow');

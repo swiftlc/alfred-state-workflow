@@ -37,7 +37,7 @@ const builtInFeatures = [
         id: 'switch_env',
         name: '切换环境',
         description: '切换当前工作环境',
-        requiredKeys: ['env'],
+        requiredKeys: ['swimlane'],
         requiredInputs: [
             {
                 key: 'ak',
@@ -77,6 +77,22 @@ const builtInFeatures = [
         action: 'copy_to_clipboard',
         type: 'split_by_dict',
         recordHistory: false // 不记录到历史中
+    },
+    {
+        id: 'modify_dict_desc',
+        name: (data) => `📝 修改描述：${data._currentDict.name}: ${data._currentSelected.name}`,
+        description: (data) => `当前描述：${data._currentSelected.description}`,
+        requiredKeys: [],
+        action: 'modify_dict_desc',
+        type: 'split_by_dict',
+        recordHistory: false, // 不记录到历史中
+        requiredInputs: [
+            {key: 'input1', label: '描述', placeholder: '请输入要修改的描述内容'}
+        ],
+        actionHandler: async (context, wf) => {
+            const { sendNotification } = require('../core/utils');
+            sendNotification('修改字典描述成功！', '测试成功');
+        }
     }
 ];
 

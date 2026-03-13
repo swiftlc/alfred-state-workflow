@@ -68,17 +68,6 @@ module.exports = (app) => {
         const query = context.query || '';
         const items = [];
 
-        // 0. 任务中心入口 (如果有任务)
-        const tasks = TaskManager.getAllTasks();
-        if (tasks.length > 0) {
-            const runningCount = tasks.filter(t => t.status === 'running').length;
-            const title = runningCount > 0 ? `⏳ 任务中心 (${runningCount}个运行中)` : `📋 任务中心 (${tasks.length}个历史任务)`;
-            const subtitle = '查看和管理后台任务';
-            if (matchQuery(query, '任务中心', 'task')) {
-                items.push(wf.createRerunItem(title, subtitle, 'task_manage', {data}));
-            }
-        }
-
         // 1. 历史记录区 (History)
         const history = HistoryManager.getHistory();
         // 主页展示所有固定的历史，以及最多3条未固定的历史
@@ -131,7 +120,7 @@ module.exports = (app) => {
             }
         }
 
-        // 1. 字典选择区 (Context)
+        // 2. 字典选择区 (Context)
         const dicts = await dictService.getDictionaries();
         for (const dict of dicts) {
             const selected = data[dict.key];
@@ -143,7 +132,7 @@ module.exports = (app) => {
             }
         }
 
-        // 2. 功能矩阵区 (Features)
+        // 3. 功能矩阵区 (Features)
         for (const feature of features) {
             if (feature.type === 'split_by_dict') {
                 // 处理基于字典裂变的功能
@@ -214,7 +203,18 @@ module.exports = (app) => {
             }
         }
 
-        // 3. 上下文管理与缓存管理
+        // 4. 任务中心入口 (如果有任务)
+        const tasks = TaskManager.getAllTasks();
+        if (tasks.length > 0) {
+            const runningCount = tasks.filter(t => t.status === 'running').length;
+            const title = runningCount > 0 ? `⏳ 任务中心 (${runningCount}个运行中)` : `📋 任务中心 (${tasks.length}个历史任务)`;
+            const subtitle = '查看和管理后台任务';
+            if (matchQuery(query, '任务中心', 'task')) {
+                items.push(wf.createRerunItem(title, subtitle, 'task_manage', {data}));
+            }
+        }
+
+        // 5. 上下文管理与缓存管理
         if (Object.keys(data).length > 0 && matchQuery(query, '清空上下文')) {
             items.push(wf.createRerunItem('🗑️ 清空上下文', '清除所有已选择的字典数据，重新开始', 'home', {data: {}}));
         }
