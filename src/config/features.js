@@ -204,6 +204,73 @@ const builtInFeatures = [
             openUrl(`https://jumper.mws.sankuai.com/terminal?hostIp=${machine.ip}`);
         },
     },
+    {
+        id: "query_tenant_poi",
+        name: "🏪 查询租户门店",
+        description: "查询当前租户下的门店列表",
+        requiredKeys: ["tenant"],
+        requiredInputs: [
+            {
+                key: "poi",
+                label: "门店",
+                placeholder: "请选择门店",
+                disableManualInput: true,
+                fetchOptions: async (query, contextData) => {
+                    const tenantId = contextData.tenant.value;
+
+                    return CacheManager.get(
+                        "tenant_pois:" + tenantId,
+                        async () => {
+                            try {
+                                let response = await http.post(
+                                    "http://www.swiftlc.com:8080/api/octo-invoke",
+                                    {
+                                        params: {
+                                            tenantId: parseInt(tenantId),
+                                            poiStatus: 1
+                                        },
+                                        appkey: "com.sankuai.shangou.empower.tenant",
+                                        swimlane: "",
+                                        methodKeyword: "PoiThriftService#queryPoiInfoListByCondition"
+                                    },
+                                    {
+                                        headers: {
+                                            "Content-Type": "application/json;charset=UTF-8"
+                                        }
+                                    }
+                                );
+
+                                Logger.info("接口响应", response)
+
+                                response = JSON.parse(response.data.return)
+
+                                if (response && response.status && response.status.code === 0 && response.poiList) {
+                                    return response.poiList.map(poi => ({
+                                        name: poi.poiName,
+                                        description: `门店ID: ${poi.poiId} | 地址: ${poi.poiAddress || '无'}}`,
+                                        value: poi
+                                    }));
+                                }
+                                return [];
+                            } catch (error) {
+                                Logger.error("获取租户门店列表失败", error);
+                                return [];
+                            }
+                        },
+                        24 * 60 * 60 * 1000 // 缓存 24 小时
+                    );
+                }
+            }
+        ],
+        action: "query_tenant_poi_action",
+        actionHandler: async (context, wf) => {
+            const { copyToClipboard, sendNotification } = require("../core/utils");
+            const poi = context.data.poi.value;
+            const poiInfo = JSON.stringify(poi, null, 2);
+            copyToClipboard(poiInfo);
+            sendNotification(`已复制门店: ${poi.poiName} 的信息`, "复制成功");
+        }
+    }
 ];
 
 // 合并内置功能和插件功能
