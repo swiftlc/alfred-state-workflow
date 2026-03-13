@@ -370,7 +370,7 @@ module.exports = (app) => {
         const dictName = dicts.find(d => d.key === dictKey)?.name || dictKey;
 
         if (query) {
-            dictItems = dictItems.filter(item => matchQuery(query, item.name));
+            dictItems = dictItems.filter(item => matchQuery(query, item.name, item.value));
             // 增加手动输入结果
             dictItems.unshift({
                 id: `manual_${query}`,
@@ -384,7 +384,8 @@ module.exports = (app) => {
             const newData = {...data, [dictKey]: item};
 
             let title = item.isManual ? `✏️ 手动输入: ${item.name}` : `${item.name}`;
-            let subtitle = item.isManual ? `将 ${item.name} 设置为当前 ${dictName} (手动输入)` : `${item.value}  ${item.description}`;
+
+            let subtitle = item.isManual ? `将 ${item.name} 设置为当前 ${dictName} (手动输入)` : (item.value === item.description ? `${item.value}` : `${item.value}  ${item.description}`);
 
             if (pendingAction) {
                 const feature = features.find(f => f.id === pendingAction);
