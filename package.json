@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "filter": "node src/filter.js",
-    "action": "node src/action.js"
+    "filter": "tsx src/filter.ts",
+    "action": "tsx src/action.ts",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
@@ -16,5 +17,10 @@
     "fuzzy": "^0.1.3",
     "fuzzysort": "^3.1.0",
     "pinyin-match": "^1.2.10"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }
