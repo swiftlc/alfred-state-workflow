@@ -174,7 +174,10 @@ module.exports = (app) => {
                 continue; // 上下文完全不匹配时不展示该功能
             }
 
-            if (!matchQuery(query, feature.name, feature.description)) {
+            const featureName = typeof feature.name === 'function' ? feature.name(data) : feature.name;
+            const featureDescription = typeof feature.description === 'function' ? feature.description(data) : feature.description;
+
+            if (!matchQuery(query, featureName, featureDescription)) {
                 continue;
             }
 
@@ -183,24 +186,24 @@ module.exports = (app) => {
                 if (feature.requiredInputs && feature.requiredInputs.length > 0) {
                     // 字典上下文已齐备，但还需要手动输入参数
                     const nextInput = feature.requiredInputs[0];
-                    items.push(wf.createRerunItem(`⚙️ 配置: ${feature.name}`, `需要输入: ${nextInput.label} (点击开始配置)`, 'input_state', {
+                    items.push(wf.createRerunItem(`⚙️ 配置: ${featureName}`, `需要输入: ${nextInput.label} (点击开始配置)`, 'input_state', {
                         data,
                         pendingAction: feature.id,
                         inputIndex: 0
                     }));
                 } else {
                     // 满足条件，可直接执行
-                    items.push(wf.createItem(` ${feature.name}`, feature.description, feature.action, {
+                    items.push(wf.createItem(` ${featureName}`, featureDescription, feature.action, {
                         data,
-                        historyTitle: `执行: ${feature.name}`,
-                        historySubtitle: feature.description,
+                        historyTitle: `执行: ${featureName}`,
+                        historySubtitle: featureDescription,
                         recordHistory: feature.recordHistory !== false // 默认支持历史记录
                     }));
                 }
             } else {
                 // 缺少上下文，引导配置
                 const missingNames = dicts.filter(d => missingKeys.includes(d.key)).map(d => d.name).join(', ');
-                items.push(wf.createRerunItem(`⚙️ 配置: ${feature.name}`, `缺少上下文: ${missingNames} (点击开始配置)`, 'select_dict', {
+                items.push(wf.createRerunItem(`⚙️ 配置: ${featureName}`, `缺少上下文: ${missingNames} (点击开始配置)`, 'select_dict', {
                     dictKey: missingKeys[0],
                     data,
                     pendingAction: feature.id
@@ -384,10 +387,13 @@ module.exports = (app) => {
                 const feature = features.find(f => f.id === pendingAction);
                 const missingKeys = getMissingKeys(feature, newData);
 
+                const featureName = typeof feature.name === 'function' ? feature.name(newData) : feature.name;
+                const featureDescription = typeof feature.description === 'function' ? feature.description(newData) : feature.description;
+
                 if (missingKeys.length > 0) {
                     // 还有缺失的上下文，继续引导
                     const nextDictName = dicts.find(d => d.key === missingKeys[0])?.name || missingKeys[0];
-                    subtitle = `继续配置 ${feature.name} (下一步: 选择${nextDictName})`;
+                    subtitle = `继续配置 ${featureName} (下一步: 选择${nextDictName})`;
                     items.push(wf.createRerunItem(title, subtitle, 'select_dict', {
                         dictKey: missingKeys[0],
                         data: newData,
@@ -396,7 +402,7 @@ module.exports = (app) => {
                 } else if (feature.requiredInputs && feature.requiredInputs.length > 0) {
                     // 字典上下文已齐备，但还需要手动输入参数
                     const nextInput = feature.requiredInputs[0];
-                    subtitle = `继续配置 ${feature.name} (下一步: 输入${nextInput.label})`;
+                    subtitle = `继续配置 ${featureName} (下一步: 输入${nextInput.label})`;
                     items.push(wf.createRerunItem(title, subtitle, 'input_state', {
                         data: newData,
                         pendingAction,
@@ -404,11 +410,11 @@ module.exports = (app) => {
                     }));
                 } else {
                     // 上下文已齐备，直接提供执行选项
-                    subtitle = `配置完成，按回车直接执行 [${feature.name}]`;
+                    subtitle = `配置完成，按回车直接执行 [${featureName}]`;
                     items.push(wf.createItem(title, subtitle, feature.action, {
                         data: newData,
-                        historyTitle: `执行: ${feature.name}`,
-                        historySubtitle: feature.description,
+                        historyTitle: `执行: ${featureName}`,
+                        historySubtitle: featureDescription,
                         recordHistory: feature.recordHistory !== false // 默认支持历史记录
                     }));
                 }
@@ -468,16 +474,19 @@ module.exports = (app) => {
                         const title = opt.isManual ? `✏️ 手动输入: ${opt.name}` : `选择: ${opt.name}`;
                         const subtitle = opt.description || `设置为 ${currentInput.label}`;
 
+                        const featureName = typeof feature.name === 'function' ? feature.name(newData) : feature.name;
+                        const featureDescription = typeof feature.description === 'function' ? feature.description(newData) : feature.description;
+
                         if (isLastInput) {
-                            items.push(wf.createItem(title, `配置完成，按回车直接执行 [${feature.name}] - ${subtitle}`, feature.action, {
+                            items.push(wf.createItem(title, `配置完成，按回车直接执行 [${featureName}] - ${subtitle}`, feature.action, {
                                 data: newData,
-                                historyTitle: `执行: ${feature.name}`,
-                                historySubtitle: feature.description,
+                                historyTitle: `执行: ${featureName}`,
+                                historySubtitle: featureDescription,
                                 recordHistory: feature.recordHistory !== false // 默认支持历史记录
                             }));
                         } else {
                             const nextInput = feature.requiredInputs[inputIndex + 1];
-                            items.push(wf.createRerunItem(title, `继续配置 ${feature.name} (下一步: 输入${nextInput.label}) - ${subtitle}`, 'input_state', {
+                            items.push(wf.createRerunItem(title, `继续配置 ${featureName} (下一步: 输入${nextInput.label}) - ${subtitle}`, 'input_state', {
                                 data: newData,
                                 pendingAction,
                                 inputIndex: inputIndex + 1
@@ -493,16 +502,19 @@ module.exports = (app) => {
             if (query) {
                 const newData = {...data, [currentInput.key]: {name: query, value: query, isManual: true}};
 
+                const featureName = typeof feature.name === 'function' ? feature.name(newData) : feature.name;
+                const featureDescription = typeof feature.description === 'function' ? feature.description(newData) : feature.description;
+
                 if (isLastInput) {
-                    items.push(wf.createItem(`✅ 确认输入: ${query}`, `配置完成，按回车直接执行 [${feature.name}]`, feature.action, {
+                    items.push(wf.createItem(`✅ 确认输入: ${query}`, `配置完成，按回车直接执行 [${featureName}]`, feature.action, {
                         data: newData,
-                        historyTitle: `执行: ${feature.name}`,
-                        historySubtitle: feature.description,
+                        historyTitle: `执行: ${featureName}`,
+                        historySubtitle: featureDescription,
                         recordHistory: feature.recordHistory !== false // 默认支持历史记录
                     }));
                 } else {
                     const nextInput = feature.requiredInputs[inputIndex + 1];
-                    items.push(wf.createRerunItem(`✅ 确认输入: ${query}`, `继续配置 ${feature.name} (下一步: 输入${nextInput.label})`, 'input_state', {
+                    items.push(wf.createRerunItem(`✅ 确认输入: ${query}`, `继续配置 ${featureName} (下一步: 输入${nextInput.label})`, 'input_state', {
                         data: newData,
                         pendingAction,
                         inputIndex: inputIndex + 1
