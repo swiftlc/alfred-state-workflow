@@ -59,6 +59,17 @@ const builtInFeatures = [
         action: 'switch_env'
     },
     {
+        id: 'inline_action_test',
+        name: '测试内联动作',
+        description: '这是一个测试内联动作的功能',
+        requiredKeys: [],
+        action: 'inline_action_test_action',
+        actionHandler: async (context, wf) => {
+            const { sendNotification } = require('../core/utils');
+            sendNotification('内联动作执行成功！', '测试成功');
+        }
+    },
+    {
         id: 'copy_dict_value',
         name: (data) => `📋 复制 ${data._currentDict.name}: ${data._currentSelected.name}`,
         description: (data) => `将 ${data._currentDict.name} [${data._currentSelected.name}] 复制到剪切板`,

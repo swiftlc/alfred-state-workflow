@@ -231,7 +231,17 @@ class Workflow {
     }
 
     // 执行自定义动作
-    const handler = this.actions[action];
+    let handler = this.actions[action];
+
+    // 如果在 actions 中找不到，尝试在 features 中查找是否有内联的 actionHandler
+    if (!handler) {
+      const features = require('../config/features');
+      const feature = features.find(f => f.action === action);
+      if (feature && typeof feature.actionHandler === 'function') {
+        handler = feature.actionHandler;
+      }
+    }
+
     if (handler) {
       try {
         // 记录历史 (如果 context.recordHistory 不为 false)
