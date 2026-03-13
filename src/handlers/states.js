@@ -146,13 +146,23 @@ module.exports = (app) => {
                         const featureDescription = typeof feature.description === 'function' ? feature.description(contextData) : feature.description;
 
                         if (matchQuery(query, featureName, featureDescription)) {
-                            items.push(wf.createItem(featureName, featureDescription, feature.action, {
-                                data,
-                                dictKey: dict.key, // 通用的 dictKey
-                                historyTitle: featureName,
-                                historySubtitle: featureDescription,
-                                recordHistory: feature.recordHistory !== false // 默认支持历史记录
-                            }));
+                            if (feature.requiredInputs && feature.requiredInputs.length > 0) {
+                                const nextInput = feature.requiredInputs[0];
+                                items.push(wf.createRerunItem(`⚙️ 配置: ${featureName}`, `需要输入: ${nextInput.label} (点击开始配置)`, 'input_state', {
+                                    data: contextData,
+                                    dictKey: dict.key,
+                                    pendingAction: feature.id,
+                                    inputIndex: 0
+                                }));
+                            } else {
+                                items.push(wf.createItem(featureName, featureDescription, feature.action, {
+                                    data: contextData,
+                                    dictKey: dict.key, // 通用的 dictKey
+                                    historyTitle: featureName,
+                                    historySubtitle: featureDescription,
+                                    recordHistory: feature.recordHistory !== false // 默认支持历史记录
+                                }));
+                            }
                         }
                     }
                 }
