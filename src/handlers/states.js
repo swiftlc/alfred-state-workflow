@@ -148,7 +148,7 @@ module.exports = (app) => {
                         if (matchQuery(query, featureName, featureDescription)) {
                             if (feature.requiredInputs && feature.requiredInputs.length > 0) {
                                 const nextInput = feature.requiredInputs[0];
-                                items.push(wf.createRerunItem(`⚙️ 配置: ${featureName}`, `需要输入: ${nextInput.label} (点击开始配置)`, 'input_state', {
+                                items.push(wf.createRerunItem(`${featureName}`, `${featureDescription}`, 'input_state', {
                                     data: contextData,
                                     dictKey: dict.key,
                                     pendingAction: feature.id,

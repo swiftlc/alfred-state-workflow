@@ -1,4 +1,6 @@
 const PluginManager = require("../core/PluginManager");
+const { http } = require("../core/HttpClient");
+const Logger = require("../core/Logger");
 
 /**
  * 功能矩阵配置
@@ -115,10 +117,22 @@ const builtInFeatures = [
             const { sendNotification } = require("../core/utils");
             const { _currentSelected, _currentDict, input1 } = context.data;
 
-            sendNotification(
-                `修改字典描述成功！${_currentDict.name}:${_currentSelected.name} ${input1.value}`,
-                "测试成功",
+            // 注意：如果 dictKey 是中文，axios 会自动进行 urlencode
+            const body = {
+                categoryKey: _currentDict.key,
+                title: _currentSelected.name,
+                description: input1.value,
+            };
+            const response = await http.put(
+                "http://127.0.0.1:8083/dictionaries",
+                body,
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                },
             );
+            sendNotification("修改成功！", "修改成功")
         },
     },
 ];

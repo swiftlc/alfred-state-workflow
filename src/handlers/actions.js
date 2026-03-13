@@ -11,6 +11,8 @@ const { execSync } = require("child_process");
 const { http } = require("../core/HttpClient");
 const Logger = require("../core/Logger");
 
+const ssoUrl = "http://www.swiftlc.com/api/sso";
+
 /**
  * 注册所有的执行动作 (Actions)
  * 对应 src/config/features.js 中的 action 字段
@@ -21,8 +23,6 @@ module.exports = (app) => {
         // 启动后台任务，并自动跳转到进度展示界面
         wf.startTask("login_task", context);
     });
-
-    const ssoUrl = "http://www.swiftlc.com/api/sso";
 
     // 注册后台任务的具体执行逻辑
     app.onTask("login_task", async (task, context) => {
