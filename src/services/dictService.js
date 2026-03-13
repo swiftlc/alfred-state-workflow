@@ -86,10 +86,7 @@ class DictService {
             // 这样在后续的 action 中可以直接通过 context.data[dictKey].xxx 访问原始数据
             return response.data.map(item => ({
               ...item, // 展开所有原始字段
-              id: item.id,
               name: item.title || item.value, // 优先使用 title 作为展示名称
-              description: item.description || item.value, // 补充描述信息
-              value: item.value // 保留原始 value 供后续使用
             }));
           }
           return DICT_ITEMS[dictKey] || []; // 降级使用本地数据

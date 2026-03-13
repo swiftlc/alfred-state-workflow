@@ -1,6 +1,7 @@
 const PluginManager = require("../core/PluginManager");
 const { http } = require("../core/HttpClient");
 const Logger = require("../core/Logger");
+const CacheManager = require("../core/CacheManager");
 
 /**
  * 功能矩阵配置
@@ -113,7 +114,7 @@ const builtInFeatures = [
         ],
         actionHandler: async (context, wf) => {
             const Logger = require("../core/Logger");
-            Logger.info(`执行描述修改${JSON.stringify(context)}`);
+            Logger.info(`修改描述：${JSON.stringify(context)}`);
             const { sendNotification } = require("../core/utils");
             const { _currentSelected, _currentDict, input1 } = context.data;
 
@@ -132,7 +133,78 @@ const builtInFeatures = [
                     },
                 },
             );
-            sendNotification("修改成功！", "修改成功")
+            sendNotification("修改成功！", "修改成功");
+        },
+    },
+    {
+        id: "view_swimlane_machines",
+        name: "🖥️ 泳道机器查看",
+        description: "查看当前泳道下的机器状态",
+        requiredKeys: ["swimlane"],
+        condition: (data) => {
+            Logger.info("当前泳道信息", data.swimlane);
+            return data.swimlane && data.swimlane.description;
+        },
+        requiredInputs: [
+            {
+                key: "machine",
+                label: "机器",
+                placeholder: "请选择机器",
+                disableManualInput: true,
+                fetchOptions: async (query, contextData) => {
+                    const stack_uuid = contextData.swimlane.description;
+
+                    return CacheManager.get(
+                        "swimlane_machines:" + stack_uuid,
+                        async () => {
+                            try {
+                                const proxyDest = `https://dev.sankuai.com/gateway/cargo/api/stack?type=runners_octo_status&stack_uuid=${stack_uuid}`;
+                                const response = await http.get(
+                                    "http://www.swiftlc.com/api/sso",
+                                    {
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                            "x-proxy-dest": proxyDest,
+                                        },
+                                    },
+                                );
+                                Logger.info("接口响应", response);
+
+                                if (response && response.data) {
+                                    const machines = Object.values(
+                                        response.data,
+                                    );
+                                    // 按照appkey排序
+                                    machines.sort((a, b) =>
+                                        (a.appkey || "").localeCompare(
+                                            b.appkey || "",
+                                        ),
+                                    );
+                                    return machines.map((m) => ({
+                                        name: m.appkey,
+                                        description: `IP: ${m.ip} | 状态: ${m.status} | 节点: ${m.nodeStatus} ${m.errMsg ? "| 错误: " + m.errMsg : ""}`,
+                                        value: m,
+                                    }));
+                                }
+                                return [];
+                            } catch (error) {
+                                console.error("获取泳道机器列表失败", error);
+                                return []; // 降级使用本地数据
+                            }
+                        },
+                        60 * 1000, // 缓存 1 分钟
+                    );
+                },
+            },
+        ],
+        action: "view_swimlane_machines_action",
+        actionHandler: async (context, wf) => {
+            const { sendNotification } = require("../core/utils");
+            const machine = context.data.machine.value;
+            sendNotification(
+                `已选择机器: ${machine.appkey}`,
+                `IP: ${machine.ip} | 状态: ${machine.status}`,
+            );
         },
     },
 ];

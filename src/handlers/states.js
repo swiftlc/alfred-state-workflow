@@ -176,6 +176,10 @@ module.exports = (app) => {
                 continue; // 上下文完全不匹配时不展示该功能
             }
 
+            if (typeof feature.condition === 'function' && !feature.condition(data)) {
+                continue; // 不满足自定义条件时不展示该功能
+            }
+
             const featureName = typeof feature.name === 'function' ? feature.name(data) : feature.name;
             const featureDescription = typeof feature.description === 'function' ? feature.description(data) : feature.description;
 
@@ -424,7 +428,7 @@ module.exports = (app) => {
                     }));
                 } else {
                     // 上下文已齐备，直接提供执行选项
-                    subtitle = `配置完成，按回车直接执行 [${featureName}]`;
+                    subtitle = `执行 [${featureName}]`;
                     items.push(wf.createItem(title, subtitle, feature.action, {
                         data: newData,
                         historyTitle: `执行: ${featureName}`,
@@ -471,7 +475,9 @@ module.exports = (app) => {
                 if (query) {
                     options = options.filter(opt => matchQuery(query, opt.name, opt.description));
                     // 允许用户手动输入不在列表中的值
-                    options.unshift({name: query, description: '手动输入', isManual: true});
+                    if (!currentInput.disableManualInput) {
+                        options.unshift({name: query, description: '手动输入', isManual: true});
+                    }
                 }
 
                 if (options.length === 0) {
@@ -485,14 +491,14 @@ module.exports = (app) => {
                         // 如果是手动输入，构造一个基本的对象；如果是接口返回的，直接使用整个对象
                         const optValue = opt.isManual ? {name: opt.name, value: opt.name, isManual: true} : opt;
                         const newData = {...data, [currentInput.key]: optValue};
-                        const title = opt.isManual ? `✏️ 手动输入: ${opt.name}` : `选择: ${opt.name}`;
+                        const title = opt.isManual ? `✏️ 手动输入: ${opt.name}` : `${opt.name}`;
                         const subtitle = opt.description || `设置为 ${currentInput.label}`;
 
                         const featureName = typeof feature.name === 'function' ? feature.name(newData) : feature.name;
                         const featureDescription = typeof feature.description === 'function' ? feature.description(newData) : feature.description;
 
                         if (isLastInput) {
-                            items.push(wf.createItem(title, `配置完成，按回车直接执行 [${featureName}] - ${subtitle}`, feature.action, {
+                            items.push(wf.createItem(title, `执行 [${featureName}] - ${subtitle}`, feature.action, {
                                 data: newData,
                                 historyTitle: `执行: ${featureName}`,
                                 historySubtitle: featureDescription,
