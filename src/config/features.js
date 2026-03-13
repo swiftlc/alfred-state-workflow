@@ -60,10 +60,11 @@ const builtInFeatures = [
     },
     {
         id: 'copy_dict_value',
-        name: '复制到剪切板',
+        name: (data) => `📋 复制 ${data._currentDict.name}: ${data._currentSelected.name}`,
+        description: (data) => `将 ${data._currentDict.name} [${data._currentSelected.name}] 复制到剪切板`,
         requiredKeys: [], // 全局字典操作不需要特定的 requiredKeys，它会根据当前已选的字典动态生成
         action: 'copy_to_clipboard',
-        type: 'global_dict_action',
+        type: 'split_by_dict',
         recordHistory: false // 不记录到历史中
     }
 ];

@@ -81,14 +81,14 @@ module.exports = (app) => {
 
         const Logger = require('../core/Logger');
         Logger.info('执行动作: copy_to_clipboard', context)
-        const {copyKey, data} = context;
+        const {dictKey, data} = context;
 
-        if (copyKey && data && data[copyKey]) {
-            const itemData = data[copyKey];
+        if (dictKey && data && data[dictKey]) {
+            const itemData = data[dictKey];
             // 将完整的 JSON 数据格式化后复制到剪切板
             const jsonString = JSON.stringify(itemData, null, 2);
             copyToClipboard(jsonString);
-            sendNotification(`已复制 ${copyKey} 的完整数据`, '复制成功');
+            sendNotification(`已复制 ${dictKey} 的完整数据`, '复制成功');
         } else if (context.copyValue) {
             // 兼容旧的逻辑（如果有的话）
             copyToClipboard(context.copyValue);

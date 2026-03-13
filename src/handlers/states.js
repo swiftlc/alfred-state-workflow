@@ -145,20 +145,23 @@ module.exports = (app) => {
 
         // 2. 功能矩阵区 (Features)
         for (const feature of features) {
-            if (feature.type === 'global_dict_action') {
-                // 处理全局字典操作类型的 feature
+            if (feature.type === 'split_by_dict') {
+                // 处理基于字典裂变的功能
                 for (const dict of dicts) {
                     const selected = data[dict.key];
                     if (selected) {
-                        const title = `📋 复制 ${dict.name}: ${selected.name}`;
-                        const subtitle = ``;
+                        // 构造一个包含当前字典信息的上下文，用于动态计算 name 和 description
+                        const contextData = { ...data, _currentDict: dict, _currentSelected: selected };
 
-                        if (matchQuery(query, title, subtitle)) {
-                            items.push(wf.createItem(title, subtitle, feature.action, {
+                        const featureName = typeof feature.name === 'function' ? feature.name(contextData) : feature.name;
+                        const featureDescription = typeof feature.description === 'function' ? feature.description(contextData) : feature.description;
+
+                        if (matchQuery(query, featureName, featureDescription)) {
+                            items.push(wf.createItem(featureName, featureDescription, feature.action, {
                                 data,
-                                copyKey: dict.key,
-                                historyTitle: title,
-                                historySubtitle: subtitle,
+                                dictKey: dict.key, // 通用的 dictKey
+                                historyTitle: featureName,
+                                historySubtitle: featureDescription,
                                 recordHistory: feature.recordHistory !== false // 默认支持历史记录
                             }));
                         }
