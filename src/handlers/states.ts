@@ -102,7 +102,7 @@ export default function registerStates(app: Workflow): void {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
 
-    // 0. 智能别名区（若有匹配的别名，优先展示）
+    // 0. 快捷指令区（若有匹配的指令，优先展示）
     const aliases = AliasManager.getAll();
     const matchedAliases = aliases.filter(alias =>
       matchQuery(query, alias.alias, alias.title)
@@ -213,7 +213,7 @@ export default function registerStates(app: Workflow): void {
               recordHistory: feature.recordHistory !== false,
             }, {
               cmd: {
-                subtitle: `⚡ 另存为别名: ${featureName}`,
+                subtitle: `⚡ 存为快捷指令: ${featureName}`,
                 action: 'rerun',
                 payload: {
                   nextState: 'alias_save',
@@ -265,7 +265,7 @@ export default function registerStates(app: Workflow): void {
               recordHistory: feature.recordHistory !== false,
             }, {
               cmd: {
-                subtitle: `⚡ 另存为别名: ${featureName}`,
+                subtitle: `⚡ 存为快捷指令: ${featureName}`,
                 action: 'rerun',
                 payload: {
                   nextState: 'alias_save',
@@ -328,15 +328,15 @@ export default function registerStates(app: Workflow): void {
       );
     }
 
-    // 6. 智能别名管理入口
-    if (matchQuery(query, '别名', 'alias')) {
+    // 6. 快捷指令管理入口
+    if (matchQuery(query, '快捷指令', '指令', 'alias')) {
       const aliasCount = aliases.length;
       const subtitle = aliasCount > 0
-        ? `已保存 ${aliasCount} 个别名  ·  快速执行常用操作`
-        : '保存常用操作序列为别名，一步直达';
+        ? `已保存 ${aliasCount} 条快捷指令  ·  一键执行常用操作`
+        : '将功能操作绑定为触发词，一步直达执行';
       items.push(
         wf.createRerunItem(
-          '⚡ 智能别名管理',
+          '⚡ 快捷指令',
           subtitle,
           'alias_manage',
           { data },
@@ -816,8 +816,8 @@ export default function registerStates(app: Workflow): void {
   });
 
   /**
-   * 状态：智能别名管理 (alias_manage)
-   * 展示所有已保存的别名，支持执行和删除
+   * 状态：快捷指令管理 (alias_manage)
+   * 展示所有已保存的快捷指令，支持执行和删除
    */
   app.onState('alias_manage', async (context, wf) => {
     const query = context.query ?? '';
@@ -825,30 +825,16 @@ export default function registerStates(app: Workflow): void {
     const allAliases = AliasManager.getAll();
     const currentData = context.data ?? {};
 
-    // 保存当前操作为新别名入口（有可执行的功能时才展示）
-    if (matchQuery(query, '新建', '保存', '别名')) {
-      items.push(
-        wf.createRerunItem(
-          '➕ 创建新别名...',
-          '将当前操作保存为快速别名，下次一键直达',
-          'alias_save',
-          { data: currentData },
-          {},
-          Icons.alias
-        )
-      );
-    }
-
     if (allAliases.length === 0) {
       items.push({
-        title: '暂无保存的别名',
-        subtitle: '选择上方「创建新别名」来创建第一个别名',
+        title: '暂无快捷指令',
+        subtitle: '在主菜单功能列表中，对任意功能按 Cmd+Enter 即可创建快捷指令',
         valid: false,
         icon: icon('alias'),
       });
     } else {
       for (const alias of allAliases) {
-        const usageText = alias.usageCount > 0 ? `用了 ${alias.usageCount} 次` : '未使用过';
+        const usageText = alias.usageCount > 0 ? `已执行 ${alias.usageCount} 次` : '从未执行';
         const title = `⚡ ${alias.alias}`;
         const subtitle = `${alias.title}  ·  ${usageText}`;
 
@@ -862,7 +848,7 @@ export default function registerStates(app: Workflow): void {
             { aliasId: alias.id, aliasAction: alias.action, aliasData: alias.data },
             {
               alt: {
-                subtitle: '🗑️ 删除此别名',
+                subtitle: '🗑️ 删除此快捷指令',
                 action: 'delete_alias',
                 payload: { aliasId: alias.id, returnState: 'alias_manage', data: currentData },
               },
@@ -878,8 +864,8 @@ export default function registerStates(app: Workflow): void {
   });
 
   /**
-   * 状态：创建或编辑别名 (alias_save)
-   * 用户输入别名触发词后，提示确认保存
+   * 状态：创建快捷指令 (alias_save)
+   * 用户输入触发词后，提示确认保存
    * 必须携带 pendingAction + aliasTitle 才有实际意义
    */
   app.onState('alias_save', async (context, wf) => {
@@ -894,7 +880,7 @@ export default function registerStates(app: Workflow): void {
     if (!pendingAction) {
       items.push({
         title: '⚠️ 请先选择要绑定的操作',
-        subtitle: '在主菜单功能列表中，对想要绑定的功能按 Cmd+Enter 进入别名创建',
+        subtitle: '在主菜单功能列表中，对想要绑定的功能按 Cmd+Enter 创建快捷指令',
         valid: false,
         icon: icon('alias'),
       });
@@ -904,7 +890,7 @@ export default function registerStates(app: Workflow): void {
 
     // 展示将要绑定的操作信息
     items.push({
-      title: `📌 绑定操作: ${aliasTitle ?? pendingAction}`,
+      title: `📌 将绑定: ${aliasTitle ?? pendingAction}`,
       subtitle: aliasSubtitle ?? `Action: ${pendingAction}`,
       valid: false,
       icon: icon('alias'),
@@ -947,14 +933,14 @@ export default function registerStates(app: Workflow): void {
     } else {
       // 等待用户输入别名
       items.push({
-        title: `✏️ 请输入别名触发词`,
-        subtitle: `在搜索框输入短词（如 lgd、dev-auth），回车保存`,
+        title: `✏️ 请输入触发词`,
+        subtitle: `输入不含空格的短词（如 lgd、dev-auth），回车保存`,
         valid: false,
         icon: icon('alias'),
       });
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回别名列表', 'alias_manage', { data }, {}, Icons.alias));
+    items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', 'alias_manage', { data }, {}, Icons.alias));
     return items;
   });
 }

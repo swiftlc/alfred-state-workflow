@@ -188,16 +188,16 @@ export default function registerActions(app: Workflow): void {
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   });
 
-  // ─── 智能别名相关动作 ─────────────────────────────────────────────────────────
+  // ─── 快捷指令相关动作 ─────────────────────────────────────────────────────────
 
-  // 动作：执行别名（恢复上下文快照，在当前进程内直接调用绑定的 action handler）
+  // 动作：执行快捷指令（恢复上下文快照，在当前进程内直接调用绑定的 action handler）
   app.onAction('execute_alias', async (context, wf) => {
     const aliasId = context['aliasId'] as string | undefined;
     const aliasAction = context['aliasAction'] as string | undefined;
     const aliasData = context['aliasData'] as Record<string, unknown> | undefined;
 
     if (!aliasId || !aliasAction || !aliasData) {
-      sendNotification('别名信息不完整', 'Workflow');
+      sendNotification('快捷指令信息不完整', 'Workflow');
       return;
     }
 
@@ -215,7 +215,7 @@ export default function registerActions(app: Workflow): void {
     await wf.runAction(aliasContext);
   });
 
-  // 动作：保存别名
+  // 动作：保存快捷指令
   app.onAction('save_alias', async (context, wf) => {
     const aliasName = context['aliasName'] as string | undefined;
     const pendingAction = context['pendingAction'] as string | undefined;
@@ -224,12 +224,12 @@ export default function registerActions(app: Workflow): void {
     const data = context.data ?? {};
 
     if (!aliasName?.trim()) {
-      sendNotification('别名名称不能为空', 'Workflow');
+      sendNotification('触发词不能为空', 'Workflow');
       return;
     }
 
     if (!pendingAction) {
-      sendNotification('别名缺少绑定操作，请重新选择功能后创建', 'Workflow');
+      sendNotification('快捷指令缺少绑定操作，请重新选择功能后创建', 'Workflow');
       return;
     }
 
@@ -242,17 +242,17 @@ export default function registerActions(app: Workflow): void {
     );
 
     Logger.info(`保存别名: ${alias.alias} → ${alias.action}`, alias as unknown as object);
-    sendNotification(`别名「${alias.alias}」已保存 → ${alias.title}`, 'Workflow');
+    sendNotification(`快捷指令「${alias.alias}」已保存 → ${alias.title}`, 'Workflow');
     wf.triggerAlfred(encodeContext({ state: 'alias_manage', data }));
   });
 
-  // 动作：删除别名
+  // 动作：删除快捷指令
   app.onAction('delete_alias', async (context, wf) => {
     const aliasId = context['aliasId'] as string | undefined;
     if (!aliasId) return;
 
     AliasManager.delete(aliasId);
-    sendNotification('别名已删除', 'Workflow');
+    sendNotification('快捷指令已删除', 'Workflow');
     const nextState = (context.returnState as string | undefined) ?? 'alias_manage';
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   });
