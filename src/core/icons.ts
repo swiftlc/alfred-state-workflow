@@ -36,6 +36,9 @@ const Icons = {
 
   /** 工作区快照 */
   workspace: path.join(ICONS_DIR, 'workspace.svg'),
+
+  /** 智能别名 */
+  alias: path.join(ICONS_DIR, 'alias.svg'),
 } as const;
 
 export type IconKey = keyof typeof Icons;

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="108" fill="#FFF7ED"/>
+
+  <!-- 闪电符号（左侧，表示「快速直达」） -->
+  <polygon points="220,88 172,276 216,276 172,424 320,212 268,212 320,88"
+           fill="#FF6600"/>
+
+  <!-- 右侧：短词标签框 -->
+  <rect x="312" y="148" width="140" height="52" rx="14"
+        fill="none" stroke="#FFAA00" stroke-width="14"/>
+  <!-- 标签内文字占位线 -->
+  <line x1="332" y1="174" x2="432" y2="174"
+        stroke="#FFAA00" stroke-width="11" stroke-linecap="round"/>
+
+  <!-- 连接线：闪电 → 标签 -->
+  <line x1="308" y1="174" x2="312" y2="174"
+        stroke="#FFAA00" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- 右侧：箭头指向（表示「映射/直达」） -->
+  <rect x="312" y="236" width="140" height="52" rx="14"
+        fill="none" stroke="#FFD090" stroke-width="12"/>
+  <line x1="332" y1="262" x2="414" y2="262"
+        stroke="#FFD090" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- 小箭头（→） -->
+  <polyline points="424,252 442,262 424,272"
+            fill="none" stroke="#FF6600" stroke-width="12"
+            stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 底部：键盘回车键暗示（直达感） -->
+  <rect x="148" y="360" width="216" height="64" rx="16"
+        fill="none" stroke="#FF6600" stroke-width="14"/>
+  <!-- 回车符号 ↵ -->
+  <polyline points="318,378 338,378 338,410 192,410"
+            fill="none" stroke="#FF6600" stroke-width="12"
+            stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="210,392 192,410 210,428"
+            fill="none" stroke="#FF6600" stroke-width="12"
+            stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+

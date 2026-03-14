@@ -182,6 +182,30 @@ export interface WorkspaceRecord {
   usageCount: number;
 }
 
+// ─── 智能别名 ──────────────────────────────────────────────────────────────────
+
+/** 智能别名：将一个完整的「上下文 + 动作」绑定到短词，一步直达执行 */
+export interface AliasRecord {
+  /** 唯一 ID */
+  id: string;
+  /** 别名触发词（如 "login-dev"、"lgd"） */
+  alias: string;
+  /** 对应的 action 名称 */
+  action: string;
+  /** 执行时传入的上下文数据快照 */
+  data: ContextData;
+  /** 展示标题（如「🚀 租户泳道登录」） */
+  title: string;
+  /** 展示副标题 */
+  subtitle?: string;
+  /** 创建时间戳 */
+  createdAt: number;
+  /** 最后使用时间戳 */
+  lastUsedAt: number;
+  /** 使用次数 */
+  usageCount: number;
+}
+
 // ─── 插件 ──────────────────────────────────────────────────────────────────────
 
 export interface Plugin {

@@ -4,6 +4,7 @@ import CacheManager from '../core/CacheManager';
 import HistoryManager from '../core/HistoryManager';
 import TaskManager from '../core/TaskManager';
 import WorkspaceManager from '../core/WorkspaceManager';
+import AliasManager from '../core/AliasManager';
 import {http} from '../core/HttpClient';
 import Logger from '../core/Logger';
 import type Workflow from '../core/Workflow';
@@ -184,6 +185,64 @@ export default function registerActions(app: Workflow): void {
     WorkspaceManager.delete(workspaceId);
     sendNotification('工作区已删除', 'Workflow');
     const nextState = (context.returnState as string | undefined) ?? 'workspace_manage';
+    wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
+  });
+
+  // ─── 智能别名相关动作 ─────────────────────────────────────────────────────────
+
+  // 动作：执行别名（还原上下文并执行对应的 action）
+  app.onAction('execute_alias', async (context, wf) => {
+    const aliasId = context['aliasId'] as string | undefined;
+    const aliasAction = context['aliasAction'] as string | undefined;
+    const aliasData = context['aliasData'] as Record<string, unknown> | undefined;
+
+    if (!aliasId || !aliasAction || !aliasData) {
+      sendNotification('别名信息不完整', 'Workflow');
+      return;
+    }
+
+    // 标记别名使用
+    AliasManager.markUsed(aliasId);
+
+    // 执行别名关联的 action，并恢复上下文
+    Logger.info(`执行别名: ${aliasId}`, { action: aliasAction });
+    wf.triggerAlfred(encodeContext({ state: 'home', data: aliasData, _nextAction: aliasAction }));
+  });
+
+  // 动作：保存别名
+  app.onAction('save_alias', async (context, wf) => {
+    const aliasName = context['aliasName'] as string | undefined;
+    const data = context.data ?? {};
+
+    if (!aliasName?.trim()) {
+      sendNotification('别名名称不能为空', 'Workflow');
+      return;
+    }
+
+    // 提取当前操作信息（从 data 中获取对应的 action 和 title）
+    // 这里假设会从之前保存的操作历史中获取，或者从当前 context 推导
+    // 简化方案：使用别名本身作为 title，action 为通用的「回到主页」
+    const alias = AliasManager.add(
+      aliasName.trim(),
+      'rerun',  // 缺省 action，实际应该由操作流程提供
+      data,
+      `操作序列: ${aliasName.trim()}`,
+      '保存的快速别名'
+    );
+
+    Logger.info(`保存别名: ${alias.id}`, alias as unknown as object);
+    sendNotification(`别名「${aliasName.trim()}」已保存`, 'Workflow');
+    wf.triggerAlfred(encodeContext({ state: 'alias_manage', data }));
+  });
+
+  // 动作：删除别名
+  app.onAction('delete_alias', async (context, wf) => {
+    const aliasId = context['aliasId'] as string | undefined;
+    if (!aliasId) return;
+
+    AliasManager.delete(aliasId);
+    sendNotification('别名已删除', 'Workflow');
+    const nextState = (context.returnState as string | undefined) ?? 'alias_manage';
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   });
 }

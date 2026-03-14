@@ -2,7 +2,8 @@ import dictService from '../services/dictService';
 import features from '../config/features';
 import TaskManager from '../core/TaskManager';
 import HistoryManager from '../core/HistoryManager';
-import WorkspaceManager, { WorkspaceManager as WorkspaceManagerClass } from '../core/WorkspaceManager';
+import WorkspaceManager, {WorkspaceManager as WorkspaceManagerClass} from '../core/WorkspaceManager';
+import AliasManager from '../core/AliasManager';
 import {matchQuery} from '../core/utils';
 import Icons, {icon} from '../core/icons';
 import type Workflow from '../core/Workflow';
@@ -100,6 +101,24 @@ export default function registerStates(app: Workflow): void {
     const data = context.data ?? {};
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
+
+    // 0. 智能别名区（若有匹配的别名，优先展示）
+    const aliases = AliasManager.getAll();
+    const matchedAliases = aliases.filter(alias =>
+      matchQuery(query, alias.alias, alias.title)
+    );
+    for (const alias of matchedAliases) {
+      items.push(
+        wf.createItem(
+          `⚡ ${alias.alias}`,
+          alias.subtitle || alias.title,
+          'execute_alias',
+          { aliasId: alias.id, aliasAction: alias.action, aliasData: alias.data },
+          {},
+          Icons.alias
+        )
+      );
+    }
 
     // 1. 历史记录区
     const history = HistoryManager.getHistory();
@@ -285,7 +304,25 @@ export default function registerStates(app: Workflow): void {
       );
     }
 
-    // 6. 上下文 / 缓存管理
+    // 6. 智能别名管理入口
+    if (matchQuery(query, '别名', 'alias')) {
+      const aliasCount = aliases.length;
+      const subtitle = aliasCount > 0
+        ? `已保存 ${aliasCount} 个别名  ·  快速执行常用操作`
+        : '保存常用操作序列为别名，一步直达';
+      items.push(
+        wf.createRerunItem(
+          '⚡ 智能别名管理',
+          subtitle,
+          'alias_manage',
+          { data },
+          {},
+          Icons.alias
+        )
+      );
+    }
+
+    // 7. 上下文 / 缓存管理
     if (Object.keys(data).length > 0 && matchQuery(query, '清空上下文')) {
       items.push(
         wf.createRerunItem('🗑️ 清空上下文', '清除所有已选择的字典数据，重新开始', 'home', { data: {} }, {}, Icons.context)
@@ -751,6 +788,125 @@ export default function registerStates(app: Workflow): void {
     }
 
     items.push(wf.createRerunItem('🔙 返回', '返回工作区列表', 'workspace_manage', { data }, {}, Icons.workspace));
+    return items;
+  });
+
+  /**
+   * 状态：智能别名管理 (alias_manage)
+   * 展示所有已保存的别名，支持执行和删除
+   */
+  app.onState('alias_manage', async (context, wf) => {
+    const query = context.query ?? '';
+    const items: AlfredItem[] = [];
+    const allAliases = AliasManager.getAll();
+    const currentData = context.data ?? {};
+
+    // 保存当前操作为新别名入口（有可执行的功能时才展示）
+    if (matchQuery(query, '新建', '保存', '别名')) {
+      items.push(
+        wf.createRerunItem(
+          '➕ 创建新别名...',
+          '将当前操作保存为快速别名，下次一键直达',
+          'alias_save',
+          { data: currentData },
+          {},
+          Icons.alias
+        )
+      );
+    }
+
+    if (allAliases.length === 0) {
+      items.push({
+        title: '暂无保存的别名',
+        subtitle: '选择上方「创建新别名」来创建第一个别名',
+        valid: false,
+        icon: icon('alias'),
+      });
+    } else {
+      for (const alias of allAliases) {
+        const usageText = alias.usageCount > 0 ? `用了 ${alias.usageCount} 次` : '未使用过';
+        const title = `⚡ ${alias.alias}`;
+        const subtitle = `${alias.title}  ·  ${usageText}`;
+
+        if (!matchQuery(query, alias.alias, alias.title)) continue;
+
+        items.push(
+          wf.createItem(
+            title,
+            subtitle,
+            'execute_alias',
+            { aliasId: alias.id, aliasAction: alias.action, aliasData: alias.data },
+            {
+              alt: {
+                subtitle: '🗑️ 删除此别名',
+                action: 'delete_alias',
+                payload: { aliasId: alias.id, returnState: 'alias_manage', data: currentData },
+              },
+            },
+            Icons.alias
+          )
+        );
+      }
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data: currentData }, {}, Icons.workflow));
+    return items;
+  });
+
+  /**
+   * 状态：创建或编辑别名 (alias_save)
+   * 用户输入别名触发词后，提示确认保存
+   */
+  app.onState('alias_save', async (context, wf) => {
+    const query = context.query ?? '';
+    const data = context.data ?? {};
+    const items: AlfredItem[] = [];
+
+    if (query) {
+      // 检查是否为有效的别名（不包含空格，主要用于快速触发）
+      const trimmedQuery = query.trim();
+      if (trimmedQuery.includes(' ')) {
+        items.push({
+          title: '❌ 别名不能包含空格',
+          subtitle: '请输入不含空格的短词（如 lgd、dev-login）',
+          valid: false,
+          icon: icon('alias'),
+        });
+      } else {
+        // 展示确认保存选项
+        items.push(
+          wf.createItem(
+            `⚡ 保存为「${trimmedQuery}」`,
+            `快速触发词: ${trimmedQuery}`,
+            'save_alias',
+            { aliasName: trimmedQuery, data },
+            {},
+            Icons.alias
+          )
+        );
+
+        // 检查是否有同名别名，给出覆盖提示
+        const existing = AliasManager.getAll().find((a) => a.alias === trimmedQuery);
+        if (existing) {
+          items.push({
+            title: `⚠️ 已存在同名别名「${trimmedQuery}」`,
+            subtitle: '回车将覆盖原有定义',
+            valid: false,
+            icon: icon('alias'),
+          });
+        }
+      }
+    } else {
+      // 等待用户输入别名
+      items.push({
+        title: `✏️ 请输入别名触发词`,
+        subtitle: `保存当前操作序列为快速别名（如 lgd、dev-auth、aws-push）`,
+        valid: false,
+        icon: icon('alias'),
+      });
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回别名列表', 'alias_manage', { data }, {}, Icons.alias));
     return items;
   });
 }
