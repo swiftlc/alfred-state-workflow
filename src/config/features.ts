@@ -3,6 +3,7 @@ import {http} from '../core/HttpClient';
 import Logger from '../core/Logger';
 import CacheManager from '../core/CacheManager';
 import {copyToClipboard, openUrl, sendNotification} from '../core/utils';
+import {icon} from '../core/icons';
 import type {ContextData, DictItem, Feature} from '../types';
 
 /**
@@ -22,6 +23,7 @@ const builtInFeatures: Feature[] = [
     description: '',
     requiredKeys: ['tenant', 'swimlane'],
     action: 'login',
+    icon: icon('login'),
   },
   {
     id: 'jump_qnh_management',
@@ -29,6 +31,7 @@ const builtInFeatures: Feature[] = [
     description: '',
     requiredKeys: ['swimlane'],
     action: 'jump_qnh_management',
+    icon: icon('search'),
   },
   {
     id: 'jump_qnh',
@@ -36,12 +39,14 @@ const builtInFeatures: Feature[] = [
     description: '',
     requiredKeys: ['swimlane'],
     action: 'jump_qnh',
+    icon: icon('search'),
   },
   {
     id: 'switch_env',
     name: '切换环境',
     description: '切换当前工作环境',
     requiredKeys: ['swimlane'],
+    icon: icon('context'),
     requiredInputs: [
       {
         key: 'ak',
@@ -65,6 +70,7 @@ const builtInFeatures: Feature[] = [
   },
   {
     id: 'copy_dict_value',
+    icon: icon('cache'),
     name: (data: ContextData) =>
       `📋 复制 ${(data['_currentDict'] as DictItem | undefined)?.name ?? ''}: ${(data['_currentSelected'] as DictItem | undefined)?.name ?? ''}`,
     description: (data: ContextData) =>
@@ -76,6 +82,7 @@ const builtInFeatures: Feature[] = [
   },
   {
     id: 'modify_dict_desc',
+    icon: icon('context'),
     name: (data: ContextData) =>
       `📝 修改描述：${(data['_currentDict'] as DictItem | undefined)?.name ?? ''}: ${(data['_currentSelected'] as DictItem | undefined)?.name ?? ''}`,
     description: (data: ContextData) =>
@@ -112,6 +119,7 @@ const builtInFeatures: Feature[] = [
     name: '🖥️ 泳道机器查看',
     description: '查看当前泳道下的机器状态',
     requiredKeys: ['swimlane'],
+    icon: icon('task'),
     condition: (data: ContextData) => {
       const swimlane = data['swimlane'] as DictItem | undefined;
       Logger.info('当前泳道信息', swimlane as object ?? {});
@@ -172,6 +180,7 @@ const builtInFeatures: Feature[] = [
     name: '🏪 查询租户门店',
     description: '查询当前租户下的门店列表',
     requiredKeys: ['tenant'],
+    icon: icon('search'),
     requiredInputs: [
       {
         key: 'poi',

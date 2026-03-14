@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="108" fill="#FFF7ED"/>
+
+  <!-- 插件主体 -->
+  <rect x="130" y="160" width="200" height="220" rx="20"
+        fill="none" stroke="#FF6600" stroke-width="18"/>
+
+  <!-- 顶部两个卡口（插脚） -->
+  <rect x="165" y="124" width="42" height="48" rx="12"
+        fill="none" stroke="#FF6600" stroke-width="18"/>
+  <rect x="253" y="124" width="42" height="48" rx="12"
+        fill="none" stroke="#FF6600" stroke-width="18"/>
+
+  <!-- 右侧连接口 -->
+  <rect x="330" y="226" width="58" height="30" rx="10"
+        fill="#FF6600"/>
+  <rect x="330" y="286" width="58" height="30" rx="10"
+        fill="#FFAA00"/>
+
+  <!-- 主体内部横线 -->
+  <line x1="162" y1="230" x2="298" y2="230" stroke="#FFE0C0" stroke-width="10" stroke-linecap="round"/>
+  <line x1="162" y1="258" x2="298" y2="258" stroke="#FFE0C0" stroke-width="10" stroke-linecap="round"/>
+  <line x1="162" y1="286" x2="250" y2="286" stroke="#FFE0C0" stroke-width="10" stroke-linecap="round"/>
+</svg>
+

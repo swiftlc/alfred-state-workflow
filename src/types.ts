@@ -126,6 +126,8 @@ export interface Feature {
   requiredInputs?: RequiredInput[];
   /** 内联 action 处理函数（无需在 actions.ts 中单独注册） */
   actionHandler?: ActionHandler;
+  /** Alfred 列表项图标（{ path } 格式，路径指向 SVG/PNG） */
+  icon?: { path: string };
 }
 
 // ─── 任务相关 ──────────────────────────────────────────────────────────────────

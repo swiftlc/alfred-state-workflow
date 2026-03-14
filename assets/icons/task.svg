@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="108" fill="#FFF7ED"/>
+
+  <!-- 进度圆环背景 -->
+  <circle cx="256" cy="256" r="140" fill="none" stroke="#FFE0C0" stroke-width="28"/>
+
+  <!-- 进度弧（顺时针从顶部） -->
+  <circle cx="256" cy="256" r="140" fill="none"
+          stroke="#FF6600" stroke-width="28"
+          stroke-linecap="round"
+          stroke-dasharray="659 879"
+          stroke-dashoffset="220"
+          transform="rotate(-90 256 256)"/>
+
+  <!-- 中心：播放/执行三角形 -->
+  <polygon points="224,196 224,316 348,256" fill="#FF6600"/>
+</svg>
+

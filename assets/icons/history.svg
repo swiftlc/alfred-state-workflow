@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="108" fill="#FFF7ED"/>
+
+  <!-- 时钟外圆 -->
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#FF6600" stroke-width="18"/>
+
+  <!-- 时针（指向10点方向） -->
+  <line x1="256" y1="256" x2="196" y2="184"
+        stroke="#FF6600" stroke-width="18" stroke-linecap="round"/>
+  <!-- 分针（指向12点偏右，较长） -->
+  <line x1="256" y1="256" x2="286" y2="130"
+        stroke="#FF6600" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- 中心点 -->
+  <circle cx="256" cy="256" r="14" fill="#FF6600"/>
+
+  <!-- 逆时针回溯箭头（左侧） -->
+  <path d="M134,340 Q94,256 134,172"
+        fill="none" stroke="#FFAA00" stroke-width="14"
+        stroke-linecap="round" stroke-dasharray="12,10"/>
+  <polyline points="126,175 134,155 150,172"
+            fill="none" stroke="#FFAA00" stroke-width="14"
+            stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+

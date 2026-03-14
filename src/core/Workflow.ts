@@ -144,13 +144,18 @@ class Workflow {
     subtitle: string,
     actionName: string,
     payload: Record<string, unknown> = {},
-    mods: Record<string, ModDef> = {}
+    mods: Record<string, ModDef> = {},
+    iconPath?: string
   ): AlfredItem {
     const item: AlfredItem = {
       title,
       subtitle,
       arg: encodeContext({ action: actionName, ...payload }),
     };
+
+    if (iconPath) {
+      item.icon = { path: iconPath };
+    }
 
     if (Object.keys(mods).length > 0) {
       item.mods = {};
@@ -170,9 +175,10 @@ class Workflow {
     subtitle: string,
     nextState: string,
     payload: Record<string, unknown> = {},
-    mods: Record<string, ModDef> = {}
+    mods: Record<string, ModDef> = {},
+    iconPath?: string
   ): AlfredItem {
-    return this.createItem(title, subtitle, 'rerun', { nextState, ...payload }, mods);
+    return this.createItem(title, subtitle, 'rerun', { nextState, ...payload }, mods, iconPath);
   }
 
   // ─── 运行入口 ─────────────────────────────────────────────────────────────────

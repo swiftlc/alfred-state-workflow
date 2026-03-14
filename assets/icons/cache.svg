@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="108" fill="#FFF7ED"/>
+
+  <!-- 数据库三层，从下到上 -->
+  <!-- 层3底 -->
+  <path d="M136,330 Q136,366 256,366 Q376,366 376,330 L376,302 Q376,338 256,338 Q136,338 136,302 Z"
+        fill="#FFE0C0" stroke="#FF6600" stroke-width="0"/>
+  <ellipse cx="256" cy="302" rx="120" ry="28" fill="#FFE0C0" stroke="#FFAA00" stroke-width="14"/>
+
+  <!-- 层2 -->
+  <path d="M136,274 Q136,310 256,310 Q376,310 376,274 L376,246 Q376,282 256,282 Q136,282 136,246 Z"
+        fill="#FFDBB0" stroke="#FF6600" stroke-width="0"/>
+  <ellipse cx="256" cy="246" rx="120" ry="28" fill="#FFDBB0" stroke="#FF6600" stroke-width="14"/>
+
+  <!-- 层1（顶层，实色橙） -->
+  <path d="M136,218 Q136,254 256,254 Q376,254 376,218 L376,190 Q376,226 256,226 Q136,226 136,190 Z"
+        fill="#FF6600" stroke="#FF6600" stroke-width="0"/>
+  <ellipse cx="256" cy="190" rx="120" ry="28" fill="#FF6600" stroke="#FF6600" stroke-width="14"/>
+  <!-- 顶层高光椭圆 -->
+  <ellipse cx="244" cy="184" rx="56" ry="12" fill="white" opacity="0.25"/>
+
+  <!-- 右侧刷新箭头 -->
+  <path d="M396,210 Q430,190 430,240 Q430,290 396,270"
+        fill="none" stroke="#FFAA00" stroke-width="14" stroke-linecap="round"/>
+  <polyline points="388,207 400,192 408,210"
+            fill="none" stroke="#FFAA00" stroke-width="14"
+            stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+

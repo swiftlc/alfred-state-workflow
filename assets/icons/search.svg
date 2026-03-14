@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="108" fill="#FFF7ED"/>
+
+  <!-- 放大镜圆圈 -->
+  <circle cx="216" cy="216" r="116" fill="none" stroke="#FF6600" stroke-width="28"/>
+
+  <!-- 放大镜手柄 -->
+  <line x1="302" y1="302" x2="392" y2="392"
+        stroke="#FF6600" stroke-width="28" stroke-linecap="round"/>
+</svg>
+
