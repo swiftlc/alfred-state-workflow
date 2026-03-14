@@ -3,6 +3,7 @@ import {copyToClipboard, encodeContext, openUrl, sendNotification} from '../core
 import CacheManager from '../core/CacheManager';
 import HistoryManager from '../core/HistoryManager';
 import TaskManager from '../core/TaskManager';
+import WorkspaceManager from '../core/WorkspaceManager';
 import {http} from '../core/HttpClient';
 import Logger from '../core/Logger';
 import type Workflow from '../core/Workflow';
@@ -139,6 +140,50 @@ export default function registerActions(app: Workflow): void {
     TaskManager.clearTasks(['done', 'error', 'cancelled']);
     sendNotification('已清除所有结束的任务记录');
     const nextState = context.returnState ?? 'task_manage';
+    wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
+  });
+
+  // ─── 工作区相关动作 ──────────────────────────────────────────────────────────
+
+  // 动作：加载工作区（恢复上下文快照并回到主页）
+  app.onAction('load_workspace', async (context, wf) => {
+    const workspaceId = context['workspaceId'] as string | undefined;
+    if (!workspaceId) return;
+
+    const workspace = WorkspaceManager.markUsed(workspaceId);
+    if (!workspace) {
+      sendNotification('工作区不存在或已被删除', 'Workflow');
+      return;
+    }
+
+    sendNotification(`已切换到工作区: ${workspace.name}`, 'Workflow');
+    wf.triggerAlfred(encodeContext({ state: 'home', data: workspace.data }));
+  });
+
+  // 动作：保存工作区快照
+  app.onAction('save_workspace', async (context, wf) => {
+    const workspaceName = context['workspaceName'] as string | undefined;
+    const data = context.data ?? {};
+
+    if (!workspaceName?.trim()) {
+      sendNotification('工作区名称不能为空', 'Workflow');
+      return;
+    }
+
+    const workspace = WorkspaceManager.add(workspaceName.trim(), data);
+    Logger.info(`保存工作区: ${workspace.name}`, workspace as unknown as object);
+    sendNotification(`工作区「${workspace.name}」已保存`, 'Workflow');
+    wf.triggerAlfred(encodeContext({ state: 'workspace_manage', data }));
+  });
+
+  // 动作：删除工作区
+  app.onAction('delete_workspace', async (context, wf) => {
+    const workspaceId = context['workspaceId'] as string | undefined;
+    if (!workspaceId) return;
+
+    WorkspaceManager.delete(workspaceId);
+    sendNotification('工作区已删除', 'Workflow');
+    const nextState = (context.returnState as string | undefined) ?? 'workspace_manage';
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   });
 }

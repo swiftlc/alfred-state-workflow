@@ -33,6 +33,9 @@ const Icons = {
 
   /** 上下文 / 字典 */
   context: path.join(ICONS_DIR, 'context.svg'),
+
+  /** 工作区快照 */
+  workspace: path.join(ICONS_DIR, 'workspace.svg'),
 } as const;
 
 export type IconKey = keyof typeof Icons;

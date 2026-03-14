@@ -164,6 +164,24 @@ export interface HistoryRecord {
   isPinned: boolean;
 }
 
+// ─── 工作区快照 ────────────────────────────────────────────────────────────────
+
+/** 工作区快照：保存一组完整的字典上下文，支持一键恢复 */
+export interface WorkspaceRecord {
+  /** 唯一 ID */
+  id: string;
+  /** 工作区名称（用户命名） */
+  name: string;
+  /** 快照时保存的字典上下文数据 */
+  data: ContextData;
+  /** 创建时间戳 */
+  createdAt: number;
+  /** 最后使用时间戳 */
+  lastUsedAt: number;
+  /** 使用次数 */
+  usageCount: number;
+}
+
 // ─── 插件 ──────────────────────────────────────────────────────────────────────
 
 export interface Plugin {

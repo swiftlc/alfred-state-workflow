@@ -2,6 +2,7 @@ import dictService from '../services/dictService';
 import features from '../config/features';
 import TaskManager from '../core/TaskManager';
 import HistoryManager from '../core/HistoryManager';
+import WorkspaceManager, { WorkspaceManager as WorkspaceManagerClass } from '../core/WorkspaceManager';
 import {matchQuery} from '../core/utils';
 import Icons, {icon} from '../core/icons';
 import type Workflow from '../core/Workflow';
@@ -265,7 +266,26 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    // 5. 上下文 / 缓存管理
+    // 5. 工作区管理入口
+    if (matchQuery(query, '工作区', 'workspace')) {
+      const workspaces = WorkspaceManager.getAll();
+      const wsCount = workspaces.length;
+      const subtitle = wsCount > 0
+        ? `已保存 ${wsCount} 个工作区  ·  快速切换上下文快照`
+        : '保存当前上下文为工作区，下次一键恢复';
+      items.push(
+        wf.createRerunItem(
+          '🗂️ 工作区管理',
+          subtitle,
+          'workspace_manage',
+          { data },
+          {},
+          Icons.workspace
+        )
+      );
+    }
+
+    // 6. 上下文 / 缓存管理
     if (Object.keys(data).length > 0 && matchQuery(query, '清空上下文')) {
       items.push(
         wf.createRerunItem('🗑️ 清空上下文', '清除所有已选择的字典数据，重新开始', 'home', { data: {} }, {}, Icons.context)
@@ -607,6 +627,130 @@ export default function registerStates(app: Workflow): void {
     }
 
     items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }, {}, Icons.workflow));
+    return items;
+  });
+
+  /**
+   * 状态：工作区管理 (workspace_manage)
+   * 展示所有已保存的工作区快照，支持加载和删除
+   */
+  app.onState('workspace_manage', async (context, wf) => {
+    const query = context.query ?? '';
+    const items: AlfredItem[] = [];
+    const workspaces = WorkspaceManager.getAll();
+
+    // 保存当前上下文为新工作区入口（有上下文数据时才展示）
+    const currentData = context.data ?? {};
+    const hasData = Object.keys(currentData).filter((k) => !k.startsWith('_')).length > 0;
+    if (hasData && matchQuery(query, '保存', '新建', '当前上下文')) {
+      const suggestedName = WorkspaceManagerClass.suggestName(currentData);
+      items.push(
+        wf.createRerunItem(
+          '💾 将当前上下文保存为工作区...',
+          `当前: ${suggestedName}  (点击进入命名)`,
+          'workspace_save',
+          { data: currentData },
+          {},
+          Icons.workspace
+        )
+      );
+    }
+
+    if (workspaces.length === 0) {
+      items.push({
+        title: '暂无保存的工作区',
+        subtitle: '选择上方「保存当前上下文」来创建第一个工作区',
+        valid: false,
+        icon: icon('workspace'),
+      });
+    } else {
+      for (const ws of workspaces) {
+        const contextSummary = WorkspaceManagerClass.suggestName(ws.data);
+        const usageText = ws.usageCount > 0 ? `用了 ${ws.usageCount} 次` : '未使用过';
+        const title = `📂 ${ws.name}`;
+        const subtitle = `${contextSummary}  ·  ${usageText}`;
+
+        if (!matchQuery(query, ws.name, contextSummary)) continue;
+
+        items.push(
+          wf.createItem(
+            title,
+            subtitle,
+            'load_workspace',
+            { workspaceId: ws.id, data: ws.data },
+            {
+              alt: {
+                subtitle: '🗑️ 删除此工作区',
+                action: 'delete_workspace',
+                payload: { workspaceId: ws.id, returnState: 'workspace_manage', data: currentData },
+              },
+            },
+            Icons.workspace
+          )
+        );
+      }
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data: currentData }, {}, Icons.workflow));
+    return items;
+  });
+
+  /**
+   * 状态：命名并保存工作区 (workspace_save)
+   * 用户在搜索框输入工作区名称后回车保存
+   */
+  app.onState('workspace_save', async (context, wf) => {
+    const query = context.query ?? '';
+    const data = context.data ?? {};
+    const items: AlfredItem[] = [];
+    const suggestedName = WorkspaceManagerClass.suggestName(data);
+
+    if (query) {
+      // 用户已输入名称，展示确认保存选项
+      items.push(
+        wf.createItem(
+          `💾 保存为「${query}」`,
+          `将当前上下文快照保存为工作区: ${suggestedName}`,
+          'save_workspace',
+          { workspaceName: query, data },
+          {},
+          Icons.workspace
+        )
+      );
+
+      // 检查是否有同名工作区，给出覆盖提示
+      const existing = WorkspaceManager.getAll().find((w) => w.name === query);
+      if (existing) {
+        items.push({
+          title: `⚠️ 已存在同名工作区「${query}」`,
+          subtitle: '回车将覆盖原有内容',
+          valid: false,
+          icon: icon('workspace'),
+        });
+      }
+    } else {
+      // 等待用户输入名称
+      items.push({
+        title: `✏️ 请输入工作区名称`,
+        subtitle: `建议名称: ${suggestedName}  (在搜索框输入后回车保存)`,
+        valid: false,
+        icon: icon('workspace'),
+      });
+
+      // 快速使用建议名称保存
+      items.push(
+        wf.createItem(
+          `💾 使用建议名称「${suggestedName}」保存`,
+          '直接回车以建议名称保存工作区',
+          'save_workspace',
+          { workspaceName: suggestedName, data },
+          {},
+          Icons.workspace
+        )
+      );
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回工作区列表', 'workspace_manage', { data }, {}, Icons.workspace));
     return items;
   });
 }

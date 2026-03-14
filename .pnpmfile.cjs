@@ -1,1 +1,4 @@
-{"allowBuild":["esbuild"]}
+module.exports = {
+  hooks: {},
+};
+
