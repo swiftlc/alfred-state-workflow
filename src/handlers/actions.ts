@@ -190,7 +190,7 @@ export default function registerActions(app: Workflow): void {
 
   // ─── 智能别名相关动作 ─────────────────────────────────────────────────────────
 
-  // 动作：执行别名（还原上下文并执行对应的 action）
+  // 动作：执行别名（恢复上下文快照，在当前进程内直接调用绑定的 action handler）
   app.onAction('execute_alias', async (context, wf) => {
     const aliasId = context['aliasId'] as string | undefined;
     const aliasAction = context['aliasAction'] as string | undefined;
@@ -201,17 +201,26 @@ export default function registerActions(app: Workflow): void {
       return;
     }
 
-    // 标记别名使用
-    AliasManager.markUsed(aliasId);
+    // 标记别名使用（更新统计）
+    const alias = AliasManager.markUsed(aliasId);
 
-    // 执行别名关联的 action，并恢复上下文
-    Logger.info(`执行别名: ${aliasId}`, { action: aliasAction });
-    wf.triggerAlfred(encodeContext({ state: 'home', data: aliasData, _nextAction: aliasAction }));
+    Logger.info(`执行别名: ${alias?.alias} → ${aliasAction}`, { data: aliasData });
+
+    // 构造还原的上下文，直接调用 runAction 执行目标动作
+    // triggerAlfred 走的是 filter 路径，无法触发 action；必须在当前进程内调用
+    const aliasContext = encodeContext({
+      action: aliasAction,
+      data: aliasData,
+    });
+    await wf.runAction(aliasContext);
   });
 
   // 动作：保存别名
   app.onAction('save_alias', async (context, wf) => {
     const aliasName = context['aliasName'] as string | undefined;
+    const pendingAction = context['pendingAction'] as string | undefined;
+    const aliasTitle = context['aliasTitle'] as string | undefined;
+    const aliasSubtitle = context['aliasSubtitle'] as string | undefined;
     const data = context.data ?? {};
 
     if (!aliasName?.trim()) {
@@ -219,19 +228,21 @@ export default function registerActions(app: Workflow): void {
       return;
     }
 
-    // 提取当前操作信息（从 data 中获取对应的 action 和 title）
-    // 这里假设会从之前保存的操作历史中获取，或者从当前 context 推导
-    // 简化方案：使用别名本身作为 title，action 为通用的「回到主页」
+    if (!pendingAction) {
+      sendNotification('别名缺少绑定操作，请重新选择功能后创建', 'Workflow');
+      return;
+    }
+
     const alias = AliasManager.add(
       aliasName.trim(),
-      'rerun',  // 缺省 action，实际应该由操作流程提供
+      pendingAction,
       data,
-      `操作序列: ${aliasName.trim()}`,
-      '保存的快速别名'
+      aliasTitle ?? pendingAction,
+      aliasSubtitle
     );
 
-    Logger.info(`保存别名: ${alias.id}`, alias as unknown as object);
-    sendNotification(`别名「${aliasName.trim()}」已保存`, 'Workflow');
+    Logger.info(`保存别名: ${alias.alias} → ${alias.action}`, alias as unknown as object);
+    sendNotification(`别名「${alias.alias}」已保存 → ${alias.title}`, 'Workflow');
     wf.triggerAlfred(encodeContext({ state: 'alias_manage', data }));
   });
 

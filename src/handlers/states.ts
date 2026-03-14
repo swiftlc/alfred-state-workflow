@@ -203,17 +203,29 @@ export default function registerStates(app: Workflow): void {
                 inputIndex: 0,
               }, {}, featureIconPath)
             );
-          } else {
-            items.push(
-              wf.createItem(featureName, featureDescription, feature.action, {
-                data: contextData,
-                dictKey: dict.key,
-                historyTitle: featureName,
-                historySubtitle: featureDescription,
-                recordHistory: feature.recordHistory !== false,
-              }, {}, featureIconPath)
-            );
-          }
+        } else {
+          items.push(
+            wf.createItem(featureName, featureDescription, feature.action, {
+              data: contextData,
+              dictKey: dict.key,
+              historyTitle: featureName,
+              historySubtitle: featureDescription,
+              recordHistory: feature.recordHistory !== false,
+            }, {
+              cmd: {
+                subtitle: `⚡ 另存为别名: ${featureName}`,
+                action: 'rerun',
+                payload: {
+                  nextState: 'alias_save',
+                  data: contextData,
+                  pendingAction: feature.action,
+                  aliasTitle: featureName,
+                  aliasSubtitle: featureDescription,
+                },
+              },
+            }, featureIconPath)
+          );
+        }
         }
         continue;
       }
@@ -251,7 +263,19 @@ export default function registerStates(app: Workflow): void {
               historyTitle: `执行: ${featureName}`,
               historySubtitle: featureDescription,
               recordHistory: feature.recordHistory !== false,
-            }, {}, featureIconPath)
+            }, {
+              cmd: {
+                subtitle: `⚡ 另存为别名: ${featureName}`,
+                action: 'rerun',
+                payload: {
+                  nextState: 'alias_save',
+                  data,
+                  pendingAction: feature.action,
+                  aliasTitle: featureName,
+                  aliasSubtitle: featureDescription,
+                },
+              },
+            }, featureIconPath)
           );
         }
       } else {
@@ -856,11 +880,35 @@ export default function registerStates(app: Workflow): void {
   /**
    * 状态：创建或编辑别名 (alias_save)
    * 用户输入别名触发词后，提示确认保存
+   * 必须携带 pendingAction + aliasTitle 才有实际意义
    */
   app.onState('alias_save', async (context, wf) => {
     const query = context.query ?? '';
     const data = context.data ?? {};
+    const pendingAction = context['pendingAction'] as string | undefined;
+    const aliasTitle = context['aliasTitle'] as string | undefined;
+    const aliasSubtitle = context['aliasSubtitle'] as string | undefined;
     const items: AlfredItem[] = [];
+
+    // 如果没有 pendingAction，说明不是从功能 item 进入的，提示用户先选择一个功能
+    if (!pendingAction) {
+      items.push({
+        title: '⚠️ 请先选择要绑定的操作',
+        subtitle: '在主菜单功能列表中，对想要绑定的功能按 Cmd+Enter 进入别名创建',
+        valid: false,
+        icon: icon('alias'),
+      });
+      items.push(wf.createRerunItem('🔙 返回', '返回别名列表', 'alias_manage', { data }, {}, Icons.alias));
+      return items;
+    }
+
+    // 展示将要绑定的操作信息
+    items.push({
+      title: `📌 绑定操作: ${aliasTitle ?? pendingAction}`,
+      subtitle: aliasSubtitle ?? `Action: ${pendingAction}`,
+      valid: false,
+      icon: icon('alias'),
+    });
 
     if (query) {
       // 检查是否为有效的别名（不包含空格，主要用于快速触发）
@@ -877,9 +925,9 @@ export default function registerStates(app: Workflow): void {
         items.push(
           wf.createItem(
             `⚡ 保存为「${trimmedQuery}」`,
-            `快速触发词: ${trimmedQuery}`,
+            `触发词 "${trimmedQuery}" → ${aliasTitle ?? pendingAction}`,
             'save_alias',
-            { aliasName: trimmedQuery, data },
+            { aliasName: trimmedQuery, data, pendingAction, aliasTitle, aliasSubtitle },
             {},
             Icons.alias
           )
@@ -890,7 +938,7 @@ export default function registerStates(app: Workflow): void {
         if (existing) {
           items.push({
             title: `⚠️ 已存在同名别名「${trimmedQuery}」`,
-            subtitle: '回车将覆盖原有定义',
+            subtitle: `将覆盖原绑定: ${existing.title}`,
             valid: false,
             icon: icon('alias'),
           });
@@ -900,7 +948,7 @@ export default function registerStates(app: Workflow): void {
       // 等待用户输入别名
       items.push({
         title: `✏️ 请输入别名触发词`,
-        subtitle: `保存当前操作序列为快速别名（如 lgd、dev-auth、aws-push）`,
+        subtitle: `在搜索框输入短词（如 lgd、dev-auth），回车保存`,
         valid: false,
         icon: icon('alias'),
       });
