@@ -251,7 +251,8 @@ class Workflow {
 
     if (!handler) {
       // 动态导入避免循环依赖
-      const features = require('../config/features') as import('../types').Feature[];
+      const featuresModule = require('../config/features');
+      const features = (featuresModule?.default ?? featuresModule) as import('../types').Feature[];
       const feature = features.find((f) => f.action === action);
       if (feature && typeof feature.actionHandler === 'function') {
         handler = feature.actionHandler;
