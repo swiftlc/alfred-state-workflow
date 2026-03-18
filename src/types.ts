@@ -104,6 +104,8 @@ export interface RequiredInput {
   disableManualInput?: boolean;
   /** 动态获取候选选项 */
   fetchOptions?: (query: string, contextData: ContextData) => Promise<DictItem[]>;
+  /** 跳过条件：返回 true 时跳过此步骤，直接进入下一步或执行 action */
+  skipIf?: (contextData: ContextData) => boolean;
 }
 
 /** 功能定义 */

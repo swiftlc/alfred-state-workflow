@@ -572,9 +572,9 @@ export default function registerStates(app: Workflow): void {
    * 状态：手动输入参数 (input_state)
    */
   app.onState('input_state', async (context, wf) => {
-    const data = context.data ?? {};
+    let data = context.data ?? {};
     const pendingAction = context.pendingAction;
-    const inputIndex = (context.inputIndex as number | undefined) ?? 0;
+    let inputIndex = (context.inputIndex as number | undefined) ?? 0;
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
 
@@ -583,7 +583,17 @@ export default function registerStates(app: Workflow): void {
       return [wf.createRerunItem('❌ 错误', '找不到需要输入的配置项', 'home')];
     }
 
-    const currentInput = feature.requiredInputs[inputIndex]!;
+    // 跳过满足 skipIf 条件的步骤
+    let currentInput = feature.requiredInputs[inputIndex]!;
+    while (currentInput.skipIf?.(data)) {
+      inputIndex++;
+      if (!feature.requiredInputs[inputIndex]) {
+        // 所有后续步骤都被跳过，直接执行 action
+        return [wf.createItem('▶️ 执行', '条件已满足，直接执行', feature.action, { data })];
+      }
+      currentInput = feature.requiredInputs[inputIndex]!;
+    }
+
     const isLastInput = inputIndex === feature.requiredInputs.length - 1;
 
     if (currentInput.fetchOptions) {

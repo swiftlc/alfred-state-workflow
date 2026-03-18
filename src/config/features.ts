@@ -230,16 +230,69 @@ const builtInFeatures: Feature[] = [
           ];
         },
       },
+      {
+        key: 'appkey_method',
+        label: '服务方法',
+        placeholder: '请选择要查看的服务方法',
+        disableManualInput: true,
+        /** 仅在选择了「查看服务方法」时才需要此步骤 */
+        skipIf: (contextData) => (contextData['appkey_node_action'] as DictItem | undefined)?.value !== 'view_methods',
+        fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
+          const appkey = contextData['appkey'] as DictItem;
+          const node = (contextData['appkey_node'] as DictItem & { value: OctoServerNode }).value;
+          const appkeyValue = appkey.value ?? appkey.name;
+
+          return CacheManager.get<DictItem[]>(
+            `appkey_methods:${appkeyValue}:${node.ip}:${node.port}`,
+            async () => {
+              try {
+                const proxyDest = `https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck/serviceMethods?appkey=${appkeyValue}&host=${node.ip}&port=${node.port}&isRequestPort=false`;
+                const response = await http.proxy<OctoServiceMethodsResponse>('GET', proxyDest);
+                Logger.info('服务方法响应', response as object);
+
+                if (response?.success && response.data) {
+                  const methods: Array<{ serviceName: string; method: string }> = [];
+                  // data 结构: { "full.service.ClassName": { "methodName(params):ReturnType": weight } }
+                  for (const [svcClass, methodMap] of Object.entries(response.data)) {
+                    // 从完整类名中提取简短服务名（最后一个点后的部分）
+                    const serviceName = svcClass.split('.').pop() ?? svcClass;
+                    for (const methodSignature of Object.keys(methodMap as Record<string, unknown>)) {
+                      // 提取方法名（括号前的部分）
+                      const methodName = methodSignature.split('(')[0] ?? methodSignature;
+                      methods.push({
+                        serviceName,
+                        method: `${serviceName}#${methodName}`,
+                      });
+                    }
+                  }
+                  // 按方法名排序
+                  methods.sort((a, b) => a.method.localeCompare(b.method));
+                  return methods.map((m) => ({
+                    name: m.method,
+                    description: m.serviceName,
+                    value: m.method,
+                  }));
+                }
+                return [];
+              } catch {
+                return [];
+              }
+            },
+            60 * 1000
+          ) as Promise<DictItem[]>;
+        },
+      },
     ],
     action: 'view_appkey_machines_action',
     actionHandler: async (context) => {
       const node = (context.data['appkey_node'] as DictItem & { value: OctoServerNode }).value;
       const action = (context.data['appkey_node_action'] as DictItem | undefined)?.value;
+      const method = (context.data['appkey_method'] as DictItem | undefined)?.value;
 
-      if (action === 'view_methods') {
-        const appkey = (context.data['appkey'] as DictItem);
-        const appkeyValue = appkey.value ?? appkey.name;
-        openUrl(`https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck/serverNodes?appkey=${appkeyValue}&env=test`);
+      if (action === 'view_methods' && method) {
+        // 已选方法，可扩展：复制方法名、跳转文档等
+        copyToClipboard(method);
+        sendNotification(`已复制方法: ${method}`, '复制成功');
       } else {
         // 默认：跳转节点
         openUrl(`https://jumper.mws.sankuai.com/terminal?hostIp=${node.ip}`);
@@ -335,6 +388,13 @@ interface OctoServerNodesResponse {
   success: boolean;
   code: number;
   data: OctoServerNode[];
+}
+
+/** octo serviceMethods 接口响应结构 */
+interface OctoServiceMethodsResponse {
+  success: boolean;
+  code: number;
+  data: Record<string, Record<string, number>>;
 }
 
 interface PoiInfo {
