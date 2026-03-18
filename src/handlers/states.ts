@@ -179,6 +179,7 @@ export default function registerStates(app: Workflow): void {
     for (const feature of features) {
       if (feature.type === 'split_by_dict') {
         for (const dict of dicts) {
+          if (feature.excludeKeys?.includes(dict.key)) continue;
           const selected = data[dict.key] as DictItem | undefined;
           if (!selected) continue;
 

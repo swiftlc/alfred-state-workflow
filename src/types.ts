@@ -118,6 +118,8 @@ export interface Feature {
   action: string;
   /** 功能类型：split_by_dict 表示对所有已选字典项各生成一个条目 */
   type?: 'split_by_dict' | string;
+  /** 当 type 为 split_by_dict 时，排除指定 category key，不对这些字典进行裂变 */
+  excludeKeys?: string[];
   /** 附加条件：返回 false 时不展示此功能 */
   condition?: (data: ContextData) => boolean;
   /** 是否记录到历史，默认 true */

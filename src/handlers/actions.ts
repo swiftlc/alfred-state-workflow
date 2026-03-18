@@ -67,10 +67,16 @@ export default function registerActions(app: Workflow): void {
 
   // 动作：复制字典值到剪切板
   app.onAction('copy_to_clipboard', async (context) => {
-    Logger.info('执行动作: copy_to_clipboard', context);
+    // Logger.info('执行动作: copy_to_clipboard', context);
     const currentSelected = context.data['_currentSelected'] as DictItem;
     const currentDict = context.data['_currentDict'] as DictItem;
-    copyToClipboard(JSON.stringify(currentSelected, null, 2));
+
+    if (currentDict.name === 'appkey'){
+      copyToClipboard(currentSelected.value ?? "");
+    }else{
+      copyToClipboard(JSON.stringify(currentSelected, null, 2));
+    }
+
     sendNotification(
       `已复制 ${currentDict.name}:${currentSelected.name} 的完整数据`,
       '复制成功'

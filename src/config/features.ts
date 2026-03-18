@@ -88,6 +88,7 @@ const builtInFeatures: Feature[] = [
     description: (data: ContextData) =>
       `当前描述：${(data['_currentSelected'] as DictItem | undefined)?.description ?? ''}`,
     requiredKeys: [],
+    excludeKeys:["appkey"],
     action: 'modify_dict_desc',
     type: 'split_by_dict',
     recordHistory: false,
