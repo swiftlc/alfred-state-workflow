@@ -4,6 +4,9 @@
  * 接口规范：
  * 1. GET /api/v1/dicts           → 返回所有字典类型列表
  * 2. GET /api/v1/dicts/:key/items → 返回指定字典下的所有选项
+ *
+ * 特殊字典：
+ * - appkey: 固定写死 category，条目通过代理接口动态获取，缓存 7 天
  */
 
 import CacheManager from '../core/CacheManager';
@@ -14,6 +17,7 @@ const DICTS: DictCategory[] = [
   { key: 'tenant', name: '租户' },
   { key: 'swimlane', name: '泳道' },
   { key: 'env', name: '环境' },
+  { key: 'appkey', name: 'appkey' },
 ];
 
 const DICT_ITEMS: Record<string, DictItem[]> = {
@@ -40,6 +44,21 @@ interface ApiResponse<T> {
   message?: string;
 }
 
+/** octo 接口返回的 appkey 列表响应结构 */
+interface OctoAppsResponse {
+  success: boolean;
+  code: number;
+  msg: string | null;
+  data: string[];
+}
+
+/** appkey 列表查询接口（通过代理服务转发） */
+const APPKEY_DEST_URL =
+  'https://octo.mws-test.sankuai.com/api/octo/v2/common/apps?mis=liucheng58';
+
+/** appkey 缓存 7 天 */
+const APPKEY_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
+
 class DictService {
   /** 获取所有字典类型 */
   async getDictionaries(): Promise<DictCategory[]> {
@@ -51,10 +70,15 @@ class DictService {
             'http://127.0.0.1:8083/categories'
           );
           if (response && response.code === 0 && Array.isArray(response.data)) {
-            return response.data.map((category) => ({
+            const categories = response.data.map((category) => ({
               key: category.key,
               name: category.name,
             }));
+            // 追加写死的 appkey 字典（若接口已包含则不重复添加）
+            if (!categories.some((c) => c.key === 'appkey')) {
+              categories.push({ key: 'appkey', name: 'appkey' });
+            }
+            return categories;
           }
           return DICTS;
         } catch {
@@ -65,8 +89,39 @@ class DictService {
     ) as Promise<DictCategory[]>;
   }
 
+  /** 通过代理接口获取 appkey 列表，缓存 7 天 */
+  private async fetchAppkeyItems(): Promise<DictItem[]> {
+    return CacheManager.get<DictItem[]>(
+      'dict_items_appkey',
+      async () => {
+        const response = await http.proxy<OctoAppsResponse>(
+          'GET',
+          APPKEY_DEST_URL
+        );
+        if (response && response.success && Array.isArray(response.data)) {
+          return response.data.map((appkey) => ({
+            id: appkey,
+            name: appkey,
+            value: appkey,
+          }));
+        }
+        return [];
+      },
+      APPKEY_CACHE_TTL
+    ) as Promise<DictItem[]>;
+  }
+
   /** 获取指定字典下的所有选项 */
   async getDictionaryItems(dictKey: string): Promise<DictItem[]> {
+    // appkey 字典通过代理接口获取，缓存 7 天
+    if (dictKey === 'appkey') {
+      try {
+        return await this.fetchAppkeyItems();
+      } catch {
+        return [];
+      }
+    }
+
     return CacheManager.get<DictItem[]>(
       `dict_items_${dictKey}`,
       async () => {

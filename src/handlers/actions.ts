@@ -10,8 +10,6 @@ import Logger from '../core/Logger';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
 
-const ssoUrl = 'http://www.swiftlc.com/api/sso';
-
 /**
  * 注册所有执行动作
  * 对应 src/config/features.ts 中的 action 字段
@@ -30,10 +28,10 @@ export default function registerActions(app: Workflow): void {
     const proxyDest = `https://${swimlane.value}-sl-management.shangou.test.meituan.com/api/sac/account/createManagerAndRelTenant?u2dhn6k=7c5a6586a4650cdbf81a6858dd3cffad&yodaReady=h5&csecplatform=4&csecversion=4.2.0`;
     task.update(10, '配置sso账号关联...');
 
-    const data = await http.post<{ code: number; message?: string }>(
-      ssoUrl,
-      { tenantId: tenant.value },
-      { headers: { 'Content-Type': 'application/json', 'x-proxy-dest': proxyDest } }
+    const data = await http.proxy<{ code: number; message?: string }>(
+      'POST',
+      proxyDest,
+      { data: { tenantId: tenant.value } }
     );
 
     if (data.code === 0) {

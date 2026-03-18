@@ -140,14 +140,9 @@ const builtInFeatures: Feature[] = [
             async () => {
               try {
                 const proxyDest = `https://dev.sankuai.com/gateway/cargo/api/stack?type=runners_octo_status&stack_uuid=${stackUuid}`;
-                const response = await http.get<{ data?: Record<string, MachineInfo> }>(
-                  'http://www.swiftlc.com/api/sso',
-                  {
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'x-proxy-dest': proxyDest,
-                    },
-                  }
+                const response = await http.proxy<{ data?: Record<string, MachineInfo> }>(
+                  'GET',
+                  proxyDest
                 );
                 Logger.info('接口响应', response as object);
                 if (response?.data) {
