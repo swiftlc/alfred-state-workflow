@@ -172,6 +172,81 @@ const builtInFeatures: Feature[] = [
     },
   },
   {
+    id: 'view_appkey_machines',
+    name: (data: ContextData) => {
+      const appkey = data['appkey'] as DictItem | undefined;
+      return `🖥️ appkey 机器列表${appkey ? ` (${appkey.name})` : ''}`;
+    },
+    description: '查看当前 Appkey 下的服务节点列表',
+    requiredKeys: ['appkey'],
+    icon: icon('task'),
+    requiredInputs: [
+      {
+        key: 'appkey_node',
+        label: '服务节点',
+        placeholder: '请选择节点',
+        disableManualInput: true,
+        fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
+          const appkey = contextData['appkey'] as DictItem;
+          const appkeyValue = appkey.value ?? appkey.name;
+
+          return CacheManager.get<DictItem[]>(
+            `appkey_nodes:${appkeyValue}:test`,
+            async () => {
+              try {
+                const proxyDest = `https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck/serverNodes?appkey=${appkeyValue}&env=test`;
+                const response = await http.proxy<OctoServerNodesResponse>('GET', proxyDest);
+                Logger.info('appkey 机器列表响应', response as object);
+                if (response?.success && Array.isArray(response.data)) {
+                  return response.data.map((node) => {
+                    const statusText = node.status === 0 ? '正常' : `异常(${node.status})`;
+                    const swimlaneText = node.swimlane ? `泳道: ${node.swimlane}` : '基础环境';
+                    const buildingText = node.properties?.['building'] ? ` | 机房: ${node.properties['building']}` : '';
+                    return {
+                      name: `${node.ip} | ${swimlaneText}`,
+                      description: ` 状态: ${statusText}`,
+                      value: node as unknown as string,
+                    };
+                  });
+                }
+                return [];
+              } catch {
+                return [];
+              }
+            },
+            60 * 1000
+          ) as Promise<DictItem[]>;
+        },
+      },
+      {
+        key: 'appkey_node_action',
+        label: '操作',
+        placeholder: '请选择要执行的操作',
+        disableManualInput: true,
+        fetchOptions: async (): Promise<DictItem[]> => {
+          return [
+            { name: '🔗 跳转节点', value: 'jump', description: '通过 SSH 跳板机连接该节点' },
+            { name: '📋 查看服务方法', value: 'view_methods', description: '查看该节点暴露的 Thrift 服务方法列表' },
+          ];
+        },
+      },
+    ],
+    action: 'view_appkey_machines_action',
+    actionHandler: async (context) => {
+      const node = (context.data['appkey_node'] as DictItem & { value: OctoServerNode }).value;
+      const action = (context.data['appkey_node_action'] as DictItem | undefined)?.value;
+
+      if (action === 'view_methods') {
+        const appkey = (context.data['appkey'] as DictItem);
+        const appkeyValue = appkey.value ?? appkey.name;
+        openUrl(`https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck/serverNodes?appkey=${appkeyValue}&env=test`);
+      } else {
+        // 默认：跳转节点
+        openUrl(`https://jumper.mws.sankuai.com/terminal?hostIp=${node.ip}`);
+      }
+    },
+  },
+  {
     id: 'query_tenant_poi',
     name: '🏪 查询租户门店',
     description: '查询当前租户下的门店列表',
@@ -240,6 +315,26 @@ interface MachineInfo {
   status: string;
   nodeStatus: string;
   errMsg?: string;
+}
+
+/** octo serverNodes 接口返回的单个节点结构 */
+interface OctoServerNode {
+  appkey: string;
+  name: string;
+  ip: string;
+  port: number;
+  version: string;
+  /** 0: 正常, 其他: 异常 */
+  status: number;
+  cell: string;
+  swimlane: string;
+  properties?: Record<string, string>;
+}
+
+interface OctoServerNodesResponse {
+  success: boolean;
+  code: number;
+  data: OctoServerNode[];
 }
 
 interface PoiInfo {
