@@ -86,13 +86,16 @@ class Workflow {
     }
   }
 
+  /** 上下文最长保留时间：10 分钟 */
+  private static readonly CONTEXT_TTL_MS = 10 * 60 * 1000;
+
   loadContext(): Context {
     try {
       const raw = fs.readFileSync(CONTEXT_FILE, 'utf8');
       const context = JSON.parse(raw) as Context & { timestamp?: number };
 
-      // 上下文保存时间超过 1 分钟则重置
-      if (context.timestamp && Date.now() - context.timestamp > 60000) {
+      // 上下文保存时间超过 TTL 则重置
+      if (context.timestamp && Date.now() - context.timestamp > Workflow.CONTEXT_TTL_MS) {
         return { state: 'home', data: {} };
       }
       return context;
@@ -187,6 +190,8 @@ class Workflow {
     let context: Context;
     if (!arg) {
       context = this.loadContext();
+      // 每次打开 Alfred（无参数入口）都刷新 timestamp，重新计时
+      this.saveContext(context);
     } else {
       context = (decodeContext(arg) as Context | null) ?? { state: 'home', data: {} };
       this.saveContext(context);
@@ -281,7 +286,10 @@ class Workflow {
           action !== 'delete_history' &&
           action !== 'refresh_cache'
         ) {
-          this.saveContext({ state: 'home', data: context.data ?? {} });
+          // 将 action 携带的 data 与持久化上下文的 data 合并，action data 优先覆盖
+          const persisted = this.loadContext();
+          const mergedData = { ...persisted.data, ...(context.data ?? {}) };
+          this.saveContext({ state: 'home', data: mergedData });
         }
       } catch (err) {
         Logger.error(`Action execution failed: ${action}`, err as Error, { context });
