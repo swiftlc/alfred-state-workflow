@@ -249,8 +249,8 @@ export default function registerStates(app: Workflow): void {
           const nextInput = feature.requiredInputs[0]!;
           items.push(
             wf.createRerunItem(
-              `⚙️ 配置: ${featureName}`,
-              `需要输入: ${nextInput.label} (点击开始配置)`,
+              `${featureName}`,
+              `${featureDescription}`,
               'input_state',
               { data, pendingAction: feature.id, inputIndex: 0 },
               {},
@@ -261,7 +261,7 @@ export default function registerStates(app: Workflow): void {
           items.push(
             wf.createItem(` ${featureName}`, featureDescription, feature.action, {
               data,
-              historyTitle: `执行: ${featureName}`,
+              historyTitle: `${featureName}`,
               historySubtitle: featureDescription,
               recordHistory: feature.recordHistory !== false,
             }, {
@@ -527,7 +527,7 @@ export default function registerStates(app: Workflow): void {
 
         if (missingKeys.length > 0) {
           const nextDictName = dicts.find((d) => d.key === missingKeys[0])?.name ?? missingKeys[0] ?? '';
-          subtitle = `继续配置 ${featureName} (下一步: 选择${nextDictName})`;
+          subtitle = `(下一步: 选择${nextDictName})`;
           items.push(
             wf.createRerunItem(title, subtitle, 'select_dict', {
               dictKey: missingKeys[0],
@@ -537,7 +537,7 @@ export default function registerStates(app: Workflow): void {
           );
         } else if (feature.requiredInputs && feature.requiredInputs.length > 0) {
           const nextInput = feature.requiredInputs[0]!;
-          subtitle = `继续配置 ${featureName} (下一步: 输入${nextInput.label})`;
+          subtitle = `(下一步: 输入${nextInput.label})`;
           items.push(
             wf.createRerunItem(title, subtitle, 'input_state', {
               data: newData,
@@ -629,9 +629,9 @@ export default function registerStates(app: Workflow): void {
 
             if (isLastInput) {
               items.push(
-                wf.createItem(title, `执行 [${featureName}] - ${subtitle}`, feature.action, {
+                wf.createItem(title, `[${featureName}] - ${subtitle}`, feature.action, {
                   data: newData,
-                  historyTitle: `执行: ${featureName}`,
+                  historyTitle: `${featureName}`,
                   historySubtitle: featureDescription,
                   recordHistory: feature.recordHistory !== false,
                 }, {}, featureIconPath)
@@ -641,7 +641,7 @@ export default function registerStates(app: Workflow): void {
               items.push(
                 wf.createRerunItem(
                   title,
-                  `继续配置 ${featureName} (下一步: 输入${nextInput.label}) - ${subtitle}`,
+                  `${featureName} - ${subtitle}`,
                   'input_state',
                   { data: newData, pendingAction, inputIndex: inputIndex + 1 },
                   {},
@@ -670,7 +670,7 @@ export default function registerStates(app: Workflow): void {
           items.push(
             wf.createItem(`✅ 确认输入: ${query}`, `配置完成，按回车直接执行 [${featureName}]`, feature.action, {
               data: newData,
-              historyTitle: `执行: ${featureName}`,
+              historyTitle: `${featureName}`,
               historySubtitle: featureDescription,
               recordHistory: feature.recordHistory !== false,
             }, {}, featureIconPath)

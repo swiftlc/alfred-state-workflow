@@ -175,9 +175,12 @@ const builtInFeatures: Feature[] = [
     id: 'view_appkey_machines',
     name: (data: ContextData) => {
       const appkey = data['appkey'] as DictItem | undefined;
-      return `🖥️ appkey 机器列表${appkey ? ` (${appkey.name})` : ''}`;
+      return `🖥️ appkey 机器列表`;
     },
-    description: '查看当前 Appkey 下的服务节点列表',
+    description: (data: ContextData) => {
+      const appkey = data['appkey'] as DictItem | undefined;
+      return `${appkey ? ` ${appkey.name}` : ''}`;
+    },
     requiredKeys: ['appkey'],
     icon: icon('task'),
     requiredInputs: [
@@ -200,8 +203,7 @@ const builtInFeatures: Feature[] = [
                 if (response?.success && Array.isArray(response.data)) {
                   return response.data.map((node) => {
                     const statusText = node.status === 0 ? '正常' : `异常(${node.status})`;
-                    const swimlaneText = node.swimlane ? `泳道: ${node.swimlane}` : '基础环境';
-                    const buildingText = node.properties?.['building'] ? ` | 机房: ${node.properties['building']}` : '';
+                    const swimlaneText = node.swimlane ? `${node.swimlane}` : 'default';
                     return {
                       name: `${node.ip} | ${swimlaneText}`,
                       description: ` 状态: ${statusText}`,
@@ -254,23 +256,22 @@ const builtInFeatures: Feature[] = [
                   const methods: Array<{ serviceName: string; method: string }> = [];
                   // data 结构: { "full.service.ClassName": { "methodName(params):ReturnType": weight } }
                   for (const [svcClass, methodMap] of Object.entries(response.data)) {
-                    // 从完整类名中提取简短服务名（最后一个点后的部分）
                     const serviceName = svcClass.split('.').pop() ?? svcClass;
                     for (const methodSignature of Object.keys(methodMap as Record<string, unknown>)) {
                       // 提取方法名（括号前的部分）
                       const methodName = methodSignature.split('(')[0] ?? methodSignature;
                       methods.push({
                         serviceName,
-                        method: `${serviceName}#${methodName}`,
+                        method: `${methodName}`,
                       });
                     }
                   }
                   // 按方法名排序
                   methods.sort((a, b) => a.method.localeCompare(b.method));
                   return methods.map((m) => ({
-                    name: m.method,
-                    description: m.serviceName,
-                    value: m.method,
+                    name: m.serviceName,
+                    description: m.method,
+                    value: `${m.serviceName}#${m.method}`,
                   }));
                 }
                 return [];
