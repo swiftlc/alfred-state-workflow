@@ -1,0 +1,466 @@
+<mxfile host="65bd71144e">
+    <diagram id="p1" name="Filter-Action 数据流">
+        <mxGraphModel dx="2277" dy="1043" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="960" pageHeight="1080" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="ttl" value="Filter → Action 主交互数据流" style="text;strokeColor=none;fillColor=none;html=1;fontSize=18;fontStyle=1;align=center;" vertex="1" parent="1">
+                    <mxGeometry x="130" y="20" width="700" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="lh" value="① Script Filter 路径" style="text;strokeColor=none;fillColor=none;html=1;fontSize=12;fontStyle=2;align=center;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="68" width="220" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="rh" value="② Run Script 路径" style="text;strokeColor=none;fillColor=none;html=1;fontSize=12;fontStyle=2;align=center;" vertex="1" parent="1">
+                    <mxGeometry x="510" y="68" width="220" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="L1" value="Alfred 触发 Script Filter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cccccc;strokeColor=#333333;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="100" width="220" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="L2" value="filter.ts&#xa;读取 WORKFLOW_STATE + query" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="200" width="220" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="L3" value="decodeContext(arg)&#xa;解析 Base64 JSON → Context" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="300" width="220" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="L4" value="有 arg?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="65" y="390" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="L5a" value="loadContext()&#xa;读 context.json&#xa;TTL 10分钟检查" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="500" width="180" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="L6" value="查找 StateHandler&#xa;context.state → handler" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="620" width="220" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="L7" value="StateHandler 执行&#xa;(home / select_dict / input_state&#xa;/ progress / history_manage …)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="720" width="220" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="L8" value="返回 AlfredItem[]&#xa;item.arg = encodeContext({action,…})" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="840" width="220" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="L9" value="Alfred UI 展示列表" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cccccc;strokeColor=#333333;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="940" width="220" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="R1" value="用户选中条目（按回车）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cccccc;strokeColor=#333333;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+                    <mxGeometry x="510" y="940" width="220" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="R2" value="action.ts&#xa;读取 alfred_workflow_arg" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="510" y="840" width="220" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="R3" value="decodeContext(arg)&#xa;获取 action 名称" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="510" y="740" width="220" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="R4" value="ActionHandler(context, wf)&#xa;执行业务逻辑" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="510" y="640" width="220" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="R5" value="耗时操作?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="545" y="540" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="R6a" value="saveContext()&#xa;state=home, data=merged&#xa;写 context.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#333333;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="510" y="420" width="220" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="R6b" value="wf.startTask()&#xa;→ 见「后台任务」页" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#555555;fontSize=11;dashed=1;" vertex="1" parent="1">
+                    <mxGeometry x="760" y="550" width="170" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="eL1L2" value="WORKFLOW_STATE + query" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="L1" target="L2">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eL2L3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="L2" target="L3">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eL3L4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="L3" target="L4">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eL4L5a" value="无 arg" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="L4" target="L5a">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="20" y="420"/>
+                            <mxPoint x="20" y="532"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="eL5aL6" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0;entryY=0.5;" edge="1" parent="1" source="L5a" target="L6">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="120" y="585"/>
+                            <mxPoint x="120" y="645"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="eL4L6" value="有 arg" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=1;exitY=0.5;entryX=1;entryY=0;" edge="1" parent="1" source="L4" target="L6">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="280" y="420"/>
+                            <mxPoint x="280" y="645"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="eL6L7" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="L6" target="L7">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eL7L8" value="JSON stdout" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="L7" target="L8">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eL8L9" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="L8" target="L9">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eBridge" value="用户选中 item&#xa;alfred_workflow_arg = item.arg" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="L9" target="R1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eR1R2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="R1" target="R2">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eR2R3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="R2" target="R3">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eR3R4" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="R3" target="R4">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eR4R5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="R4" target="R5">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eR5R6a" value="否" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="R5" target="R6a">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eR5R6b" value="是" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="R5" target="R6b">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eLoop" value="下次 Alfred 打开读取持久化 Context" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#888888;exitX=0;exitY=0.5;entryX=0;entryY=0.5;endArrow=open;" edge="1" parent="1" source="R6a" target="L1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="460" y="452"/>
+                            <mxPoint x="460" y="50"/>
+                            <mxPoint x="10" y="50"/>
+                            <mxPoint x="10" y="125"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="noteRerun" value="※ progress 状态：rerun=0.2s&#xa;   Alfred 每 0.2 秒自动重触发 Script Filter" style="text;strokeColor=#aaaaaa;fillColor=#f8f8f8;html=1;fontSize=10;align=left;spacingLeft=6;whiteSpace=wrap;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="790" width="280" height="40" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram id="p2" name="后台任务流程">
+        <mxGraphModel dx="1480" dy="678" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="900" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="ttl2" value="后台任务流程（Worker + rerun 轮询循环）" style="text;strokeColor=none;fillColor=none;html=1;fontSize=18;fontStyle=1;align=center;" vertex="1" parent="1">
+                    <mxGeometry x="100" y="16" width="800" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="col1bg" value="主进程（action.ts）" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#555555;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="60" width="280" height="720" as="geometry"/>
+                </mxCell>
+                <mxCell id="M1" value="ActionHandler 调用&#xa;wf.startTask(taskName, ctx)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cccccc;strokeColor=#555555;fontSize=11;" vertex="1" parent="col1bg">
+                    <mxGeometry x="25" y="40" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="M2" value="生成 jobId&#xa;job_&lt;ts&gt;_&lt;rand&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col1bg">
+                    <mxGeometry x="25" y="130" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="M3" value="TaskManager.initTask(jobId)&#xa;写入 status=running" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col1bg">
+                    <mxGeometry x="25" y="220" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="M4" value="spawn tsx worker.ts&#xa;taskName jobId contextStr&#xa;(detached, stdio:ignore)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col1bg">
+                    <mxGeometry x="25" y="310" width="230" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="M5" value="triggerAlfred()&#xa;encodeContext({state:&#39;progress&#39;, jobId})" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col1bg">
+                    <mxGeometry x="25" y="420" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="M6" value="主进程退出" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cccccc;strokeColor=#555555;fontSize=11;" vertex="1" parent="col1bg">
+                    <mxGeometry x="65" y="510" width="150" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="eM12" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col1bg" source="M1" target="M2">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eM23" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col1bg" source="M2" target="M3">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eM34" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col1bg" source="M3" target="M4">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eM45" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col1bg" source="M4" target="M5">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eM56" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col1bg" source="M5" target="M6">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="col2bg" value="Worker 子进程（worker.ts）" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#555555;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+                    <mxGeometry x="340" y="60" width="280" height="720" as="geometry"/>
+                </mxCell>
+                <mxCell id="W1" value="worker 启动&#xa;解析 taskName / jobId / ctx" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col2bg">
+                    <mxGeometry x="25" y="40" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="W2" value="执行 TaskHandler&#xa;await handler(updater, ctx)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col2bg">
+                    <mxGeometry x="25" y="130" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="W3" value="updater.update(progress, msg)&#xa;检查 cancelled 状态" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col2bg">
+                    <mxGeometry x="25" y="220" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="WD" value="已取消?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#555555;fontSize=11;" vertex="1" parent="col2bg">
+                    <mxGeometry x="75" y="310" width="130" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="W4" value="TaskManager.updateTask()&#xa;写进度到 job_*.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col2bg">
+                    <mxGeometry x="25" y="410" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="W5" value="status = done / error" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cccccc;strokeColor=#555555;fontSize=11;" vertex="1" parent="col2bg">
+                    <mxGeometry x="55" y="500" width="170" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="WC" value="抛出取消异常&#xa;status=cancelled" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col2bg">
+                    <mxGeometry x="25" y="580" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="eW12" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col2bg" source="W1" target="W2">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eW23" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col2bg" source="W2" target="W3">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eW3D" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col2bg" source="W3" target="WD">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eWDno" value="否" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="col2bg" source="WD" target="W4">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eW45" value="完成" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col2bg" source="W4" target="W5">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eWDyes" value="是" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="col2bg" source="WD" target="WC">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="20" y="340"/>
+                            <mxPoint x="20" y="607"/>
+                            <mxPoint x="140" y="607"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="eWloop" value="继续执行" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#888888;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="col2bg" source="W4" target="W3">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="265" y="437"/>
+                            <mxPoint x="265" y="247"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="col3bg" value="Alfred + Script Filter" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#555555;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="60" width="280" height="720" as="geometry"/>
+                </mxCell>
+                <mxCell id="F1" value="triggerAlfred 触发&#xa;Script Filter state=progress" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col3bg">
+                    <mxGeometry x="25" y="40" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="F2" value="progress StateHandler&#xa;TaskManager.getTask(jobId)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col3bg">
+                    <mxGeometry x="25" y="130" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="FD" value="status=&#xa;running?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#555555;fontSize=11;" vertex="1" parent="col3bg">
+                    <mxGeometry x="75" y="220" width="130" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="F3" value="返回进度 item&#xa;rerun: 0.2s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col3bg">
+                    <mxGeometry x="25" y="320" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="F4" value="Alfred 0.2s 后&#xa;重新触发 Script Filter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cccccc;strokeColor=#555555;fontSize=11;" vertex="1" parent="col3bg">
+                    <mxGeometry x="25" y="410" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="F5" value="展示完成/失败结果&#xa;用户回车 → home" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8e8e8;strokeColor=#555555;fontSize=11;" vertex="1" parent="col3bg">
+                    <mxGeometry x="25" y="530" width="230" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="eF12" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col3bg" source="F1" target="F2">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eF2D" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col3bg" source="F2" target="FD">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eFDrun" value="是" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="col3bg" source="FD" target="F3">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eF34" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;" edge="1" parent="col3bg" source="F3" target="F4">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eFDdone" value="否(done/error)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="col3bg" source="FD" target="F5">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="265" y="252"/>
+                            <mxPoint x="265" y="557"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="eFloop" value="rerun 循环" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#888888;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="col3bg" source="F4" target="F2">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="15" y="437"/>
+                            <mxPoint x="15" y="157"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="storage" value="data/job_&lt;id&gt;.json&#xa;（共享任务状态文件）" style="shape=mxgraph.flowchart.database;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="430" y="820" width="160" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="eSpawn" value="spawn 子进程" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#555555;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="M4" target="W1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="330" y="375"/>
+                            <mxPoint x="330" y="107"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="eTrigger" value="osascript&#xa;External Trigger" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#555555;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="M5" target="F1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="650" y="467"/>
+                            <mxPoint x="650" y="107"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="eWrite" value="写进度" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#333333;exitX=0.5;exitY=1;entryX=0;entryY=0.5;" edge="1" parent="1" source="W4" target="storage">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eRead" value="读进度" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#777777;exitX=0.5;exitY=1;entryX=1;entryY=0.5;" edge="1" parent="1" source="F2" target="storage">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="noteCancel" value="取消：用户 Cmd+Enter → cancel_task action → TaskManager 写 status=cancelled → worker 下次 update() 检测到 → 抛异常终止" style="text;strokeColor=#aaaaaa;fillColor=#f8f8f8;html=1;fontSize=10;align=left;spacingLeft=6;whiteSpace=wrap;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="900" width="700" height="35" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram id="p3" name="系统组件总览">
+        <mxGraphModel dx="1480" dy="678" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="760" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="ttl3" value="系统组件总览" style="text;strokeColor=none;fillColor=none;html=1;fontSize=18;fontStyle=1;align=center;" vertex="1" parent="1">
+                    <mxGeometry x="300" y="16" width="600" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="bg1" value="Alfred 宿主应用" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#888888;fontSize=12;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="60" width="1160" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="A1" value="Script Filter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="90" width="140" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="A2" value="Run Script" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="280" y="90" width="140" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="A3" value="Alfred UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="480" y="90" width="140" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="A4" value="External Trigger (osascript)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="700" y="90" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="bg2" value="入口层  src/" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#888888;fontSize=12;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="175" width="1160" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="B1" value="filter.ts&#xa;runFilter(arg, query)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="80" y="200" width="180" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="B2" value="action.ts&#xa;runAction(arg)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="340" y="200" width="180" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="B3" value="worker.ts&#xa;(tsx 子进程)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="200" width="180" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="bg3" value="核心层  src/core/" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#888888;fontSize=12;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="295" width="1160" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="C1" value="Workflow.ts&#xa;状态机/动作/任务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#cccccc;strokeColor=#555555;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="320" width="140" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="C2" value="CacheManager&#xa;cache.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="200" y="320" width="130" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="C3" value="HistoryManager&#xa;history.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="345" y="320" width="130" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="C4" value="TaskManager&#xa;job_*.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="490" y="320" width="130" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="C5" value="WorkspaceManager&#xa;workspaces.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="635" y="320" width="140" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="C6" value="AliasManager&#xa;aliases.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="790" y="320" width="130" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="C7" value="PluginManager&#xa;plugins/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="935" y="320" width="120" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="C8" value="HttpClient&#xa;proxy:8083" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="1070" y="320" width="100" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="bg4" value="配置 &amp; 处理层  src/config/ + src/handlers/ + src/services/" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#888888;fontSize=12;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="425" width="1160" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="D1" value="config/features.ts&#xa;Feature[] 功能矩阵" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="60" y="450" width="190" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="D2" value="handlers/states.ts&#xa;StateHandler 注册" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="310" y="450" width="190" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="D3" value="handlers/actions.ts&#xa;ActionHandler 注册" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="560" y="450" width="190" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="D4" value="services/dictService.ts&#xa;字典数据服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="810" y="450" width="190" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="bg5" value="外部系统" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#888888;fontSize=12;fontStyle=1;verticalAlign=top;align=left;spacingLeft=10;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="545" width="1160" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="E1" value="本地代理服务&#xa;127.0.0.1:8083" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="150" y="570" width="180" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="E2" value="字典 API&#xa;/categories /dictionaries" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="510" y="570" width="180" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="E3" value="远程 API&#xa;octo / cargo / etc." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e0e0;strokeColor=#555555;fontSize=11;" vertex="1" parent="1">
+                    <mxGeometry x="870" y="570" width="180" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="eA1B1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="A1" target="B1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eA2B2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="A2" target="B2">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eB1C1" value="runFilter()" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=0.5;exitY=1;entryX=0.3;entryY=0;" edge="1" parent="1" source="B1" target="C1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eB2C1" value="runAction()" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=0.5;exitY=1;entryX=0.7;entryY=0;" edge="1" parent="1" source="B2" target="C1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eB3C4" value="updateTask()" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="B3" target="C4">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eC1D2" value="onState()" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=0.3;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="C1" target="D2">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eC1D3" value="onAction()" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=0.7;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="C1" target="D3">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eC7D1" value="inject Feature[]" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="C7" target="D1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="995" y="415"/>
+                            <mxPoint x="155" y="415"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="eD2D4" value="getDicts()" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="D2" target="D4">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="eD4C2" value="get/set" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="D4" target="C2">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="905" y="415"/>
+                            <mxPoint x="265" y="415"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="eC8E1" value="HTTP" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="C8" target="E1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1120" y="535"/>
+                            <mxPoint x="240" y="535"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="eE1E3" value="转发" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="E1" target="E3">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

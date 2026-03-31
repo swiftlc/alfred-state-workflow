@@ -12,11 +12,11 @@
 import CacheManager from '../core/CacheManager';
 import {http} from '../core/HttpClient';
 import type {DictCategory, DictItem} from '../types';
+import {PROXY_BASE_URL} from '../config/features';
 
 const DICTS: DictCategory[] = [
   { key: 'tenant', name: '租户' },
   { key: 'swimlane', name: '泳道' },
-  { key: 'env', name: '环境' },
   { key: 'appkey', name: 'appkey' },
 ];
 
@@ -62,31 +62,7 @@ const APPKEY_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 class DictService {
   /** 获取所有字典类型 */
   async getDictionaries(): Promise<DictCategory[]> {
-    return CacheManager.get<DictCategory[]>(
-      'dicts_list',
-      async () => {
-        try {
-          const response = await http.get<ApiResponse<DictCategory[]>>(
-            'http://127.0.0.1:8083/categories'
-          );
-          if (response && response.code === 0 && Array.isArray(response.data)) {
-            const categories = response.data.map((category) => ({
-              key: category.key,
-              name: category.name,
-            }));
-            // 追加写死的 appkey 字典（若接口已包含则不重复添加）
-            if (!categories.some((c) => c.key === 'appkey')) {
-              categories.push({ key: 'appkey', name: 'appkey' });
-            }
-            return categories;
-          }
-          return DICTS;
-        } catch {
-          return DICTS;
-        }
-      },
-      24 * 60 * 60 * 1000 // 缓存 24 小时
-    ) as Promise<DictCategory[]>;
+    return DICTS;
   }
 
   /** 通过代理接口获取 appkey 列表，缓存 7 天 */
@@ -127,7 +103,7 @@ class DictService {
       async () => {
         try {
           const response = await http.get<ApiResponse<DictItem[]>>(
-            'http://127.0.0.1:8083/dictionaries',
+            `${PROXY_BASE_URL}/dictionaries`,
             { params: { categoryKey: dictKey } }
           );
           if (response && response.code === 0 && Array.isArray(response.data)) {

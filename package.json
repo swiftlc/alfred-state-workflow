@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "filter": "tsx src/filter.ts",
-    "action": "tsx src/action.ts",
+    "filter": "bun src/filter.ts",
+    "action": "bun src/action.ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

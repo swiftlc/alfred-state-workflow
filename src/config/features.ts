@@ -6,6 +6,8 @@ import {copyToClipboard, openUrl, sendNotification} from '../core/utils';
 import {icon} from '../core/icons';
 import type {ContextData, DictItem, Feature} from '../types';
 
+export const PROXY_BASE_URL = 'http://127.0.0.1:8083';
+
 /**
  * 功能矩阵配置
  *
@@ -105,7 +107,7 @@ const builtInFeatures: Feature[] = [
       const currentDict = context.data['_currentDict'] as DictItem;
       const input1 = context.data['input1'] as DictItem;
 
-      await http.put('http://127.0.0.1:8083/dictionaries', {
+      await http.put(`${PROXY_BASE_URL}/dictionaries`, {
         categoryKey: currentDict.key,
         title: currentSelected.name,
         description: input1.value,
