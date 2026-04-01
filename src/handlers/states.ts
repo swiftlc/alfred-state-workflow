@@ -1,5 +1,6 @@
 import dictService from '../services/dictService';
 import features from '../config/features';
+import DictPinManager from '../core/DictPinManager';
 import TaskManager from '../core/TaskManager';
 import HistoryManager from '../core/HistoryManager';
 import WorkspaceManager, {WorkspaceManager as WorkspaceManagerClass} from '../core/WorkspaceManager';
@@ -157,12 +158,6 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    if (displayHistory.length > 0 && matchQuery(query, '管理历史记录')) {
-      items.push(
-        wf.createRerunItem('📚 管理历史记录', `查看全部 ${history.length} 条历史记录`, 'history_manage', {}, {}, Icons.history)
-      );
-    }
-
     // 2. 字典选择区
     const dicts = await dictService.getDictionaries();
     for (const dict of dicts) {
@@ -178,56 +173,34 @@ export default function registerStates(app: Workflow): void {
     // 3. 功能矩阵区
     for (const feature of features) {
       if (feature.type === 'split_by_dict') {
-        for (const dict of dicts) {
-          if (feature.excludeKeys?.includes(dict.key)) continue;
-          const selected = data[dict.key] as DictItem | undefined;
-          if (!selected) continue;
+        // 计算有多少个字典项可以执行此 feature
+        const availableDicts = dicts.filter((dict) => {
+          if (feature.excludeKeys?.includes(dict.key)) return false;
+          return !!(data[dict.key] as DictItem | undefined);
+        });
+        if (availableDicts.length === 0) continue;
 
-          const contextData: ContextData = {
-            ...data,
-            _currentDict: dict as unknown as DictItem,
-            _currentSelected: selected,
-          };
-          const featureName = typeof feature.name === 'function' ? feature.name(contextData) : feature.name;
-          const featureDescription =
-            typeof feature.description === 'function' ? feature.description(contextData) : feature.description;
+        // 用第一个可用字典项的数据生成 feature 名称作为入口标题
+        const firstDict = availableDicts[0]!;
+        const firstSelected = data[firstDict.key] as DictItem;
+        const firstContextData: ContextData = {
+          ...data,
+          _currentDict: firstDict as unknown as DictItem,
+          _currentSelected: firstSelected,
+        };
+        // 一级入口标题优先用 label，其次用静态 name，动态 name 函数则 fallback 到 feature.id
+        const entryTitle = feature.label
+          ?? (typeof feature.name === 'string' ? feature.name : feature.id);
+        const entrySubtitle = availableDicts.map((d) => (data[d.key] as DictItem).name).join(' / ');
 
-          if (!matchQuery(query, featureName, featureDescription)) continue;
+        if (!matchQuery(query, entryTitle, entrySubtitle)) continue;
 
-          const featureIconPath = feature.icon?.path;
-          if (feature.requiredInputs && feature.requiredInputs.length > 0) {
-            items.push(
-              wf.createRerunItem(featureName, featureDescription, 'input_state', {
-                data: contextData,
-                dictKey: dict.key,
-                pendingAction: feature.id,
-                inputIndex: 0,
-              }, {}, featureIconPath)
-            );
-        } else {
-          items.push(
-            wf.createItem(featureName, featureDescription, feature.action, {
-              data: contextData,
-              dictKey: dict.key,
-              historyTitle: featureName,
-              historySubtitle: featureDescription,
-              recordHistory: feature.recordHistory !== false,
-            }, {
-              cmd: {
-                subtitle: `⚡ 存为快捷指令: ${featureName}`,
-                action: 'rerun',
-                payload: {
-                  nextState: 'alias_save',
-                  data: contextData,
-                  pendingAction: feature.action,
-                  aliasTitle: featureName,
-                  aliasSubtitle: featureDescription,
-                },
-              },
-            }, featureIconPath)
-          );
-        }
-        }
+        items.push(
+          wf.createRerunItem(entryTitle, entrySubtitle, 'split_feature', {
+            data,
+            pendingFeatureId: feature.id,
+          }, {}, feature.icon?.path)
+        );
         continue;
       }
 
@@ -297,67 +270,176 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    // 4. 任务中心入口
+    // 4. 管理中心入口（汇聚所有管理类操作，避免干扰主流程）
     const tasks = TaskManager.getAllTasks();
-    if (tasks.length > 0) {
-      const runningCount = tasks.filter((t) => t.status === 'running').length;
-      const title =
-        runningCount > 0
-          ? `⏳ 任务中心 (${runningCount}个运行中)`
-          : `📋 任务中心 (${tasks.length}个历史任务)`;
-      if (matchQuery(query, '任务中心', 'task')) {
-        items.push(wf.createRerunItem(title, '查看和管理后台任务', 'task_manage', { data }, {}, Icons.task));
-      }
+    const runningCount = tasks.filter((t) => t.status === 'running').length;
+    const manageBadges: string[] = [];
+    if (runningCount > 0) manageBadges.push(`${runningCount}个任务运行中`);
+    const manageSubtitle = manageBadges.length > 0
+      ? `历史 / 任务 / 工作区 / 快捷指令  ·  ${manageBadges.join('  ')}`
+      : '历史 / 任务 / 工作区 / 快捷指令';
+
+    if (matchQuery(query, '管理', 'manage', '历史', '任务', '工作区', '快捷指令', '缓存', '上下文')) {
+      items.push(wf.createRerunItem('⚙️ 管理', manageSubtitle, 'manage', { data }, {}, Icons.workflow));
     }
 
-    // 5. 工作区管理入口
+    return items;
+  });
+
+  /**
+   * 状态：管理中心 (manage)
+   * 汇聚历史记录、任务中心、工作区、快捷指令、清空上下文、刷新缓存等管理类操作
+   */
+  app.onState('manage', async (context, wf) => {
+    const query = context.query ?? '';
+    const data = context.data ?? {};
+    const items: AlfredItem[] = [];
+
+    // 历史记录
+    const history = HistoryManager.getHistory();
+    if (matchQuery(query, '历史记录', 'history')) {
+      items.push(
+        wf.createRerunItem(
+          '📚 历史记录',
+          `共 ${history.length} 条记录`,
+          'history_manage',
+          { data },
+          {},
+          Icons.history
+        )
+      );
+    }
+
+    // 任务中心
+    const tasks = TaskManager.getAllTasks();
+    if (matchQuery(query, '任务中心', 'task')) {
+      const runningCount = tasks.filter((t) => t.status === 'running').length;
+      const taskTitle = runningCount > 0
+        ? `⏳ 任务中心 (${runningCount}个运行中)`
+        : `📋 任务中心`;
+      const taskSubtitle = tasks.length > 0
+        ? `共 ${tasks.length} 条任务记录`
+        : '暂无后台任务';
+      items.push(wf.createRerunItem(taskTitle, taskSubtitle, 'task_manage', { data }, {}, Icons.task));
+    }
+
+    // 工作区管理
     if (matchQuery(query, '工作区', 'workspace')) {
       const workspaces = WorkspaceManager.getAll();
-      const wsCount = workspaces.length;
-      const subtitle = wsCount > 0
-        ? `已保存 ${wsCount} 个工作区  ·  快速切换上下文快照`
+      const wsSubtitle = workspaces.length > 0
+        ? `已保存 ${workspaces.length} 个工作区`
         : '保存当前上下文为工作区，下次一键恢复';
       items.push(
-        wf.createRerunItem(
-          '🗂️ 工作区管理',
-          subtitle,
-          'workspace_manage',
-          { data },
-          {},
-          Icons.workspace
-        )
+        wf.createRerunItem('🗂️ 工作区管理', wsSubtitle, 'workspace_manage', { data }, {}, Icons.workspace)
       );
     }
 
-    // 6. 快捷指令管理入口
+    // 快捷指令管理
     if (matchQuery(query, '快捷指令', '指令', 'alias')) {
-      const aliasCount = aliases.length;
-      const subtitle = aliasCount > 0
-        ? `已保存 ${aliasCount} 条快捷指令  ·  一键执行常用操作`
+      const aliases = AliasManager.getAll();
+      const aliasSubtitle = aliases.length > 0
+        ? `已保存 ${aliases.length} 条快捷指令`
         : '将功能操作绑定为触发词，一步直达执行';
       items.push(
-        wf.createRerunItem(
-          '⚡ 快捷指令',
-          subtitle,
-          'alias_manage',
-          { data },
-          {},
-          Icons.alias
-        )
+        wf.createRerunItem('⚡ 快捷指令', aliasSubtitle, 'alias_manage', { data }, {}, Icons.alias)
       );
     }
 
-    // 7. 上下文 / 缓存管理
-    if (Object.keys(data).length > 0 && matchQuery(query, '清空上下文')) {
+    // 清空上下文
+    if (Object.keys(data).filter((k) => !k.startsWith('_')).length > 0 && matchQuery(query, '清空上下文')) {
       items.push(
         wf.createRerunItem('🗑️ 清空上下文', '清除所有已选择的字典数据，重新开始', 'home', { data: {} }, {}, Icons.context)
       );
     }
 
-    if (matchQuery(query, '刷新缓存')) {
-      items.push(wf.createItem('🔄 强制刷新缓存', '清除本地字典缓存并重新获取', 'refresh_cache', {}, {}, Icons.cache));
+    // 强制刷新缓存
+    if (matchQuery(query, '刷新缓存', 'refresh')) {
+      items.push(
+        wf.createItem('🔄 强制刷新缓存', '清除本地字典缓存并重新获取', 'refresh_cache', { data }, {}, Icons.cache)
+      );
     }
 
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }, {}, Icons.workflow));
+    return items;
+  });
+
+  /**
+   * 状态：split_by_dict 功能二级展开 (split_feature)
+   * 展示某个 split_by_dict feature 下所有字典项的具体操作条目
+   */
+  app.onState('split_feature', async (context, wf) => {
+    const query = context.query ?? '';
+    const data = context.data ?? {};
+    const pendingFeatureId = context['pendingFeatureId'] as string | undefined;
+    const items: AlfredItem[] = [];
+
+    const feature = features.find((f) => f.id === pendingFeatureId);
+    if (!feature || !pendingFeatureId) {
+      const homeHandler = wf.states['home'];
+      if (homeHandler) return homeHandler({ ...context, state: 'home', query }, wf);
+      return [];
+    }
+
+    const dicts = await dictService.getDictionaries();
+
+    for (const dict of dicts) {
+      if (feature.excludeKeys?.includes(dict.key)) continue;
+      const selected = data[dict.key] as DictItem | undefined;
+      if (!selected) continue;
+
+      const contextData: ContextData = {
+        ...data,
+        _currentDict: dict as unknown as DictItem,
+        _currentSelected: selected,
+      };
+      const featureName = typeof feature.name === 'function' ? feature.name(contextData) : feature.name;
+      const featureDescription =
+        typeof feature.description === 'function' ? feature.description(contextData) : feature.description;
+
+      // 展示字典项本身的信息，不重复展示功能名称
+      const itemTitle = selected.name;
+      const itemSubtitle = selected.value === selected.description
+        ? (selected.value ?? '')
+        : [selected.value, selected.description].filter(Boolean).join('  ');
+
+      if (!matchQuery(query, selected.name, selected.value, selected.description)) continue;
+
+      const featureIconPath = feature.icon?.path;
+      if (feature.requiredInputs && feature.requiredInputs.length > 0) {
+        items.push(
+          wf.createRerunItem(itemTitle, itemSubtitle, 'input_state', {
+            data: contextData,
+            dictKey: dict.key,
+            pendingAction: feature.id,
+            inputIndex: 0,
+          }, {}, featureIconPath)
+        );
+      } else {
+        items.push(
+          wf.createItem(itemTitle, itemSubtitle, feature.action, {
+            data: contextData,
+            dictKey: dict.key,
+            historyTitle: featureName,
+            historySubtitle: featureDescription,
+            recordHistory: feature.recordHistory !== false,
+          }, {
+            cmd: {
+              subtitle: `⚡ 存为快捷指令: ${featureName}`,
+              action: 'rerun',
+              payload: {
+                nextState: 'alias_save',
+                data: contextData,
+                pendingAction: feature.action,
+                aliasTitle: featureName,
+                aliasSubtitle: featureDescription,
+              },
+            },
+          }, featureIconPath)
+        );
+      }
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }, {}, Icons.workflow));
     return items;
   });
 
@@ -497,18 +579,39 @@ export default function registerStates(app: Workflow): void {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
 
+    // dictKey 缺失时（如 esc 后重新打开 Alfred，context 残留了 select_dict 状态），回退到 home
+    if (!dictKey) {
+      const homeHandler = wf.states['home'];
+      if (homeHandler) return homeHandler({ ...context, state: 'home', query }, wf);
+      return [];
+    }
+
     let dictItems = await dictService.getDictionaryItems(dictKey);
     const dicts = await dictService.getDictionaries();
     const dictName = dicts.find((d) => d.key === dictKey)?.name ?? dictKey;
 
+    const pinnedMap = DictPinManager.getAll();
+    const pinKey = (item: { id?: string; name: string }) => `${dictKey}:${item.id ?? item.name}`;
+
     if (query) {
       dictItems = dictItems.filter((item) => matchQuery(query, item.name, item.value));
       dictItems.unshift({ id: `manual_${query}`, name: query, value: query, isManual: true });
+    } else {
+      // 无搜索词时，已 pin 的条目排在最前
+      dictItems.sort((a, b) => {
+        const aPinned = !!pinnedMap[pinKey(a)];
+        const bPinned = !!pinnedMap[pinKey(b)];
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        return 0;
+      });
     }
 
     for (const item of dictItems) {
       const newData: ContextData = { ...data, [dictKey]: item };
-      const title = item.isManual ? `✏️ 手动输入: ${item.name}` : item.name;
+      const isPinned = !item.isManual && !!pinnedMap[pinKey(item)];
+      const titlePrefix = isPinned ? '📌 ' : '';
+      const title = item.isManual ? `✏️ 手动输入: ${item.name}` : `${titlePrefix}${item.name}`;
       let subtitle = item.isManual
         ? `将 ${item.name} 设置为当前 ${dictName} (手动输入)`
         : item.value === item.description
@@ -557,7 +660,30 @@ export default function registerStates(app: Workflow): void {
           );
         }
       } else {
-        items.push(wf.createRerunItem(title, subtitle, 'home', { data: newData }, {}, Icons.context));
+        const canModify = !item.isManual;
+        const canDelete = canModify && dictKey !== 'appkey' && !!item.id;
+        const mods: Record<string, { subtitle: string; action: string; payload: Record<string, unknown> }> = {};
+        const hints: string[] = [];
+
+        if (canModify) {
+          mods['cmd'] = {
+            subtitle: isPinned ? '取消置顶' : '📌 置顶此条目',
+            action: 'toggle_pin_dict_item',
+            payload: { dictPinKey: pinKey(item), dictKey, data },
+          };
+          hints.push('[Cmd] ' + (isPinned ? '取消置顶' : '置顶'));
+        }
+        if (canDelete) {
+          mods['alt'] = {
+            subtitle: '🗑️ 删除此条目',
+            action: 'delete_dict_item',
+            payload: { dictItemId: item.id, dictKey, dictItemName: item.name, data },
+          };
+          hints.push('[Alt] 删除');
+        }
+
+        const itemSubtitle = hints.length > 0 ? `${subtitle}  ${hints.join('  ')}` : subtitle;
+        items.push(wf.createRerunItem(title, itemSubtitle, 'home', { data: newData }, mods, Icons.context));
       }
     }
 

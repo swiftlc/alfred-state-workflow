@@ -1,11 +1,12 @@
 import {execSync} from 'child_process';
 import {copyToClipboard, encodeContext, openUrl, sendNotification} from '../core/utils';
 import CacheManager from '../core/CacheManager';
+import DictPinManager from '../core/DictPinManager';
+import {http} from '../core/HttpClient';
 import HistoryManager from '../core/HistoryManager';
 import TaskManager from '../core/TaskManager';
 import WorkspaceManager from '../core/WorkspaceManager';
 import AliasManager from '../core/AliasManager';
-import {http} from '../core/HttpClient';
 import Logger from '../core/Logger';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
@@ -31,7 +32,7 @@ export default function registerActions(app: Workflow): void {
     const data = await http.proxy<{ code: number; message?: string }>(
       'POST',
       proxyDest,
-      { data: { tenantId: tenant.value } }
+      { data: { tenantId: tenant.value }, timeout: 30000 }
     );
 
     if (data.code === 0) {
@@ -54,15 +55,6 @@ export default function registerActions(app: Workflow): void {
   app.onAction('jump_qnh', async (context) => {
     const swimlane = context.data['swimlane'] as DictItem;
     openUrl(`https://${swimlane.value}-sl-qnh.shangou.test.meituan.com/`);
-  });
-
-  // 动作：切换环境
-  app.onAction('switch_env', async (context) => {
-    const swimlane = context.data['swimlane'] as DictItem;
-    const branch = context.data['branch'] as DictItem | undefined;
-    let msg = `已切换到环境: ${swimlane.name}`;
-    if (branch) msg += `，分支: ${branch.name}`;
-    sendNotification(msg, 'Workflow');
   });
 
   // 动作：复制字典值到剪切板
@@ -88,6 +80,35 @@ export default function registerActions(app: Workflow): void {
     CacheManager.clearAll();
     sendNotification('缓存已清空，下次查询将重新获取数据', '刷新成功');
     wf.triggerAlfred(encodeContext({ state: 'home', data: context.data }));
+  });
+
+  // 动作：切换字典条目置顶状态（Cmd+Enter 触发）
+  app.onAction('toggle_pin_dict_item', async (context, wf) => {
+    const dictPinKey = context['dictPinKey'] as string | undefined;
+    const dictKey = context['dictKey'] as string | undefined;
+
+    if (!dictPinKey || !dictKey) return;
+
+    DictPinManager.toggle(dictPinKey);
+    wf.triggerAlfred(encodeContext({ state: 'select_dict', dictKey, data: context.data }));
+  });
+
+  // 动作：删除字典条目（Alt+Enter 触发）
+  app.onAction('delete_dict_item', async (context, wf) => {
+    const dictItemId = context['dictItemId'] as string | undefined;
+    const dictKey = context['dictKey'] as string | undefined;
+    const dictItemName = context['dictItemName'] as string | undefined;
+
+    if (!dictItemId || !dictKey) {
+      sendNotification('缺少必要参数，无法删除', '删除失败');
+      return;
+    }
+
+    const PROXY_BASE_URL = 'http://127.0.0.1:8080';
+    await http.delete(`${PROXY_BASE_URL}/dictionaries/${dictItemId}`);
+    CacheManager.clear(`dict_items_${dictKey}`);
+    sendNotification(`已删除: ${dictItemName ?? dictItemId}`, '删除成功');
+    wf.triggerAlfred(encodeContext({ state: 'select_dict', dictKey, data: context.data }));
   });
 
   // 动作：固定/取消固定历史记录

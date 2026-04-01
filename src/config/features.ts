@@ -6,7 +6,7 @@ import {copyToClipboard, openUrl, sendNotification} from '../core/utils';
 import {icon} from '../core/icons';
 import type {ContextData, DictItem, Feature} from '../types';
 
-export const PROXY_BASE_URL = 'http://127.0.0.1:8083';
+export const PROXY_BASE_URL = 'http://127.0.0.1:8080';
 
 /**
  * 功能矩阵配置
@@ -44,34 +44,8 @@ const builtInFeatures: Feature[] = [
     icon: icon('search'),
   },
   {
-    id: 'switch_env',
-    name: '切换环境',
-    description: '切换当前工作环境',
-    requiredKeys: ['swimlane'],
-    icon: icon('context'),
-    requiredInputs: [
-      {
-        key: 'ak',
-        label: 'appkey',
-        placeholder: '请输入或选择appkey',
-        fetchOptions: async (_query: string, _contextData: ContextData): Promise<DictItem[]> => {
-          return [
-            { name: 'com.sankuai.waimai.app', description: '外卖主App' },
-            { name: 'com.sankuai.meituan.app', description: '美团主App' },
-            { name: 'com.sankuai.dianping.app', description: '点评主App' },
-          ];
-        },
-      },
-      {
-        key: 'branch',
-        label: '分支名',
-        placeholder: '请输入要切换的分支名',
-      },
-    ],
-    action: 'switch_env',
-  },
-  {
     id: 'copy_dict_value',
+    label: '📋 复制字典值',
     icon: icon('cache'),
     name: (data: ContextData) =>
       `📋 复制 ${(data['_currentDict'] as DictItem | undefined)?.name ?? ''}: ${(data['_currentSelected'] as DictItem | undefined)?.name ?? ''}`,
@@ -84,6 +58,7 @@ const builtInFeatures: Feature[] = [
   },
   {
     id: 'modify_dict_desc',
+    label: '📝 修改字典描述',
     icon: icon('context'),
     name: (data: ContextData) =>
       `📝 修改描述：${(data['_currentDict'] as DictItem | undefined)?.name ?? ''}: ${(data['_currentSelected'] as DictItem | undefined)?.name ?? ''}`,

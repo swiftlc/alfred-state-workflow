@@ -132,6 +132,8 @@ export interface Feature {
   actionHandler?: ActionHandler;
   /** Alfred 列表项图标（{ path } 格式，路径指向 SVG/PNG） */
   icon?: { path: string };
+  /** split_by_dict 类型的一级菜单标题（静态字符串，不含字典项信息） */
+  label?: string;
 }
 
 // ─── 任务相关 ──────────────────────────────────────────────────────────────────
