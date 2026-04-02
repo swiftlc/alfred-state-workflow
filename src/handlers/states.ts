@@ -180,15 +180,62 @@ export default function registerStates(app: Workflow): void {
         });
         if (availableDicts.length === 0) continue;
 
-        // 用第一个可用字典项的数据生成 feature 名称作为入口标题
-        const firstDict = availableDicts[0]!;
-        const firstSelected = data[firstDict.key] as DictItem;
-        const firstContextData: ContextData = {
-          ...data,
-          _currentDict: firstDict as unknown as DictItem,
-          _currentSelected: firstSelected,
-        };
-        // 一级入口标题优先用 label，其次用静态 name，动态 name 函数则 fallback 到 feature.id
+        const featureIconPath = feature.icon?.path;
+
+        // 只有一个可用字典项时，直接内联展示，无需二级跳转
+        if (availableDicts.length === 1) {
+          const dict = availableDicts[0]!;
+          const selected = data[dict.key] as DictItem;
+          const contextData: ContextData = {
+            ...data,
+            _currentDict: dict as unknown as DictItem,
+            _currentSelected: selected,
+          };
+          const featureName = typeof feature.name === 'function' ? feature.name(contextData) : feature.name;
+          const featureDescription = typeof feature.description === 'function' ? feature.description(contextData) : feature.description;
+          const itemTitle = feature.label ?? (typeof feature.name === 'string' ? feature.name : featureName);
+          const itemSubtitle = selected.value === selected.description
+            ? (selected.value ?? '')
+            : [selected.value, selected.description].filter(Boolean).join('  ');
+
+          if (!matchQuery(query, itemTitle, featureName, selected.name, itemSubtitle)) continue;
+
+          if (feature.requiredInputs && feature.requiredInputs.length > 0) {
+            items.push(
+              wf.createRerunItem(itemTitle, itemSubtitle, 'input_state', {
+                data: contextData,
+                dictKey: dict.key,
+                pendingAction: feature.id,
+                inputIndex: 0,
+              }, {}, featureIconPath)
+            );
+          } else {
+            items.push(
+              wf.createItem(itemTitle, itemSubtitle, feature.action, {
+                data: contextData,
+                dictKey: dict.key,
+                historyTitle: featureName,
+                historySubtitle: featureDescription,
+                recordHistory: feature.recordHistory !== false,
+              }, {
+                cmd: {
+                  subtitle: `⚡ 存为快捷指令: ${featureName}`,
+                  action: 'rerun',
+                  payload: {
+                    nextState: 'alias_save',
+                    data: contextData,
+                    pendingAction: feature.action,
+                    aliasTitle: featureName,
+                    aliasSubtitle: featureDescription,
+                  },
+                },
+              }, featureIconPath)
+            );
+          }
+          continue;
+        }
+
+        // 多个可用字典项时，聚合为一个入口进入二级菜单
         const entryTitle = feature.label
           ?? (typeof feature.name === 'string' ? feature.name : feature.id);
         const entrySubtitle = availableDicts.map((d) => (data[d.key] as DictItem).name).join(' / ');
@@ -199,7 +246,7 @@ export default function registerStates(app: Workflow): void {
           wf.createRerunItem(entryTitle, entrySubtitle, 'split_feature', {
             data,
             pendingFeatureId: feature.id,
-          }, {}, feature.icon?.path)
+          }, {}, featureIconPath)
         );
         continue;
       }
