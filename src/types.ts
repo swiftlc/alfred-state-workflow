@@ -106,6 +106,12 @@ export interface RequiredInput {
   fetchOptions?: (query: string, contextData: ContextData) => Promise<DictItem[]>;
   /** 跳过条件：返回 true 时跳过此步骤，直接进入下一步或执行 action */
   skipIf?: (contextData: ContextData) => boolean;
+  /**
+   * fetchOptions 对应的缓存 key 生成函数。
+   * 提供此字段后，input_state 会走非阻塞加载模式：
+   * 缓存未命中时立即返回加载指示器，后台发起请求写入缓存，Alfred rerun 轮询直到数据就绪。
+   */
+  cacheKey?: (contextData: ContextData) => string;
 }
 
 /** 功能定义 */

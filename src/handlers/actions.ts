@@ -16,6 +16,28 @@ import type {DictItem} from '../types';
  * 对应 src/config/features.ts 中的 action 字段
  */
 export default function registerActions(app: Workflow): void {
+  // 后台任务：预加载 fetchOptions 数据并写入缓存
+  app.onTask('_prefetch_options', async (task, context) => {
+    const featureId = context['_prefetchFeatureId'] as string | undefined;
+    const inputIndex = (context['_prefetchInputIndex'] as number | undefined) ?? 0;
+
+    const featuresModule = require('../config/features');
+    const features = (featuresModule?.default ?? featuresModule) as import('../types').Feature[];
+    const feature = features.find((f) => f.id === featureId);
+    const currentInput = feature?.requiredInputs?.[inputIndex];
+
+    if (!currentInput?.fetchOptions || !currentInput.cacheKey) {
+      task.update(100, '无需预加载');
+      return;
+    }
+
+    const resolvedCacheKey = currentInput.cacheKey(context.data);
+    task.update(10, '正在加载数据...');
+    const result = await currentInput.fetchOptions('', context.data);
+    CacheManager.set(resolvedCacheKey, result, 60 * 1000);
+    task.update(100, `已加载 ${result.length} 条数据`);
+  });
+
   // 动作：租户泳道登录（耗时，使用后台任务）
   app.onAction('login', async (context, wf) => {
     wf.startTask('login_task', context);

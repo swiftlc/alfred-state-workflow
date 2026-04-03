@@ -136,8 +136,32 @@ class Workflow {
     });
     child.unref();
 
-    const nextArg = encodeContext({ state: 'progress', jobId, data: context.data });
+    const nextArg = encodeContext({
+      state: 'progress',
+      jobId,
+      data: context.data,
+      returnState: context.returnState,
+      pendingAction: context.pendingAction,
+      inputIndex: context.inputIndex,
+      _silentOnSuccess: context['_silentOnSuccess'],
+    });
     this.triggerAlfred(nextArg);
+  }
+
+  /**
+   * 静默启动后台 worker，不跳转 progress 状态，不记录任务。
+   * 用于预加载数据（如 fetchOptions 缓存预热），结果写入 CacheManager 供 filter 轮询读取。
+   */
+  spawnWorker(taskName: string, context: Context): void {
+    const jobId = `prefetch_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const workerPath = path.join(__dirname, '../worker.ts');
+    const contextStr = encodeContext({ ...context, _prefetchJobId: jobId });
+    const tsxBin = path.join(__dirname, '../../node_modules/.bin/tsx');
+    const child = spawn(tsxBin, [workerPath, taskName, jobId, contextStr], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
   }
 
   // ─── Item 构造器 ──────────────────────────────────────────────────────────────

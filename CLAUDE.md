@@ -82,3 +82,8 @@ alfred_workflow_arg=<encoded_context> pnpm action
 ### 插件系统
 
 在 `data/plugins/` 目录下放置 `.js` 文件，导出符合 `Plugin` 类型的对象，即可动态注入 Feature 和 ActionHandler，无需修改核心代码。
+
+
+### 约束
+
+增加功能时，第一先考虑是否可以做成可配，方便feature快速配置集成，而不是针对某个name的feature做特别处理。

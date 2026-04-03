@@ -1,5 +1,6 @@
 import dictService from '../services/dictService';
 import features from '../config/features';
+import CacheManager from '../core/CacheManager';
 import DictPinManager from '../core/DictPinManager';
 import TaskManager from '../core/TaskManager';
 import HistoryManager from '../core/HistoryManager';
@@ -76,13 +77,28 @@ export default function registerStates(app: Workflow): void {
       const completedAt = task.completedAt ?? Date.now();
       const elapsed = Date.now() - completedAt;
 
-      const homeContext: Context = { ...context, state: 'home' };
+      const nextState = (context.returnState as string | undefined) ?? 'home';
+      const nextContext: Context = { ...context, state: nextState };
+      const fallbackContext: Context = { ...context, state: 'home' };
+      const silentOnSuccess = !!(context['_silentOnSuccess'] as boolean | undefined);
+
+      // 成功且静默模式：直接渲染目标状态，不展示成功 item
+      if (task.status === 'done' && silentOnSuccess) {
+        wf.saveContext(nextContext);
+        const handler = wf.states[nextState];
+        if (handler) return handler(nextContext, wf);
+        return [];
+      }
 
       if (elapsed >= COMPLETED_DISPLAY_MS) {
-        // 超过 6s，持久化 home 状态，直接渲染 home 内容
-        wf.saveContext(homeContext);
+        if (task.status === 'done') {
+          wf.saveContext(nextContext);
+          const handler = wf.states[nextState];
+          if (handler) return handler(nextContext, wf);
+        }
+        wf.saveContext(fallbackContext);
         const homeHandler = wf.states['home'];
-        if (homeHandler) return homeHandler(homeContext, wf);
+        if (homeHandler) return homeHandler(fallbackContext, wf);
         return [];
       }
 
@@ -93,14 +109,18 @@ export default function registerStates(app: Workflow): void {
         : task.status === 'cancelled'
           ? `${emoji} 任务已取消`
           : `${emoji} 执行失败: ${task.message}`;
+      const returnLabel = isSuccess ? `返回${nextState === 'home' ? '主菜单' : ''}` : '返回主菜单';
+      const returnArg = isSuccess
+        ? wf.createRerunItem('', '', nextState, { data: context.data }).arg
+        : wf.createRerunItem('', '', 'home', { data: context.data }).arg;
 
       return {
         rerun: 0.5,
         items: [
           {
             title,
-            subtitle: '按回车返回主菜单',
-            arg: wf.createRerunItem('', '', 'home', { data: context.data }).arg,
+            subtitle: `按回车${returnLabel}`,
+            arg: returnArg,
             valid: true,
             icon: { path: Icons.task },
           } as AlfredItem,
@@ -787,9 +807,27 @@ export default function registerStates(app: Workflow): void {
     const isLastInput = inputIndex === feature.requiredInputs.length - 1;
 
     if (currentInput.fetchOptions) {
-      try {
-        let options = await currentInput.fetchOptions(query, data);
+      const featureIconPath = feature.icon?.path;
+      const resolvedCacheKey = currentInput.cacheKey?.(data);
 
+      // 有 cacheKey：走非阻塞加载模式
+      if (resolvedCacheKey) {
+        const cached = await CacheManager.get<DictItem[]>(resolvedCacheKey);
+
+        if (cached === null) {
+          // 缓存未命中，启动后台 task 发起请求，自动跳转 progress 状态展示加载进度
+          wf.startTask('_prefetch_options', {
+            ...context,
+            returnState: 'input_state',
+            _silentOnSuccess: true,
+            _prefetchFeatureId: pendingAction,
+            _prefetchInputIndex: inputIndex,
+          });
+          return [];
+        }
+
+        // 缓存命中，走正常渲染逻辑
+        let options = cached;
         if (query) {
           options = options.filter((opt) => matchQuery(query, opt.name, opt.description));
           if (!currentInput.disableManualInput) {
@@ -804,7 +842,6 @@ export default function registerStates(app: Workflow): void {
             valid: false,
           });
         } else {
-          const featureIconPath = feature.icon?.path;
           for (const opt of options) {
             const optValue: DictItem = opt.isManual
               ? { name: opt.name, value: opt.name, isManual: true }
@@ -812,7 +849,6 @@ export default function registerStates(app: Workflow): void {
             const newData: ContextData = { ...data, [currentInput.key]: optValue };
             const title = opt.isManual ? `✏️ 手动输入: ${opt.name}` : opt.name;
             const subtitle = opt.description ?? `设置为 ${currentInput.label}`;
-
             const featureName = typeof feature.name === 'function' ? feature.name(newData) : feature.name;
             const featureDescription =
               typeof feature.description === 'function' ? feature.description(newData) : feature.description;
@@ -827,7 +863,6 @@ export default function registerStates(app: Workflow): void {
                 }, {}, featureIconPath)
               );
             } else {
-              const nextInput = feature.requiredInputs![inputIndex + 1]!;
               items.push(
                 wf.createRerunItem(
                   title,
@@ -841,8 +876,62 @@ export default function registerStates(app: Workflow): void {
             }
           }
         }
-      } catch (err) {
-        items.push(wf.createItem('❌ 获取选项失败', (err as Error).message, 'open_log'));
+      } else {
+        // 无 cacheKey：原有同步阻塞逻辑（向下兼容）
+        try {
+          let options = await currentInput.fetchOptions(query, data);
+
+          if (query) {
+            options = options.filter((opt) => matchQuery(query, opt.name, opt.description));
+            if (!currentInput.disableManualInput) {
+              options.unshift({ name: query, description: '手动输入', isManual: true });
+            }
+          }
+
+          if (options.length === 0) {
+            items.push({
+              title: `未找到匹配的 ${currentInput.label}`,
+              subtitle: '请尝试其他搜索词',
+              valid: false,
+            });
+          } else {
+            for (const opt of options) {
+              const optValue: DictItem = opt.isManual
+                ? { name: opt.name, value: opt.name, isManual: true }
+                : opt;
+              const newData: ContextData = { ...data, [currentInput.key]: optValue };
+              const title = opt.isManual ? `✏️ 手动输入: ${opt.name}` : opt.name;
+              const subtitle = opt.description ?? `设置为 ${currentInput.label}`;
+              const featureName = typeof feature.name === 'function' ? feature.name(newData) : feature.name;
+              const featureDescription =
+                typeof feature.description === 'function' ? feature.description(newData) : feature.description;
+
+              if (isLastInput) {
+                items.push(
+                  wf.createItem(title, `[${featureName}] - ${subtitle}`, feature.action, {
+                    data: newData,
+                    historyTitle: `${featureName}`,
+                    historySubtitle: featureDescription,
+                    recordHistory: feature.recordHistory !== false,
+                  }, {}, featureIconPath)
+                );
+              } else {
+                items.push(
+                  wf.createRerunItem(
+                    title,
+                    `${featureName} - ${subtitle}`,
+                    'input_state',
+                    { data: newData, pendingAction, inputIndex: inputIndex + 1 },
+                    {},
+                    featureIconPath
+                  )
+                );
+              }
+            }
+          }
+        } catch (err) {
+          items.push(wf.createItem('❌ 获取选项失败', (err as Error).message, 'open_log'));
+        }
       }
     } else {
       // 纯手动输入模式

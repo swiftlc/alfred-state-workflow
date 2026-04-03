@@ -116,6 +116,10 @@ const builtInFeatures: Feature[] = [
         label: '机器',
         placeholder: '请选择机器',
         disableManualInput: true,
+        cacheKey: (contextData: ContextData) => {
+          const swimlane = contextData['swimlane'] as DictItem | undefined;
+          return `swimlane_machines:${swimlane?.description ?? ''}`;
+        },
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const swimlane = contextData['swimlane'] as DictItem;
           const stackUuid = swimlane.description ?? '';
@@ -173,6 +177,11 @@ const builtInFeatures: Feature[] = [
         label: '服务节点',
         placeholder: '请选择节点',
         disableManualInput: true,
+        cacheKey: (contextData: ContextData) => {
+          const appkey = contextData['appkey'] as DictItem | undefined;
+          const appkeyValue = appkey?.value ?? appkey?.name ?? '';
+          return `appkey_nodes:${appkeyValue}:test`;
+        },
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const appkey = contextData['appkey'] as DictItem;
           const appkeyValue = appkey.value ?? appkey.name;
@@ -223,6 +232,12 @@ const builtInFeatures: Feature[] = [
         disableManualInput: true,
         /** 仅在选择了「查看服务方法」时才需要此步骤 */
         skipIf: (contextData) => (contextData['appkey_node_action'] as DictItem | undefined)?.value !== 'view_methods',
+        cacheKey: (contextData: ContextData) => {
+          const appkey = contextData['appkey'] as DictItem | undefined;
+          const node = (contextData['appkey_node'] as DictItem & { value: OctoServerNode } | undefined)?.value;
+          const appkeyValue = appkey?.value ?? appkey?.name ?? '';
+          return `appkey_methods:${appkeyValue}:${node?.ip ?? ''}:${node?.port ?? ''}`;
+        },
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const appkey = contextData['appkey'] as DictItem;
           const node = (contextData['appkey_node'] as DictItem & { value: OctoServerNode }).value;
@@ -296,6 +311,10 @@ const builtInFeatures: Feature[] = [
         label: '门店',
         placeholder: '请选择门店',
         disableManualInput: true,
+        cacheKey: (contextData: ContextData) => {
+          const tenant = contextData['tenant'] as DictItem | undefined;
+          return `tenant_pois:${tenant?.value ?? ''}`;
+        },
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const tenant = contextData['tenant'] as DictItem;
           const tenantId = tenant.value ?? '';
