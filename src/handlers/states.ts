@@ -140,22 +140,45 @@ export default function registerStates(app: Workflow): void {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
 
-    // 0. 快捷指令区（若有匹配的指令，优先展示）
-    const aliases = AliasManager.getAll();
-    const matchedAliases = aliases.filter(alias =>
-      matchQuery(query, alias.alias, alias.title)
-    );
-    for (const alias of matchedAliases) {
-      items.push(
-        wf.createItem(
-          `⚡ ${alias.alias}`,
-          alias.subtitle || alias.title,
-          'execute_alias',
-          { aliasId: alias.id, aliasAction: alias.action, aliasData: alias.data },
-          {},
-          Icons.alias
-        )
-      );
+    // 0. 快捷指令区：仅在 query 以 > 开头时展示
+    if (query.startsWith('>')) {
+      const aliasQuery = query.slice(1).trim();
+      const aliases = AliasManager.getAll();
+      const matchedAliases = aliasQuery
+        ? aliases.filter(alias => matchQuery(aliasQuery, alias.alias, alias.title))
+        : aliases;
+
+      if (matchedAliases.length === 0) {
+        items.push({
+          title: aliasQuery ? `未找到快捷指令「${aliasQuery}」` : '暂无快捷指令',
+          subtitle: '在功能列表中按 Cmd+Enter 可创建快捷指令',
+          valid: false,
+          icon: { path: Icons.alias },
+        });
+      } else {
+        for (const alias of matchedAliases) {
+          items.push(
+            wf.createItem(
+              `⚡ ${alias.alias}`,
+              alias.subtitle || alias.title,
+              'execute_alias',
+              { aliasId: alias.id, aliasAction: alias.action, aliasData: alias.data },
+              {},
+              Icons.alias
+            )
+          );
+        }
+      }
+
+      // 追加管理中心的二级菜单项
+      const manageHandler = wf.states['manage'];
+      if (manageHandler) {
+        const manageItems = await manageHandler({ ...context, state: 'manage', query: aliasQuery }, wf);
+        const manageList = Array.isArray(manageItems) ? manageItems : manageItems.items;
+        items.push(...manageList);
+      }
+
+      return items;
     }
 
     // 1. 历史记录区
@@ -788,6 +811,21 @@ export default function registerStates(app: Workflow): void {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
 
+    /** 构造存为快捷指令的 cmd mod，传入当前已收集完整 data 快照 */
+    const makeAliasMod = (featureName: string, featureDescription: string, snapData: ContextData) => ({
+      cmd: {
+        subtitle: `⚡ 存为快捷指令: ${featureName}`,
+        action: 'rerun',
+        payload: {
+          nextState: 'alias_save',
+          data: snapData,
+          pendingAction: feature!.action,
+          aliasTitle: featureName,
+          aliasSubtitle: featureDescription,
+        },
+      },
+    });
+
     const feature = features.find((f) => f.id === pendingAction);
     if (!feature || !feature.requiredInputs || !feature.requiredInputs[inputIndex]) {
       return [wf.createRerunItem('❌ 错误', '找不到需要输入的配置项', 'home')];
@@ -860,7 +898,7 @@ export default function registerStates(app: Workflow): void {
                   historyTitle: `${featureName}`,
                   historySubtitle: featureDescription,
                   recordHistory: feature.recordHistory !== false,
-                }, {}, featureIconPath)
+                }, makeAliasMod(featureName, featureDescription, newData), featureIconPath)
               );
             } else {
               items.push(
@@ -869,7 +907,7 @@ export default function registerStates(app: Workflow): void {
                   `${featureName} - ${subtitle}`,
                   'input_state',
                   { data: newData, pendingAction, inputIndex: inputIndex + 1 },
-                  {},
+                  makeAliasMod(featureName, featureDescription, newData),
                   featureIconPath
                 )
               );
@@ -913,7 +951,7 @@ export default function registerStates(app: Workflow): void {
                     historyTitle: `${featureName}`,
                     historySubtitle: featureDescription,
                     recordHistory: feature.recordHistory !== false,
-                  }, {}, featureIconPath)
+                  }, makeAliasMod(featureName, featureDescription, newData), featureIconPath)
                 );
               } else {
                 items.push(
@@ -922,7 +960,7 @@ export default function registerStates(app: Workflow): void {
                     `${featureName} - ${subtitle}`,
                     'input_state',
                     { data: newData, pendingAction, inputIndex: inputIndex + 1 },
-                    {},
+                    makeAliasMod(featureName, featureDescription, newData),
                     featureIconPath
                   )
                 );
@@ -952,7 +990,7 @@ export default function registerStates(app: Workflow): void {
               historyTitle: `${featureName}`,
               historySubtitle: featureDescription,
               recordHistory: feature.recordHistory !== false,
-            }, {}, featureIconPath)
+            }, makeAliasMod(featureName, featureDescription, newData), featureIconPath)
           );
         } else {
           const nextInput = feature.requiredInputs![inputIndex + 1]!;
@@ -962,7 +1000,7 @@ export default function registerStates(app: Workflow): void {
               `继续配置 ${featureName} (下一步: 输入${nextInput.label})`,
               'input_state',
               { data: newData, pendingAction, inputIndex: inputIndex + 1 },
-              {},
+              makeAliasMod(featureName, featureDescription, newData),
               featureIconPath
             )
           );
