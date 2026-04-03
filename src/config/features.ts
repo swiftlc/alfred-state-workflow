@@ -120,36 +120,27 @@ const builtInFeatures: Feature[] = [
           const swimlane = contextData['swimlane'] as DictItem | undefined;
           return `swimlane_machines:${swimlane?.description ?? ''}`;
         },
+        cacheTtl: 60 * 1000,
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const swimlane = contextData['swimlane'] as DictItem;
           const stackUuid = swimlane.description ?? '';
-
-          return CacheManager.get<DictItem[]>(
-            `swimlane_machines:${stackUuid}`,
-            async () => {
-              try {
-                const proxyDest = `https://dev.sankuai.com/gateway/cargo/api/stack?type=runners_octo_status&stack_uuid=${stackUuid}`;
-                const response = await http.proxy<{ data?: Record<string, MachineInfo> }>(
-                  'GET',
-                  proxyDest
-                );
-                Logger.info('接口响应', response as object);
-                if (response?.data) {
-                  const machines = Object.values(response.data);
-                  machines.sort((a, b) => (a.appkey ?? '').localeCompare(b.appkey ?? ''));
-                  return machines.map((m) => ({
-                    name: m.appkey ?? '',
-                    description: `IP: ${m.ip} | 状态: ${m.status} | 节点: ${m.nodeStatus}${m.errMsg ? ' | 错误: ' + m.errMsg : ''}`,
-                    value: m as unknown as string,
-                  }));
-                }
-                return [];
-              } catch {
-                return [];
-              }
-            },
-            60 * 1000
-          ) as Promise<DictItem[]>;
+          try {
+            const proxyDest = `https://dev.sankuai.com/gateway/cargo/api/stack?type=runners_octo_status&stack_uuid=${stackUuid}`;
+            const response = await http.proxy<{ data?: Record<string, MachineInfo> }>('GET', proxyDest);
+            Logger.info('接口响应', response as object);
+            if (response?.data) {
+              const machines = Object.values(response.data);
+              machines.sort((a, b) => (a.appkey ?? '').localeCompare(b.appkey ?? ''));
+              return machines.map((m) => ({
+                name: m.appkey ?? '',
+                description: `IP: ${m.ip} | 状态: ${m.status} | 节点: ${m.nodeStatus}${m.errMsg ? ' | 错误: ' + m.errMsg : ''}`,
+                value: m as unknown as string,
+              }));
+            }
+            return [];
+          } catch {
+            return [];
+          }
         },
       },
     ],
@@ -182,35 +173,29 @@ const builtInFeatures: Feature[] = [
           const appkeyValue = appkey?.value ?? appkey?.name ?? '';
           return `appkey_nodes:${appkeyValue}:test`;
         },
+        cacheTtl: 60 * 1000,
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const appkey = contextData['appkey'] as DictItem;
           const appkeyValue = appkey.value ?? appkey.name;
-
-          return CacheManager.get<DictItem[]>(
-            `appkey_nodes:${appkeyValue}:test`,
-            async () => {
-              try {
-                const proxyDest = `https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck/serverNodes?appkey=${appkeyValue}&env=test`;
-                const response = await http.proxy<OctoServerNodesResponse>('GET', proxyDest);
-                Logger.info('appkey 机器列表响应', response as object);
-                if (response?.success && Array.isArray(response.data)) {
-                  return response.data.map((node) => {
-                    const statusText = node.status === 0 ? '正常' : `异常(${node.status})`;
-                    const swimlaneText = node.swimlane ? `${node.swimlane}` : 'default';
-                    return {
-                      name: `${node.ip} | ${swimlaneText}`,
-                      description: ` 状态: ${statusText}`,
-                      value: node as unknown as string,
-                    };
-                  });
-                }
-                return [];
-              } catch {
-                return [];
-              }
-            },
-            60 * 1000
-          ) as Promise<DictItem[]>;
+          try {
+            const proxyDest = `https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck/serverNodes?appkey=${appkeyValue}&env=test`;
+            const response = await http.proxy<OctoServerNodesResponse>('GET', proxyDest);
+            Logger.info('appkey 机器列表响应', response as object);
+            if (response?.success && Array.isArray(response.data)) {
+              return response.data.map((node) => {
+                const statusText = node.status === 0 ? '正常' : `异常(${node.status})`;
+                const swimlaneText = node.swimlane ? `${node.swimlane}` : 'default';
+                return {
+                  name: `${node.ip} | ${swimlaneText}`,
+                  description: ` 状态: ${statusText}`,
+                  value: node as unknown as string,
+                };
+              });
+            }
+            return [];
+          } catch {
+            return [];
+          }
         },
       },
       {
@@ -238,48 +223,35 @@ const builtInFeatures: Feature[] = [
           const appkeyValue = appkey?.value ?? appkey?.name ?? '';
           return `appkey_methods:${appkeyValue}:${node?.ip ?? ''}:${node?.port ?? ''}`;
         },
+        cacheTtl: 60 * 1000,
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const appkey = contextData['appkey'] as DictItem;
           const node = (contextData['appkey_node'] as DictItem & { value: OctoServerNode }).value;
           const appkeyValue = appkey.value ?? appkey.name;
-
-          return CacheManager.get<DictItem[]>(
-            `appkey_methods:${appkeyValue}:${node.ip}:${node.port}`,
-            async () => {
-              try {
-                const proxyDest = `https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck/serviceMethods?appkey=${appkeyValue}&host=${node.ip}&port=${node.port}&isRequestPort=false`;
-                const response = await http.proxy<OctoServiceMethodsResponse>('GET', proxyDest);
-                Logger.info('服务方法响应', response as object);
-
-                if (response?.success && response.data) {
-                  const methods: Array<{ serviceName: string; method: string }> = [];
-                  // data 结构: { "full.service.ClassName": { "methodName(params):ReturnType": weight } }
-                  for (const [svcClass, methodMap] of Object.entries(response.data)) {
-                    const serviceName = svcClass.split('.').pop() ?? svcClass;
-                    for (const methodSignature of Object.keys(methodMap as Record<string, unknown>)) {
-                      // 提取方法名（括号前的部分）
-                      const methodName = methodSignature.split('(')[0] ?? methodSignature;
-                      methods.push({
-                        serviceName,
-                        method: `${methodName}`,
-                      });
-                    }
-                  }
-                  // 按方法名排序
-                  methods.sort((a, b) => a.method.localeCompare(b.method));
-                  return methods.map((m) => ({
-                    name: m.serviceName,
-                    description: m.method,
-                    value: `${m.serviceName}#${m.method}`,
-                  }));
+          try {
+            const proxyDest = `https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck/serviceMethods?appkey=${appkeyValue}&host=${node.ip}&port=${node.port}&isRequestPort=false`;
+            const response = await http.proxy<OctoServiceMethodsResponse>('GET', proxyDest);
+            Logger.info('服务方法响应', response as object);
+            if (response?.success && response.data) {
+              const methods: Array<{ serviceName: string; method: string }> = [];
+              for (const [svcClass, methodMap] of Object.entries(response.data)) {
+                const serviceName = svcClass.split('.').pop() ?? svcClass;
+                for (const methodSignature of Object.keys(methodMap as Record<string, unknown>)) {
+                  const methodName = methodSignature.split('(')[0] ?? methodSignature;
+                  methods.push({ serviceName, method: methodName });
                 }
-                return [];
-              } catch {
-                return [];
               }
-            },
-            60 * 1000
-          ) as Promise<DictItem[]>;
+              methods.sort((a, b) => a.method.localeCompare(b.method));
+              return methods.map((m) => ({
+                name: m.serviceName,
+                description: m.method,
+                value: `${m.serviceName}#${m.method}`,
+              }));
+            }
+            return [];
+          } catch {
+            return [];
+          }
         },
       },
     ],
@@ -315,42 +287,35 @@ const builtInFeatures: Feature[] = [
           const tenant = contextData['tenant'] as DictItem | undefined;
           return `tenant_pois:${tenant?.value ?? ''}`;
         },
+        cacheTtl: 24 * 60 * 60 * 1000,
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const tenant = contextData['tenant'] as DictItem;
           const tenantId = tenant.value ?? '';
-
-          return CacheManager.get<DictItem[]>(
-            `tenant_pois:${tenantId}`,
-            async () => {
-              try {
-                let response = await http.post<{ data: { return: string } }>(
-                  'http://www.swiftlc.com:8080/api/octo-invoke',
-                  {
-                    params: { tenantId: parseInt(tenantId, 10), poiStatus: 1 },
-                    appkey: 'com.sankuai.shangou.empower.tenant',
-                    swimlane: '',
-                    methodKeyword: 'PoiThriftService#queryPoiInfoListByCondition',
-                  },
-                  { headers: { 'Content-Type': 'application/json;charset=UTF-8' } }
-                );
-                Logger.info('接口响应', response as object);
-
-                const parsed = JSON.parse(response.data.return) as PoiResponse;
-                if (parsed?.status?.code === 0 && parsed.poiList) {
-                  return parsed.poiList.map((poi) => ({
-                    name: poi.poiName,
-                    description: `门店ID: ${poi.poiId} | 地址: ${poi.poiAddress ?? '无'}`,
-                    value: poi as unknown as string,
-                  }));
-                }
-                return [];
-              } catch (error) {
-                Logger.error('获取租户门店列表失败', error as Error);
-                return [];
-              }
-            },
-            24 * 60 * 60 * 1000
-          ) as Promise<DictItem[]>;
+          try {
+            const response = await http.post<{ data: { return: string } }>(
+              'http://www.swiftlc.com:8080/api/octo-invoke',
+              {
+                params: { tenantId: parseInt(tenantId, 10), poiStatus: 1 },
+                appkey: 'com.sankuai.shangou.empower.tenant',
+                swimlane: '',
+                methodKeyword: 'PoiThriftService#queryPoiInfoListByCondition',
+              },
+              { headers: { 'Content-Type': 'application/json;charset=UTF-8' } }
+            );
+            Logger.info('接口响应', response as object);
+            const parsed = JSON.parse(response.data.return) as PoiResponse;
+            if (parsed?.status?.code === 0 && parsed.poiList) {
+              return parsed.poiList.map((poi) => ({
+                name: poi.poiName,
+                description: `门店ID: ${poi.poiId} | 地址: ${poi.poiAddress ?? '无'}`,
+                value: poi as unknown as string,
+              }));
+            }
+            return [];
+          } catch (error) {
+            Logger.error('获取租户门店列表失败', error as Error);
+            return [];
+          }
         },
       },
     ],

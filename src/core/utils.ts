@@ -3,6 +3,8 @@ import {execSync} from 'child_process';
 import pinyinMatch from 'pinyin-match';
 // @ts-ignore – fuzzysort 暂无 @types 包
 import fuzzysort from 'fuzzysort';
+import CacheManager from './CacheManager';
+import type {ContextData, DictItem, RequiredInput} from '../types';
 
 export function encodeContext(obj: object): string {
   return Buffer.from(JSON.stringify(obj)).toString('base64');
@@ -67,5 +69,30 @@ export function openUrl(url: string): void {
   if (!url) return;
   const safeUrl = url.replace(/(["\\])/g, '\\$1');
   execSync(`open "${safeUrl}"`);
+}
+
+/**
+ * 统一调用 fetchOptions，自动处理 cacheKey + cacheTtl 的缓存逻辑。
+ * feature 只需编写纯粹的 fetch 函数，无需在内部手写 CacheManager 代码。
+ */
+export async function resolveOptions(
+  input: RequiredInput,
+  query: string,
+  contextData: ContextData
+): Promise<DictItem[]> {
+  if (!input.fetchOptions) return [];
+
+  const cacheKey = input.cacheKey?.(contextData);
+  const ttl = input.cacheTtl ?? 60 * 1000;
+
+  if (cacheKey) {
+    return (await CacheManager.get<DictItem[]>(
+      cacheKey,
+      () => input.fetchOptions!(query, contextData),
+      ttl
+    )) ?? [];
+  }
+
+  return input.fetchOptions(query, contextData);
 }
 

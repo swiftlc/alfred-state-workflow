@@ -102,16 +102,24 @@ export interface RequiredInput {
   placeholder?: string;
   /** 是否禁用手动输入（仅允许从列表选择） */
   disableManualInput?: boolean;
-  /** 动态获取候选选项 */
+  /**
+   * 动态获取候选选项。
+   * 只需编写真实的 fetch 逻辑，缓存由框架根据 cacheKey + cacheTtl 自动处理。
+   */
   fetchOptions?: (query: string, contextData: ContextData) => Promise<DictItem[]>;
   /** 跳过条件：返回 true 时跳过此步骤，直接进入下一步或执行 action */
   skipIf?: (contextData: ContextData) => boolean;
   /**
    * fetchOptions 对应的缓存 key 生成函数。
    * 提供此字段后，input_state 会走非阻塞加载模式：
-   * 缓存未命中时立即返回加载指示器，后台发起请求写入缓存，Alfred rerun 轮询直到数据就绪。
+   * 缓存未命中时启动后台 task 发起请求，Alfred rerun 轮询直到数据就绪。
    */
   cacheKey?: (contextData: ContextData) => string;
+  /**
+   * 缓存有效期（毫秒）。与 cacheKey 配合使用，框架自动对 fetchOptions 结果应用缓存。
+   * 不填默认 60 秒。
+   */
+  cacheTtl?: number;
 }
 
 /** 功能定义 */

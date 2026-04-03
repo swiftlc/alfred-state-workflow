@@ -1,5 +1,5 @@
 import {execSync} from 'child_process';
-import {copyToClipboard, encodeContext, openUrl, sendNotification} from '../core/utils';
+import {copyToClipboard, encodeContext, openUrl, resolveOptions, sendNotification} from '../core/utils';
 import CacheManager from '../core/CacheManager';
 import DictPinManager from '../core/DictPinManager';
 import {http} from '../core/HttpClient';
@@ -31,10 +31,8 @@ export default function registerActions(app: Workflow): void {
       return;
     }
 
-    const resolvedCacheKey = currentInput.cacheKey(context.data);
     task.update(10, '正在加载数据...');
-    const result = await currentInput.fetchOptions('', context.data);
-    CacheManager.set(resolvedCacheKey, result, 60 * 1000);
+    const result = await resolveOptions(currentInput, '', context.data);
     task.update(100, `已加载 ${result.length} 条数据`);
   });
 
