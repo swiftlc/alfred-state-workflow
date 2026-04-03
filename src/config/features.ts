@@ -76,7 +76,7 @@ const builtInFeatures: Feature[] = [
         placeholder: '请输入要修改的描述内容',
       },
     ],
-    actionHandler: async (context) => {
+    actionHandler: async (context, wf) => {
       Logger.info(`修改描述：${JSON.stringify(context)}`);
       const currentSelected = context.data['_currentSelected'] as DictItem;
       const currentDict = context.data['_currentDict'] as DictItem;
@@ -89,6 +89,13 @@ const builtInFeatures: Feature[] = [
       }, {
         headers: { 'Content-Type': 'application/json' },
       });
+      const dictKey = String(currentDict.key);
+      CacheManager.clear(`dict_items_${dictKey}`);
+      // 同步更新 context 里已选中条目的 description，避免 feature item 展示旧值
+      if (context.data[dictKey]) {
+        (context.data[dictKey] as DictItem).description = input1.value;
+        wf.saveContext({ state: 'home', data: context.data });
+      }
       sendNotification('修改成功！', '修改成功');
     },
   },

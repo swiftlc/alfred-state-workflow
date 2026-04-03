@@ -31,6 +31,10 @@ class TaskManager {
     if (fs.existsSync(file)) {
       const data = JSON.parse(fs.readFileSync(file, 'utf8')) as TaskData;
       Object.assign(data, updates);
+      // 状态首次变为终态时记录完结时间
+      if (updates.status && updates.status !== 'running' && !data.completedAt) {
+        data.completedAt = Date.now();
+      }
       fs.writeFileSync(file, JSON.stringify(data));
     }
   }

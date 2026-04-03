@@ -147,6 +147,8 @@ export interface TaskData {
   progress: number;
   message: string;
   spinnerIdx: number;
+  /** 任务完结时间戳（done/error/cancelled 时自动记录） */
+  completedAt?: number;
 }
 
 /** worker.js 中传入 task handler 的 updater 对象 */

@@ -8,7 +8,7 @@ import AliasManager from '../core/AliasManager';
 import {matchQuery} from '../core/utils';
 import Icons, {icon} from '../core/icons';
 import type Workflow from '../core/Workflow';
-import type {AlfredItem, ContextData, DictItem, Feature} from '../types';
+import type {AlfredItem, Context, ContextData, DictItem, Feature} from '../types';
 
 const SPINNERS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const;
 
@@ -70,29 +70,46 @@ export default function registerStates(app: Workflow): void {
       };
     }
 
-    if (task.status === 'done') {
-      return [
-        wf.createRerunItem(
-          `✅ ${task.message || '执行完成'}`,
-          '按回车返回主菜单',
-          'home',
-          { data: context.data },
-          {},
-          Icons.task
-        ),
-      ];
+    const COMPLETED_DISPLAY_MS = 6000;
+
+    if (task.status === 'done' || task.status === 'error' || task.status === 'cancelled') {
+      const completedAt = task.completedAt ?? Date.now();
+      const elapsed = Date.now() - completedAt;
+
+      const homeContext: Context = { ...context, state: 'home' };
+
+      if (elapsed >= COMPLETED_DISPLAY_MS) {
+        // 超过 6s，持久化 home 状态，直接渲染 home 内容
+        wf.saveContext(homeContext);
+        const homeHandler = wf.states['home'];
+        if (homeHandler) return homeHandler(homeContext, wf);
+        return [];
+      }
+
+      const isSuccess = task.status === 'done';
+      const emoji = isSuccess ? '✅' : task.status === 'cancelled' ? '🛑' : '❌';
+      const title = isSuccess
+        ? `${emoji} ${task.message || '执行完成'}`
+        : task.status === 'cancelled'
+          ? `${emoji} 任务已取消`
+          : `${emoji} 执行失败: ${task.message}`;
+
+      return {
+        rerun: 0.5,
+        items: [
+          {
+            title,
+            subtitle: '按回车返回主菜单',
+            arg: wf.createRerunItem('', '', 'home', { data: context.data }).arg,
+            valid: true,
+            icon: { path: Icons.task },
+          } as AlfredItem,
+        ],
+      };
     }
 
-    return [
-      wf.createRerunItem(
-        `❌ 执行失败: ${task.message}`,
-        '按回车返回主菜单',
-        'home',
-        { data: context.data },
-        {},
-        Icons.task
-      ),
-    ];
+    // 兜底（理论上不会到达）
+    return [wf.createRerunItem('↩️ 返回主菜单', '', 'home', { data: context.data }, {}, Icons.task)];
   });
 
   /**

@@ -32,7 +32,7 @@ export default function registerActions(app: Workflow): void {
     const data = await http.proxy<{ code: number; message?: string }>(
       'POST',
       proxyDest,
-      { data: { tenantId: tenant.value }, timeout: 30000 }
+      { data: { tenantId: tenant.value }, timeout: 60000 }
     );
 
     if (data.code === 0) {
