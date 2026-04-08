@@ -31,9 +31,23 @@ class CacheManager {
     }
   }
 
+  /** 清理所有已过期的 key，防止 cache.json 无限膨胀 */
+  private gc(data: Record<string, CacheItem>): Record<string, CacheItem> {
+    const now = Date.now();
+    let changed = false;
+    for (const key of Object.keys(data)) {
+      const item = data[key];
+      if (item?.expireAt && now > item.expireAt) {
+        delete data[key];
+        changed = true;
+      }
+    }
+    return changed ? data : data;
+  }
+
   private writeAll(data: Record<string, CacheItem>): void {
     try {
-      fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2), 'utf8');
+      fs.writeFileSync(CACHE_FILE, JSON.stringify(this.gc(data), null, 2), 'utf8');
     } catch (e) {
       console.error('Cache write error:', e);
     }

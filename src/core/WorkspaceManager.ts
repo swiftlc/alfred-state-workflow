@@ -6,6 +6,8 @@ import type {ContextData, WorkspaceRecord} from '../types';
 const WORKSPACE_FILE = path.join(__dirname, '../../data/workspaces.json');
 
 class WorkspaceManager {
+  private cache: WorkspaceRecord[] | null = null;
+
   constructor() {
     this.ensureFileExists();
   }
@@ -22,17 +24,19 @@ class WorkspaceManager {
 
   /** 读取所有工作区，按最后使用时间倒序 */
   getAll(): WorkspaceRecord[] {
+    if (this.cache !== null) {
+      return this.cache.slice().sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+    }
     try {
-      const records = JSON.parse(
-        fs.readFileSync(WORKSPACE_FILE, 'utf8')
-      ) as WorkspaceRecord[];
-      return records.sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+      this.cache = JSON.parse(fs.readFileSync(WORKSPACE_FILE, 'utf8')) as WorkspaceRecord[];
+      return this.cache.slice().sort((a, b) => b.lastUsedAt - a.lastUsedAt);
     } catch {
       return [];
     }
   }
 
   private save(records: WorkspaceRecord[]): void {
+    this.cache = records;
     fs.writeFileSync(WORKSPACE_FILE, JSON.stringify(records, null, 2), 'utf8');
   }
 

@@ -6,6 +6,8 @@ import type {AliasRecord, ContextData} from '../types';
 const ALIAS_FILE = path.join(__dirname, '../../data/aliases.json');
 
 class AliasManager {
+  private cache: AliasRecord[] | null = null;
+
   constructor() {
     this.ensureFileExists();
   }
@@ -22,17 +24,19 @@ class AliasManager {
 
   /** 读取所有别名，按使用频次倒序 */
   getAll(): AliasRecord[] {
+    if (this.cache !== null) {
+      return this.cache.slice().sort((a, b) => b.usageCount - a.usageCount || b.lastUsedAt - a.lastUsedAt);
+    }
     try {
-      const records = JSON.parse(
-        fs.readFileSync(ALIAS_FILE, 'utf8')
-      ) as AliasRecord[];
-      return records.sort((a, b) => b.usageCount - a.usageCount || b.lastUsedAt - a.lastUsedAt);
+      this.cache = JSON.parse(fs.readFileSync(ALIAS_FILE, 'utf8')) as AliasRecord[];
+      return this.cache.slice().sort((a, b) => b.usageCount - a.usageCount || b.lastUsedAt - a.lastUsedAt);
     } catch {
       return [];
     }
   }
 
   private save(records: AliasRecord[]): void {
+    this.cache = records;
     fs.writeFileSync(ALIAS_FILE, JSON.stringify(records, null, 2), 'utf8');
   }
 

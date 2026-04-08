@@ -47,7 +47,39 @@ class TaskManager {
     return null;
   }
 
+  private static readonly ORPHAN_TTL = 24 * 60 * 60 * 1000; // 24h
+
+  /** 清理孤儿任务文件：终态超过 24h 或文件 mtime 超过 24h 的任务 */
+  private static cleanOrphanFiles(): void {
+    const now = Date.now();
+    try {
+      const files = fs.readdirSync(JOBS_DIR);
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue;
+        const filePath = path.join(JOBS_DIR, file);
+        try {
+          const stat = fs.statSync(filePath);
+          const data = JSON.parse(fs.readFileSync(filePath, 'utf8')) as TaskData;
+          const isTerminal = data.status !== 'running';
+          const completedAge = data.completedAt ? now - data.completedAt : null;
+          const mtimeAge = now - stat.mtimeMs;
+          if (
+            (isTerminal && completedAge !== null && completedAge > TaskManager.ORPHAN_TTL) ||
+            (isTerminal && mtimeAge > TaskManager.ORPHAN_TTL)
+          ) {
+            fs.unlinkSync(filePath);
+          }
+        } catch {
+          // 忽略损坏的文件
+        }
+      }
+    } catch {
+      // 忽略目录读取错误
+    }
+  }
+
   static getAllTasks(): TaskData[] {
+    TaskManager.cleanOrphanFiles();
     const tasks: TaskData[] = [];
     const files = fs.readdirSync(JOBS_DIR);
     for (const file of files) {

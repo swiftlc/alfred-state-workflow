@@ -7,6 +7,8 @@ const HISTORY_FILE = path.join(__dirname, '../../data/history.json');
 const MAX_UNPINNED_HISTORY = 10;
 
 class HistoryManager {
+  private cache: HistoryRecord[] | null = null;
+
   constructor() {
     this.ensureFileExists();
   }
@@ -22,14 +24,17 @@ class HistoryManager {
   }
 
   getHistory(): HistoryRecord[] {
+    if (this.cache !== null) return this.cache;
     try {
-      return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')) as HistoryRecord[];
+      this.cache = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')) as HistoryRecord[];
+      return this.cache;
     } catch {
       return [];
     }
   }
 
   private saveHistory(history: HistoryRecord[]): void {
+    this.cache = history;
     fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2), 'utf8');
   }
 
