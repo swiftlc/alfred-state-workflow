@@ -171,14 +171,6 @@ export default function registerStates(app: Workflow): void {
         }
       }
 
-      // 追加管理中心的二级菜单项
-      const manageHandler = wf.states['manage'];
-      if (manageHandler) {
-        const manageItems = await manageHandler({ ...context, state: 'manage', query: aliasQuery }, wf);
-        const manageList = Array.isArray(manageItems) ? manageItems : manageItems.items;
-        items.push(...manageList);
-      }
-
       return items;
     }
 
@@ -385,6 +377,16 @@ export default function registerStates(app: Workflow): void {
     }
 
     items.push(...readyItems, ...missingItems);
+
+    // 3.5 空状态引导语：无 query、无历史、无任何功能条目时展示
+    if (!query && items.length === 0) {
+      items.push({
+        title: '👋 从选择字典开始',
+        subtitle: '选择上方字典后功能列表将自动出现，或输入 > 使用快捷指令',
+        valid: false,
+        icon: { path: Icons.workflow },
+      });
+    }
 
     // 4. 管理中心入口（汇聚所有管理类操作，避免干扰主流程）
     const tasks = TaskManager.getAllTasks();
@@ -907,11 +909,22 @@ export default function registerStates(app: Workflow): void {
         }
 
         if (options.length === 0) {
-          items.push({
-            title: `未找到匹配的 ${currentInput.label}`,
-            subtitle: '请尝试其他搜索词',
-            valid: false,
-          });
+          if (query) {
+            items.push({ title: `未找到匹配的 ${currentInput.label}`, subtitle: '请尝试其他搜索词', valid: false });
+          } else {
+            // 无搜索词但结果为空，说明接口返回空数据，提供重试入口并清除缓存
+            if (resolvedCacheKey) CacheManager.clear(resolvedCacheKey);
+            items.push(
+              wf.createRerunItem(
+                '⚠️ 加载失败，点击重试',
+                `${currentInput.label} 数据为空，点击重新加载`,
+                'input_state',
+                { data, pendingAction, inputIndex },
+                {},
+                featureIconPath
+              )
+            );
+          }
         } else {
           for (const opt of options) {
             const optValue: DictItem = opt.isManual
@@ -1001,7 +1014,16 @@ export default function registerStates(app: Workflow): void {
             }
           }
         } catch (err) {
-          items.push(wf.createItem('❌ 获取选项失败', (err as Error).message, 'open_log'));
+          items.push(
+            wf.createRerunItem(
+              '⚠️ 加载失败，点击重试',
+              (err as Error).message,
+              'input_state',
+              { data, pendingAction, inputIndex },
+              {},
+              featureIconPath
+            )
+          );
         }
       }
     } else {
