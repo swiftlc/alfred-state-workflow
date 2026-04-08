@@ -2,6 +2,7 @@ import dictService from '../services/dictService';
 import features from '../config/features';
 import CacheManager from '../core/CacheManager';
 import DictPinManager from '../core/DictPinManager';
+import DictRecentManager from '../core/DictRecentManager';
 import TaskManager from '../core/TaskManager';
 import HistoryManager from '../core/HistoryManager';
 import WorkspaceManager, {WorkspaceManager as WorkspaceManagerClass} from '../core/WorkspaceManager';
@@ -182,10 +183,14 @@ export default function registerStates(app: Workflow): void {
     }
 
     // 1. 历史记录区
+    // query 为空时只展示 1 条最近记录（固定的优先），搜索 h/历史 时展开全部
     const history = HistoryManager.getHistory();
     const pinnedHistory = history.filter((h) => h.isPinned);
-    const unpinnedHistory = history.filter((h) => !h.isPinned).slice(0, 3);
-    const displayHistory = [...pinnedHistory, ...unpinnedHistory];
+    const unpinnedHistory = history.filter((h) => !h.isPinned);
+    const isHistoryExpanded = query ? matchQuery(query, '历史', 'h', 'history') : false;
+    const displayHistory = isHistoryExpanded
+      ? [...pinnedHistory, ...unpinnedHistory]
+      : [...pinnedHistory, ...unpinnedHistory.slice(0, 1)];
 
     for (const record of displayHistory) {
       const histIcon = record.isPinned ? '📌' : '🕒';
@@ -230,7 +235,10 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    // 3. 功能矩阵区
+    // 3. 功能矩阵区：就绪功能在前，缺少上下文的配置项沉底
+    const readyItems: AlfredItem[] = [];
+    const missingItems: AlfredItem[] = [];
+
     for (const feature of features) {
       if (feature.type === 'split_by_dict') {
         // 计算有多少个字典项可以执行此 feature
@@ -261,7 +269,7 @@ export default function registerStates(app: Workflow): void {
           if (!matchQuery(query, itemTitle, featureName, selected.name, itemSubtitle)) continue;
 
           if (feature.requiredInputs && feature.requiredInputs.length > 0) {
-            items.push(
+            readyItems.push(
               wf.createRerunItem(itemTitle, itemSubtitle, 'input_state', {
                 data: contextData,
                 dictKey: dict.key,
@@ -270,7 +278,7 @@ export default function registerStates(app: Workflow): void {
               }, {}, featureIconPath)
             );
           } else {
-            items.push(
+            readyItems.push(
               wf.createItem(itemTitle, itemSubtitle, feature.action, {
                 data: contextData,
                 dictKey: dict.key,
@@ -302,7 +310,7 @@ export default function registerStates(app: Workflow): void {
 
         if (!matchQuery(query, entryTitle, entrySubtitle)) continue;
 
-        items.push(
+        readyItems.push(
           wf.createRerunItem(entryTitle, entrySubtitle, 'split_feature', {
             data,
             pendingFeatureId: feature.id,
@@ -326,8 +334,7 @@ export default function registerStates(app: Workflow): void {
       const missingKeys = getMissingKeys(feature, data);
       if (missingKeys.length === 0) {
         if (feature.requiredInputs && feature.requiredInputs.length > 0) {
-          const nextInput = feature.requiredInputs[0]!;
-          items.push(
+          readyItems.push(
             wf.createRerunItem(
               `${featureName}`,
               `${featureDescription}`,
@@ -338,7 +345,7 @@ export default function registerStates(app: Workflow): void {
             )
           );
         } else {
-          items.push(
+          readyItems.push(
             wf.createItem(` ${featureName}`, featureDescription, feature.action, {
               data,
               historyTitle: `${featureName}`,
@@ -364,7 +371,7 @@ export default function registerStates(app: Workflow): void {
           .filter((d) => missingKeys.includes(d.key))
           .map((d) => d.name)
           .join(', ');
-        items.push(
+        missingItems.push(
           wf.createRerunItem(
             `⚙️ 配置: ${featureName}`,
             `缺少上下文: ${missingNames} (点击开始配置)`,
@@ -376,6 +383,8 @@ export default function registerStates(app: Workflow): void {
         );
       }
     }
+
+    items.push(...readyItems, ...missingItems);
 
     // 4. 管理中心入口（汇聚所有管理类操作，避免干扰主流程）
     const tasks = TaskManager.getAllTasks();
@@ -698,26 +707,45 @@ export default function registerStates(app: Workflow): void {
     const dictName = dicts.find((d) => d.key === dictKey)?.name ?? dictKey;
 
     const pinnedMap = DictPinManager.getAll();
+    const recentMap = DictRecentManager.getRecentMap(dictKey);
     const pinKey = (item: { id?: string; name: string }) => `${dictKey}:${item.id ?? item.name}`;
+    const itemKey = (item: { id?: string; name: string }) => item.id ?? item.name;
+
+    // 当前已选中的条目 id/name
+    const currentSelected = data[dictKey] as DictItem | undefined;
+    const currentKey = currentSelected ? (currentSelected.id ?? currentSelected.name) : null;
 
     if (query) {
       dictItems = dictItems.filter((item) => matchQuery(query, item.name, item.value));
       dictItems.unshift({ id: `manual_${query}`, name: query, value: query, isManual: true });
     } else {
-      // 无搜索词时，已 pin 的条目排在最前
+      // 无搜索词时：已选中 > pin 置顶 > 最近使用时间 > 原始顺序
       dictItems.sort((a, b) => {
+        const aKey = itemKey(a);
+        const bKey = itemKey(b);
+        const aIsCurrent = aKey === currentKey;
+        const bIsCurrent = bKey === currentKey;
+        if (aIsCurrent && !bIsCurrent) return -1;
+        if (!aIsCurrent && bIsCurrent) return 1;
+
         const aPinned = !!pinnedMap[pinKey(a)];
         const bPinned = !!pinnedMap[pinKey(b)];
         if (aPinned && !bPinned) return -1;
         if (!aPinned && bPinned) return 1;
-        return 0;
+
+        const aRecent = recentMap[aKey] ?? 0;
+        const bRecent = recentMap[bKey] ?? 0;
+        return bRecent - aRecent;
       });
     }
 
     for (const item of dictItems) {
       const newData: ContextData = { ...data, [dictKey]: item };
       const isPinned = !item.isManual && !!pinnedMap[pinKey(item)];
-      const titlePrefix = isPinned ? '📌 ' : '';
+      const isCurrentlySelected = !item.isManual && itemKey(item) === currentKey;
+
+      // 标题前缀：当前已选 > pin > 普通
+      const titlePrefix = isCurrentlySelected ? '✓ ' : isPinned ? '📌 ' : '';
       const title = item.isManual ? `✏️ 手动输入: ${item.name}` : `${titlePrefix}${item.name}`;
       let subtitle = item.isManual
         ? `将 ${item.name} 设置为当前 ${dictName} (手动输入)`
@@ -790,7 +818,12 @@ export default function registerStates(app: Workflow): void {
         }
 
         const itemSubtitle = hints.length > 0 ? `${subtitle}  ${hints.join('  ')}` : subtitle;
-        items.push(wf.createRerunItem(title, itemSubtitle, 'home', { data: newData }, mods, Icons.context));
+        // 选择条目时记录最近使用，并跳转 home
+        items.push(wf.createItem(title, itemSubtitle, 'select_dict_item', {
+          dictKey,
+          dictItemKey: itemKey(item),
+          data: newData,
+        }, mods, Icons.context));
       }
     }
 
@@ -1013,6 +1046,25 @@ export default function registerStates(app: Workflow): void {
           valid: false,
         });
       }
+    }
+
+    // 上一步：inputIndex > 0 时展示，清除从上一步起收集的 data key，回退重新选择
+    if (inputIndex > 0) {
+      const prevIndex = inputIndex - 1;
+      const keysToRemove = feature.requiredInputs!.slice(prevIndex).map((inp) => inp.key);
+      const prevData = { ...data };
+      for (const k of keysToRemove) delete prevData[k];
+      const prevInput = feature.requiredInputs![prevIndex]!;
+      items.push(
+        wf.createRerunItem(
+          `← 上一步: ${prevInput.label}`,
+          `重新选择「${prevInput.label}」`,
+          'input_state',
+          { data: prevData, pendingAction, inputIndex: prevIndex },
+          {},
+          Icons.workflow
+        )
+      );
     }
 
     items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }, {}, Icons.workflow));

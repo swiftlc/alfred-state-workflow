@@ -2,6 +2,7 @@ import {execSync} from 'child_process';
 import {copyToClipboard, encodeContext, openUrl, resolveOptions, sendNotification} from '../core/utils';
 import CacheManager from '../core/CacheManager';
 import DictPinManager from '../core/DictPinManager';
+import DictRecentManager from '../core/DictRecentManager';
 import {http} from '../core/HttpClient';
 import HistoryManager from '../core/HistoryManager';
 import TaskManager from '../core/TaskManager';
@@ -99,6 +100,16 @@ export default function registerActions(app: Workflow): void {
   app.onAction('refresh_cache', async (context, wf) => {
     CacheManager.clearAll();
     sendNotification('缓存已清空，下次查询将重新获取数据', '刷新成功');
+    wf.triggerAlfred(encodeContext({ state: 'home', data: context.data }));
+  });
+
+  // 动作：选择字典条目（记录最近使用，跳转 home）
+  app.onAction('select_dict_item', async (context, wf) => {
+    const dictKey = context['dictKey'] as string | undefined;
+    const dictItemKey = context['dictItemKey'] as string | undefined;
+    if (dictKey && dictItemKey) {
+      DictRecentManager.markUsed(dictKey, dictItemKey);
+    }
     wf.triggerAlfred(encodeContext({ state: 'home', data: context.data }));
   });
 
