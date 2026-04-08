@@ -302,6 +302,27 @@ export default function registerActions(app: Workflow): void {
     wf.triggerAlfred(encodeContext({ state: 'alias_manage', data }));
   });
 
+  // 动作：重命名快捷指令触发词
+  app.onAction('rename_alias', async (context, wf) => {
+    const aliasId = context['aliasId'] as string | undefined;
+    const aliasNewName = context['aliasNewName'] as string | undefined;
+
+    if (!aliasId || !aliasNewName?.trim()) {
+      sendNotification('参数缺失，无法重命名', 'Workflow');
+      return;
+    }
+
+    // 若新名与已有其他别名冲突，先删除冲突项
+    const conflict = AliasManager.getAll().find((a) => a.alias === aliasNewName.trim() && a.id !== aliasId);
+    if (conflict) AliasManager.delete(conflict.id);
+
+    const updated = AliasManager.rename(aliasId, aliasNewName.trim());
+    if (updated) {
+      sendNotification(`已重命名为「${updated.alias}」`, 'Workflow');
+    }
+    wf.triggerAlfred(encodeContext({ state: 'alias_manage', data: context.data }));
+  });
+
   // 动作：删除快捷指令
   app.onAction('delete_alias', async (context, wf) => {
     const aliasId = context['aliasId'] as string | undefined;

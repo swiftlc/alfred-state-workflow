@@ -93,6 +93,16 @@ class AliasManager {
     return record;
   }
 
+  /** 重命名别名触发词 */
+  rename(id: string, newAlias: string): AliasRecord | null {
+    const records = this.getAll();
+    const record = records.find((r) => r.id === id);
+    if (!record) return null;
+    record.alias = newAlias;
+    this.save(records);
+    return record;
+  }
+
   /** 删除别名 */
   delete(id: string): void {
     const records = this.getAll().filter((r) => r.id !== id);

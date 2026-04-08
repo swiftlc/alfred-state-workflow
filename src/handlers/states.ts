@@ -1227,6 +1227,11 @@ export default function registerStates(app: Workflow): void {
             'execute_alias',
             { aliasId: alias.id, aliasAction: alias.action, aliasData: alias.data },
             {
+              cmd: {
+                subtitle: '✏️ 重命名触发词',
+                action: 'rerun',
+                payload: { nextState: 'alias_rename', aliasId: alias.id, aliasCurrentName: alias.alias, data: currentData },
+              },
               alt: {
                 subtitle: '🗑️ 删除此快捷指令',
                 action: 'delete_alias',
@@ -1318,6 +1323,67 @@ export default function registerStates(app: Workflow): void {
         valid: false,
         icon: icon('alias'),
       });
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', 'alias_manage', { data }, {}, Icons.alias));
+    return items;
+  });
+
+  /**
+   * 状态：重命名快捷指令触发词 (alias_rename)
+   * 用户输入新触发词后确认保存
+   */
+  app.onState('alias_rename', async (context, wf) => {
+    const query = context.query ?? '';
+    const data = context.data ?? {};
+    const aliasId = context['aliasId'] as string | undefined;
+    const aliasCurrentName = context['aliasCurrentName'] as string | undefined;
+    const items: AlfredItem[] = [];
+
+    if (!aliasId) {
+      items.push({ title: '⚠️ 参数缺失', subtitle: '无法找到要重命名的快捷指令', valid: false, icon: icon('alias') });
+      items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', 'alias_manage', { data }, {}, Icons.alias));
+      return items;
+    }
+
+    items.push({
+      title: `✏️ 重命名「${aliasCurrentName}」`,
+      subtitle: '在搜索框输入新触发词后回车保存',
+      valid: false,
+      icon: icon('alias'),
+    });
+
+    if (query) {
+      const trimmed = query.trim();
+      if (trimmed.includes(' ')) {
+        items.push({
+          title: '❌ 触发词不能包含空格',
+          subtitle: '请输入不含空格的短词（如 lgd、dev-login）',
+          valid: false,
+          icon: icon('alias'),
+        });
+      } else {
+        items.push(
+          wf.createItem(
+            `⚡ 重命名为「${trimmed}」`,
+            `${aliasCurrentName} → ${trimmed}`,
+            'rename_alias',
+            { aliasId, aliasNewName: trimmed, data },
+            {},
+            Icons.alias
+          )
+        );
+
+        const conflict = AliasManager.getAll().find((a) => a.alias === trimmed && a.id !== aliasId);
+        if (conflict) {
+          items.push({
+            title: `⚠️ 触发词「${trimmed}」已被「${conflict.title}」占用`,
+            subtitle: '保存后将覆盖原有绑定',
+            valid: false,
+            icon: icon('alias'),
+          });
+        }
+      }
     }
 
     items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', 'alias_manage', { data }, {}, Icons.alias));
