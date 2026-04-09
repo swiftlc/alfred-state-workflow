@@ -4,6 +4,7 @@ import fs from 'fs';
 import {decodeContext, encodeContext} from './utils';
 import TaskManager from './TaskManager';
 import HistoryManager from './HistoryManager';
+import {DEFAULT_STATE, FIELD_PREFETCH_JOB_ID, FIELD_SILENT_ON_SUCCESS} from '../config/constants';
 import Logger from './Logger';
 import type {ActionHandler, AlfredFilterOutput, AlfredItem, Context, StateHandler, TaskHandler,} from '../types';
 
@@ -16,6 +17,8 @@ interface WorkflowOptions {
   aliasPrefix?: string;
   /** 任务完成后结果展示时长（毫秒），默认 6000 */
   taskCompletedDisplayMs?: number;
+  /** home 状态无搜索词时最多展示的最近历史条数，默认 1 */
+  maxRecentHistory?: number;
 }
 
 /** item.mods 中每个修饰键的描述（在 createItem 中构造时使用） */
@@ -35,6 +38,7 @@ class Workflow {
   triggerName: string;
   aliasPrefix: string;
   taskCompletedDisplayMs: number;
+  maxRecentHistory: number;
   states: Record<string, StateHandler>;
   actions: Record<string, ActionHandler>;
   actionOptions: Record<string, ActionOptions>;
@@ -50,6 +54,7 @@ class Workflow {
     this.triggerName = options.triggerName ?? 'flow';
     this.aliasPrefix = options.aliasPrefix ?? '>';
     this.taskCompletedDisplayMs = options.taskCompletedDisplayMs ?? 6000;
+    this.maxRecentHistory = options.maxRecentHistory ?? 1;
     this.states = {};
     this.actions = {};
     this.actionOptions = {};
@@ -79,7 +84,7 @@ class Workflow {
     if (!fs.existsSync(CONTEXT_FILE)) {
       fs.writeFileSync(
         CONTEXT_FILE,
-        JSON.stringify({ state: 'home', data: {} }),
+        JSON.stringify({ state: DEFAULT_STATE, data: {} }),
         'utf8'
       );
     }
@@ -88,7 +93,7 @@ class Workflow {
   saveContext(context: Partial<Context>): void {
     try {
       const contextToSave: Partial<Context> & { timestamp: number } = {
-        state: context.state ?? 'home',
+        state: context.state ?? DEFAULT_STATE,
         data: context.data ?? {},
         pendingAction: context.pendingAction,
         inputIndex: context.inputIndex,
@@ -111,11 +116,11 @@ class Workflow {
 
       // 上下文保存时间超过 TTL 则重置
       if (context.timestamp && Date.now() - context.timestamp > Workflow.CONTEXT_TTL_MS) {
-        return { state: 'home', data: {} };
+        return { state: DEFAULT_STATE, data: {} };
       }
       return context;
     } catch {
-      return { state: 'home', data: {} };
+      return { state: DEFAULT_STATE, data: {} };
     }
   }
 
@@ -161,7 +166,7 @@ class Workflow {
       returnState: context.returnState,
       pendingAction: context.pendingAction,
       inputIndex: context.inputIndex,
-      _silentOnSuccess: context['_silentOnSuccess'],
+      [FIELD_SILENT_ON_SUCCESS]: context[FIELD_SILENT_ON_SUCCESS],
     });
     this.triggerAlfred(nextArg);
   }
@@ -173,7 +178,7 @@ class Workflow {
   spawnWorker(taskName: string, context: Context): void {
     const jobId = `prefetch_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const workerPath = path.join(__dirname, '../worker.ts');
-    const contextStr = encodeContext({ ...context, _prefetchJobId: jobId });
+    const contextStr = encodeContext({ ...context, [FIELD_PREFETCH_JOB_ID]: jobId });
     const tsxBin = path.join(__dirname, '../../node_modules/.bin/tsx');
     const child = spawn(tsxBin, [workerPath, taskName, jobId, contextStr], {
       detached: true,
@@ -235,12 +240,12 @@ class Workflow {
       // 每次打开 Alfred（无参数入口）都刷新 timestamp，重新计时
       this.saveContext(context);
     } else {
-      context = (decodeContext(arg) as Context | null) ?? { state: 'home', data: {} };
+      context = (decodeContext(arg) as Context | null) ?? { state: DEFAULT_STATE, data: {} };
       this.saveContext(context);
     }
 
     context.query = query.trim();
-    const stateName = context.state ?? 'home';
+    const stateName = context.state ?? DEFAULT_STATE;
     const handler = this.states[stateName];
 
     if (!handler) {
@@ -286,7 +291,7 @@ class Workflow {
 
     // 内置 rerun 动作
     if (action === 'rerun') {
-      const nextState = context.nextState ?? 'home';
+      const nextState = context.nextState ?? DEFAULT_STATE;
       const nextContext: Context = { ...context, state: nextState };
       this.saveContext(nextContext);
       this.triggerAlfred(encodeContext(nextContext));
@@ -329,7 +334,7 @@ class Workflow {
           // 将 action 携带的 data 与持久化上下文的 data 合并，action data 优先覆盖
           const persisted = this.loadContext();
           const mergedData = { ...persisted.data, ...(context.data ?? {}) };
-          this.saveContext({ state: 'home', data: mergedData });
+          this.saveContext({ state: DEFAULT_STATE, data: mergedData });
         }
       } catch (err) {
         Logger.error(`Action execution failed: ${action}`, err as Error, { context });

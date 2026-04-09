@@ -1,6 +1,15 @@
 import dictService from '../services/dictService';
 import features from '../config/features';
 import CacheManager from '../core/CacheManager';
+import {
+  DEFAULT_STATE,
+  FIELD_CURRENT_DICT,
+  FIELD_CURRENT_SELECTED,
+  FIELD_SILENT_ON_SUCCESS,
+  FIELD_PREFETCH_FEATURE_ID,
+  FIELD_PREFETCH_INPUT_INDEX,
+  FIELD_PREFETCH_DICT_KEY,
+} from '../config/constants';
 import DictPinManager from '../core/DictPinManager';
 import DictRecentManager from '../core/DictRecentManager';
 import TaskManager from '../core/TaskManager';
@@ -44,7 +53,7 @@ export default function registerStates(app: Workflow): void {
     const task = TaskManager.getTask(jobId);
 
     if (!task) {
-      return [wf.createRerunItem('❌ 错误', '找不到任务信息', 'home', { data: context.data }, {}, Icons.task)];
+      return [wf.createRerunItem('❌ 错误', '找不到任务信息', DEFAULT_STATE, { data: context.data }, {}, Icons.task)];
     }
 
     if (task.status === 'running') {
@@ -57,7 +66,7 @@ export default function registerStates(app: Workflow): void {
           {
             title: `${spinner} ${task.progress}% - ${task.message}`,
             subtitle: '任务执行中，请稍候... (按回车后台执行，按 Cmd+Enter 取消任务)',
-            arg: wf.createItem('', '', 'rerun', { nextState: 'home', data: context.data }).arg,
+            arg: wf.createItem('', '', 'rerun', { nextState: DEFAULT_STATE, data: context.data }).arg,
             icon: icon('task'),
             valid: true,
             mods: {
@@ -78,10 +87,10 @@ export default function registerStates(app: Workflow): void {
       const completedAt = task.completedAt ?? Date.now();
       const elapsed = Date.now() - completedAt;
 
-      const nextState = (context.returnState as string | undefined) ?? 'home';
+      const nextState = (context.returnState as string | undefined) ?? DEFAULT_STATE;
       const nextContext: Context = { ...context, state: nextState };
-      const fallbackContext: Context = { ...context, state: 'home' };
-      const silentOnSuccess = !!(context['_silentOnSuccess'] as boolean | undefined);
+      const fallbackContext: Context = { ...context, state: DEFAULT_STATE };
+      const silentOnSuccess = !!(context[FIELD_SILENT_ON_SUCCESS] as boolean | undefined);
 
       // 成功且静默模式：直接渲染目标状态，不展示成功 item
       if (task.status === 'done' && silentOnSuccess) {
@@ -98,7 +107,7 @@ export default function registerStates(app: Workflow): void {
           if (handler) return handler(nextContext, wf);
         }
         wf.saveContext(fallbackContext);
-        const homeHandler = wf.states['home'];
+        const homeHandler = wf.states[DEFAULT_STATE];
         if (homeHandler) return homeHandler(fallbackContext, wf);
         return [];
       }
@@ -110,10 +119,10 @@ export default function registerStates(app: Workflow): void {
         : task.status === 'cancelled'
           ? `${emoji} 任务已取消`
           : `${emoji} 执行失败: ${task.message}`;
-      const returnLabel = isSuccess ? `返回${nextState === 'home' ? '主菜单' : ''}` : '返回主菜单';
+      const returnLabel = isSuccess ? `返回${nextState === DEFAULT_STATE ? '主菜单' : ''}` : '返回主菜单';
       const returnArg = isSuccess
         ? wf.createRerunItem('', '', nextState, { data: context.data }).arg
-        : wf.createRerunItem('', '', 'home', { data: context.data }).arg;
+        : wf.createRerunItem('', '', DEFAULT_STATE, { data: context.data }).arg;
 
       return {
         rerun: 0.5,
@@ -130,7 +139,7 @@ export default function registerStates(app: Workflow): void {
     }
 
     // 兜底（理论上不会到达）
-    return [wf.createRerunItem('↩️ 返回主菜单', '', 'home', { data: context.data }, {}, Icons.task)];
+    return [wf.createRerunItem('↩️ 返回主菜单', '', DEFAULT_STATE, { data: context.data }, {}, Icons.task)];
   });
 
   /**
@@ -183,7 +192,7 @@ export default function registerStates(app: Workflow): void {
     const isHistoryExpanded = query ? matchQuery(query, '历史', 'h', 'history') : false;
     const displayHistory = isHistoryExpanded
       ? [...pinnedHistory, ...unpinnedHistory]
-      : [...pinnedHistory, ...unpinnedHistory.slice(0, 1)];
+      : [...pinnedHistory, ...unpinnedHistory.slice(0, wf.maxRecentHistory)];
 
     for (const record of displayHistory) {
       const histIcon = record.isPinned ? '📌' : '🕒';
@@ -250,8 +259,8 @@ export default function registerStates(app: Workflow): void {
           const selected = data[dict.key] as DictItem;
           const contextData: ContextData = {
             ...data,
-            _currentDict: dict as unknown as DictItem,
-            _currentSelected: selected,
+            [FIELD_CURRENT_DICT]: dict as unknown as DictItem,
+            [FIELD_CURRENT_SELECTED]: selected,
           };
           const featureName = typeof feature.name === 'function' ? feature.name(contextData) : feature.name;
           const featureDescription = typeof feature.description === 'function' ? feature.description(contextData) : feature.description;
@@ -468,7 +477,7 @@ export default function registerStates(app: Workflow): void {
     // 清空上下文
     if (Object.keys(data).filter((k) => !k.startsWith('_')).length > 0 && matchQuery(query, '清空上下文')) {
       items.push(
-        wf.createRerunItem('🗑️ 清空上下文', '清除所有已选择的字典数据，重新开始', 'home', { data: {} }, {}, Icons.context)
+        wf.createRerunItem('🗑️ 清空上下文', '清除所有已选择的字典数据，重新开始', DEFAULT_STATE, { data: {} }, {}, Icons.context)
       );
     }
 
@@ -479,7 +488,7 @@ export default function registerStates(app: Workflow): void {
       );
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }, {}, Icons.workflow));
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data }, {}, Icons.workflow));
     return items;
   });
 
@@ -495,8 +504,8 @@ export default function registerStates(app: Workflow): void {
 
     const feature = features.find((f) => f.id === pendingFeatureId);
     if (!feature || !pendingFeatureId) {
-      const homeHandler = wf.states['home'];
-      if (homeHandler) return homeHandler({ ...context, state: 'home', query }, wf);
+      const homeHandler = wf.states[DEFAULT_STATE];
+      if (homeHandler) return homeHandler({ ...context, state: DEFAULT_STATE, query }, wf);
       return [];
     }
 
@@ -510,8 +519,8 @@ export default function registerStates(app: Workflow): void {
 
       const contextData: ContextData = {
         ...data,
-        _currentDict: dict as unknown as DictItem,
-        _currentSelected: selected,
+        [FIELD_CURRENT_DICT]: dict as unknown as DictItem,
+        [FIELD_CURRENT_SELECTED]: selected,
       };
       const featureName = typeof feature.name === 'function' ? feature.name(contextData) : feature.name;
       const featureDescription =
@@ -560,7 +569,7 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }, {}, Icons.workflow));
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data }, {}, Icons.workflow));
     return items;
   });
 
@@ -615,7 +624,7 @@ export default function registerStates(app: Workflow): void {
       items.push(wf.createItem('🗑️ 清空所有历史记录', '删除所有未固定的历史记录', 'clear_history', {}, {}, Icons.history));
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data: context.data }, {}, Icons.workflow));
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data: context.data }, {}, Icons.workflow));
     return items;
   });
 
@@ -628,7 +637,7 @@ export default function registerStates(app: Workflow): void {
     const tasks = TaskManager.getAllTasks();
 
     if (tasks.length === 0) {
-      return [wf.createRerunItem('暂无后台任务', '按回车返回主菜单', 'home', { data: context.data })];
+      return [wf.createRerunItem('暂无后台任务', '按回车返回主菜单', DEFAULT_STATE, { data: context.data })];
     }
 
     let hasRunning = false;
@@ -686,7 +695,7 @@ export default function registerStates(app: Workflow): void {
       );
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data: context.data }, {}, Icons.workflow));
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data: context.data }, {}, Icons.workflow));
     return hasRunning ? { rerun: 1, items } : items;
   });
 
@@ -702,8 +711,8 @@ export default function registerStates(app: Workflow): void {
 
     // dictKey 缺失时（如 esc 后重新打开 Alfred，context 残留了 select_dict 状态），回退到 home
     if (!dictKey) {
-      const homeHandler = wf.states['home'];
-      if (homeHandler) return homeHandler({ ...context, state: 'home', query }, wf);
+      const homeHandler = wf.states[DEFAULT_STATE];
+      if (homeHandler) return homeHandler({ ...context, state: DEFAULT_STATE, query }, wf);
       return [];
     }
 
@@ -713,7 +722,7 @@ export default function registerStates(app: Workflow): void {
 
     if (cached === null) {
       // 缓存未命中：静默启动后台预加载 worker，展示 loading item，rerun 轮询直到缓存就绪
-      wf.spawnWorker('_prefetch_dict', { ...context, _prefetchDictKey: dictKey });
+      wf.spawnWorker('_prefetch_dict', { ...context, [FIELD_PREFETCH_DICT_KEY]: dictKey });
       const dictName = dicts.find((d) => d.key === dictKey)?.name ?? dictKey;
       const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
       return {
@@ -855,7 +864,7 @@ export default function registerStates(app: Workflow): void {
     }
 
     if (matchQuery(query, '返回')) {
-      items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }, {}, Icons.workflow));
+      items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data }, {}, Icons.workflow));
     }
 
     return items;
@@ -888,7 +897,7 @@ export default function registerStates(app: Workflow): void {
 
     const feature = features.find((f) => f.id === pendingAction);
     if (!feature || !feature.requiredInputs || !feature.requiredInputs[inputIndex]) {
-      return [wf.createRerunItem('❌ 错误', '找不到需要输入的配置项', 'home')];
+      return [wf.createRerunItem('❌ 错误', '找不到需要输入的配置项', DEFAULT_STATE)];
     }
 
     // 跳过满足 skipIf 条件的步骤
@@ -917,9 +926,9 @@ export default function registerStates(app: Workflow): void {
           wf.startTask('_prefetch_options', {
             ...context,
             returnState: 'input_state',
-            _silentOnSuccess: true,
-            _prefetchFeatureId: pendingAction,
-            _prefetchInputIndex: inputIndex,
+            [FIELD_SILENT_ON_SUCCESS]: true,
+            [FIELD_PREFETCH_FEATURE_ID]: pendingAction,
+            [FIELD_PREFETCH_INPUT_INDEX]: inputIndex,
           });
           return [];
         }
@@ -1114,7 +1123,7 @@ export default function registerStates(app: Workflow): void {
       );
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data }, {}, Icons.workflow));
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data }, {}, Icons.workflow));
     return items;
   });
 
@@ -1179,7 +1188,7 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data: currentData }, {}, Icons.workflow));
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data: currentData }, {}, Icons.workflow));
     return items;
   });
 
@@ -1291,7 +1300,7 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', 'home', { data: currentData }, {}, Icons.workflow));
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data: currentData }, {}, Icons.workflow));
     return items;
   });
 

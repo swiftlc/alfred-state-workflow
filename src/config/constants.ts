@@ -1,2 +1,23 @@
 /** 本地代理服务地址 */
 export const PROXY_BASE_URL = 'http://127.0.0.1:8080';
+
+/** 默认/回退 state 名称 */
+export const DEFAULT_STATE = 'home';
+
+// ─── 内部上下文字段名 ─────────────────────────────────────────────────────────────
+// 以下字段名在 context.data 中作为框架内部临时字段使用，以 _ 开头与业务字段区分
+
+/** split_by_dict 时当前正在处理的字典定义 */
+export const FIELD_CURRENT_DICT = '_currentDict';
+/** split_by_dict 时当前已选中的字典条目 */
+export const FIELD_CURRENT_SELECTED = '_currentSelected';
+/** 任务完成后是否静默（不展示成功 item，直接跳转目标状态） */
+export const FIELD_SILENT_ON_SUCCESS = '_silentOnSuccess';
+/** 预加载 fetchOptions 时传递的 feature id */
+export const FIELD_PREFETCH_FEATURE_ID = '_prefetchFeatureId';
+/** 预加载 fetchOptions 时传递的 input 索引 */
+export const FIELD_PREFETCH_INPUT_INDEX = '_prefetchInputIndex';
+/** 预加载字典列表时传递的 dictKey */
+export const FIELD_PREFETCH_DICT_KEY = '_prefetchDictKey';
+/** spawnWorker 时生成的 job id（仅 worker 进程内部使用） */
+export const FIELD_PREFETCH_JOB_ID = '_prefetchJobId';

@@ -4,7 +4,7 @@ import Logger from '../core/Logger';
 import CacheManager from '../core/CacheManager';
 import {copyToClipboard, openUrl, sendNotification} from '../core/utils';
 import {icon} from '../core/icons';
-import {PROXY_BASE_URL} from './constants';
+import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED} from './constants';
 import {DictService} from '../services/dictService';
 import type {ContextData, DictItem, Feature} from '../types';
 
@@ -50,9 +50,9 @@ const builtInFeatures: Feature[] = [
     label: '📋 复制字典值',
     icon: icon('cache'),
     name: (data: ContextData) =>
-      `📋 复制 ${(data['_currentDict'] as DictItem | undefined)?.name ?? ''}: ${(data['_currentSelected'] as DictItem | undefined)?.name ?? ''}`,
+      `📋 复制 ${(data[FIELD_CURRENT_DICT] as DictItem | undefined)?.name ?? ''}: ${(data[FIELD_CURRENT_SELECTED] as DictItem | undefined)?.name ?? ''}`,
     description: (data: ContextData) =>
-      `将 ${(data['_currentDict'] as DictItem | undefined)?.name ?? ''} [${(data['_currentSelected'] as DictItem | undefined)?.name ?? ''}] 复制到剪切板`,
+      `将 ${(data[FIELD_CURRENT_DICT] as DictItem | undefined)?.name ?? ''} [${(data[FIELD_CURRENT_SELECTED] as DictItem | undefined)?.name ?? ''}] 复制到剪切板`,
     requiredKeys: [],
     action: 'copy_to_clipboard',
     type: 'split_by_dict',
@@ -63,9 +63,9 @@ const builtInFeatures: Feature[] = [
     label: '📝 修改字典描述',
     icon: icon('context'),
     name: (data: ContextData) =>
-      `📝 修改描述：${(data['_currentDict'] as DictItem | undefined)?.name ?? ''}: ${(data['_currentSelected'] as DictItem | undefined)?.name ?? ''}`,
+      `📝 修改描述：${(data[FIELD_CURRENT_DICT] as DictItem | undefined)?.name ?? ''}: ${(data[FIELD_CURRENT_SELECTED] as DictItem | undefined)?.name ?? ''}`,
     description: (data: ContextData) =>
-      `当前描述：${(data['_currentSelected'] as DictItem | undefined)?.description ?? ''}`,
+      `当前描述：${(data[FIELD_CURRENT_SELECTED] as DictItem | undefined)?.description ?? ''}`,
     requiredKeys: [],
     excludeWhen: (dict) => dict.allowDescriptionEdit === false,
     action: 'modify_dict_desc',
@@ -80,8 +80,8 @@ const builtInFeatures: Feature[] = [
     ],
     actionHandler: async (context, wf) => {
       Logger.info(`修改描述：${JSON.stringify(context)}`);
-      const currentSelected = context.data['_currentSelected'] as DictItem;
-      const currentDict = context.data['_currentDict'] as DictItem;
+      const currentSelected = context.data[FIELD_CURRENT_SELECTED] as DictItem;
+      const currentDict = context.data[FIELD_CURRENT_DICT] as DictItem;
       const input1 = context.data['input1'] as DictItem;
 
       await http.put(`${PROXY_BASE_URL}/dictionaries`, {
@@ -96,7 +96,7 @@ const builtInFeatures: Feature[] = [
       // 同步更新 context 里已选中条目的 description，避免 feature item 展示旧值
       if (context.data[dictKey]) {
         (context.data[dictKey] as DictItem).description = input1.value;
-        wf.saveContext({ state: 'home', data: context.data });
+        wf.saveContext({ state: DEFAULT_STATE, data: context.data });
       }
       sendNotification('修改成功！', '修改成功');
     },

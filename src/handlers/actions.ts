@@ -10,7 +10,15 @@ import WorkspaceManager from '../core/WorkspaceManager';
 import AliasManager from '../core/AliasManager';
 import Logger from '../core/Logger';
 import dictService, {DictService} from '../services/dictService';
-import {PROXY_BASE_URL} from '../config/constants';
+import {
+  PROXY_BASE_URL,
+  DEFAULT_STATE,
+  FIELD_CURRENT_SELECTED,
+  FIELD_CURRENT_DICT,
+  FIELD_PREFETCH_DICT_KEY,
+  FIELD_PREFETCH_FEATURE_ID,
+  FIELD_PREFETCH_INPUT_INDEX,
+} from '../config/constants';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
 
@@ -21,7 +29,7 @@ import type {DictItem} from '../types';
 export default function registerActions(app: Workflow): void {
   // 后台任务：预加载字典列表数据并写入缓存
   app.onTask('_prefetch_dict', async (task, context) => {
-    const dictKey = context['_prefetchDictKey'] as string | undefined;
+    const dictKey = context[FIELD_PREFETCH_DICT_KEY] as string | undefined;
     if (!dictKey) {
       task.update(100, '参数缺失');
       return;
@@ -33,8 +41,8 @@ export default function registerActions(app: Workflow): void {
 
   // 后台任务：预加载 fetchOptions 数据并写入缓存
   app.onTask('_prefetch_options', async (task, context) => {
-    const featureId = context['_prefetchFeatureId'] as string | undefined;
-    const inputIndex = (context['_prefetchInputIndex'] as number | undefined) ?? 0;
+    const featureId = context[FIELD_PREFETCH_FEATURE_ID] as string | undefined;
+    const inputIndex = (context[FIELD_PREFETCH_INPUT_INDEX] as number | undefined) ?? 0;
 
     const featuresModule = require('../config/features');
     const features = (featuresModule?.default ?? featuresModule) as import('../types').Feature[];
@@ -94,8 +102,8 @@ export default function registerActions(app: Workflow): void {
 
   // 动作：复制字典值到剪切板
   app.onAction('copy_to_clipboard', async (context) => {
-    const currentSelected = context.data['_currentSelected'] as DictItem;
-    const currentDict = context.data['_currentDict'] as DictItem;
+    const currentSelected = context.data[FIELD_CURRENT_SELECTED] as DictItem;
+    const currentDict = context.data[FIELD_CURRENT_DICT] as DictItem;
 
     // 读取字典配置的 copyValue，决定复制内容
     const dicts = await dictService.getDictionaries();
@@ -122,7 +130,7 @@ export default function registerActions(app: Workflow): void {
   app.onAction('refresh_cache', async (context, wf) => {
     CacheManager.clearAll();
     sendNotification('缓存已清空，下次查询将重新获取数据', '刷新成功');
-    wf.triggerAlfred(encodeContext({ state: 'home', data: context.data }));
+    wf.triggerAlfred(encodeContext({ state: DEFAULT_STATE, data: context.data }));
   }, { skipContextSave: true });
 
   // 动作：选择字典条目（记录最近使用，跳转 home）
@@ -132,7 +140,7 @@ export default function registerActions(app: Workflow): void {
     if (dictKey && dictItemKey) {
       DictRecentManager.markUsed(dictKey, dictItemKey);
     }
-    wf.triggerAlfred(encodeContext({ state: 'home', data: context.data }));
+    wf.triggerAlfred(encodeContext({ state: DEFAULT_STATE, data: context.data }));
   });
 
   // 动作：切换字典条目置顶状态（Cmd+Enter 触发）
@@ -166,14 +174,14 @@ export default function registerActions(app: Workflow): void {
   // 动作：固定/取消固定历史记录
   app.onAction('toggle_pin', async (context, wf) => {
     if (context.id) HistoryManager.togglePin(context.id);
-    const nextState = context.returnState ?? 'home';
+    const nextState = context.returnState ?? DEFAULT_STATE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   }, { skipContextSave: true });
 
   // 动作：删除单条历史记录
   app.onAction('delete_history', async (context, wf) => {
     if (context.id) HistoryManager.deleteHistory(context.id);
-    const nextState = context.returnState ?? 'home';
+    const nextState = context.returnState ?? DEFAULT_STATE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   }, { skipContextSave: true });
 
@@ -181,7 +189,7 @@ export default function registerActions(app: Workflow): void {
   app.onAction('clear_history', async (context, wf) => {
     HistoryManager.clearAll();
     sendNotification('未固定的历史记录已清空');
-    wf.triggerAlfred(encodeContext({ state: 'home', data: context.data }));
+    wf.triggerAlfred(encodeContext({ state: DEFAULT_STATE, data: context.data }));
   });
 
   // 动作：打开日志文件
@@ -197,7 +205,7 @@ export default function registerActions(app: Workflow): void {
       TaskManager.updateTask(jobId, { status: 'cancelled', message: '任务已取消' });
       sendNotification('后台任务已取消');
     }
-    const nextState = context.returnState ?? 'home';
+    const nextState = context.returnState ?? DEFAULT_STATE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   });
 
@@ -235,7 +243,7 @@ export default function registerActions(app: Workflow): void {
     }
 
     sendNotification(`已切换到工作区: ${workspace.name}`, 'Workflow');
-    wf.triggerAlfred(encodeContext({ state: 'home', data: workspace.data }));
+    wf.triggerAlfred(encodeContext({ state: DEFAULT_STATE, data: workspace.data }));
   });
 
   // 动作：保存工作区快照
