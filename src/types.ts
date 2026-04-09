@@ -13,6 +13,8 @@ export interface DictCategory {
    * 不再走默认的 REST 接口。缓存逻辑（cacheTtl）仍由框架统一管理。
    */
   fetchItems?: () => Promise<DictItem[]>;
+  /** 接口不可用时的兜底数据，不配置则降级返回空数组 */
+  fallbackItems?: DictItem[];
   /**
    * 复制字典项时的取值方式：
    * - 'value'：仅复制 item.value

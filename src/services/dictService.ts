@@ -5,9 +5,10 @@
  * 1. GET /api/v1/dicts           → 返回所有字典类型列表
  * 2. GET /api/v1/dicts/:key/items → 返回指定字典下的所有选项
  *
- * 扩展点：
+ * 扩展点（均在 DICTS 配置）：
  * - cacheTtl：缓存有效期，不填默认 5 分钟
  * - fetchItems：自定义条目获取函数，配置后不走默认 REST 接口
+ * - fallbackItems：接口不可用时的兜底数据
  * - copyValue：复制模式，'value' / 'json' / function
  * - readonly：禁止删除条目
  */
@@ -39,28 +40,25 @@ interface ApiResponse<T> {
   message?: string;
 }
 
-/** 默认兜底数据（接口不可用时降级） */
-const DICT_ITEMS: Record<string, DictItem[]> = {
-  tenant: [
-    { id: 't-001', name: '租户张三 (t-001)' },
-    { id: 't-002', name: '租户李四 (t-002)' },
-    { id: 't-003', name: '租户王五 (t-003)' },
-  ],
-  swimlane: [
-    { id: 'base', name: '基础泳道 (base)' },
-    { id: 'qa-01', name: '测试泳道 01 (qa-01)' },
-    { id: 'perf-01', name: '压测泳道 01 (perf-01)' },
-  ],
-  env: [
-    { id: 'test', name: '测试环境 (test)' },
-    { id: 'staging', name: '预发环境 (staging)' },
-    { id: 'prod', name: '生产环境 (prod)' },
-  ],
-};
-
 const DICTS: DictCategory[] = [
-  { key: 'tenant', name: '租户' },
-  { key: 'swimlane', name: '泳道' },
+  {
+    key: 'tenant',
+    name: '租户',
+    fallbackItems: [
+      { id: 't-001', name: '租户张三 (t-001)' },
+      { id: 't-002', name: '租户李四 (t-002)' },
+      { id: 't-003', name: '租户王五 (t-003)' },
+    ],
+  },
+  {
+    key: 'swimlane',
+    name: '泳道',
+    fallbackItems: [
+      { id: 'base', name: '基础泳道 (base)' },
+      { id: 'qa-01', name: '测试泳道 01 (qa-01)' },
+      { id: 'perf-01', name: '压测泳道 01 (perf-01)' },
+    ],
+  },
   {
     key: 'appkey',
     name: 'appkey',
@@ -117,9 +115,9 @@ class DictService {
               name: (item['title'] as string | undefined) ?? (item.value as string | undefined) ?? '',
             }));
           }
-          return DICT_ITEMS[dictKey] ?? [];
+          return dictConfig?.fallbackItems ?? [];
         } catch {
-          return DICT_ITEMS[dictKey] ?? [];
+          return dictConfig?.fallbackItems ?? [];
         }
       },
       ttl
