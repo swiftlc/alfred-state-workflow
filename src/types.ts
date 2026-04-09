@@ -6,6 +6,13 @@ export interface DictCategory {
   name: string;
   /** 字典列表缓存有效期（毫秒），不填默认 5 分钟 */
   cacheTtl?: number;
+  /**
+   * 复制字典项时的取值方式：
+   * - 'value'：仅复制 item.value
+   * - 'json'：复制完整 JSON（默认）
+   * - function：动态生成复制内容，入参为选中的 DictItem
+   */
+  copyValue?: 'value' | 'json' | ((item: DictItem) => string);
 }
 
 /** 字典选项（某个字典类型下的一条具体数据） */

@@ -93,16 +93,24 @@ export default function registerActions(app: Workflow): void {
 
   // 动作：复制字典值到剪切板
   app.onAction('copy_to_clipboard', async (context) => {
-    // Logger.info('执行动作: copy_to_clipboard', context);
     const currentSelected = context.data['_currentSelected'] as DictItem;
     const currentDict = context.data['_currentDict'] as DictItem;
 
-    if (currentDict.name === 'appkey'){
-      copyToClipboard(currentSelected.value ?? "");
-    }else{
-      copyToClipboard(JSON.stringify(currentSelected, null, 2));
+    // 读取字典配置的 copyValue，决定复制内容
+    const dicts = await dictService.getDictionaries();
+    const dictConfig = dicts.find((d) => d.key === String(currentDict.key ?? currentDict.name));
+    const copyMode = dictConfig?.copyValue ?? 'json';
+
+    let textToCopy: string;
+    if (typeof copyMode === 'function') {
+      textToCopy = copyMode(currentSelected);
+    } else if (copyMode === 'value') {
+      textToCopy = currentSelected.value ?? '';
+    } else {
+      textToCopy = JSON.stringify(currentSelected, null, 2);
     }
 
+    copyToClipboard(textToCopy);
     sendNotification(
       `已复制 ${currentDict.name}:${currentSelected.name} 的完整数据`,
       '复制成功'
