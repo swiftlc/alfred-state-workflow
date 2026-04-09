@@ -6,6 +6,8 @@ export interface DictCategory {
   name: string;
   /** 字典列表缓存有效期（毫秒），不填默认 5 分钟 */
   cacheTtl?: number;
+  /** 只读字典：禁止删除条目（仍可置顶/修改描述），默认 false */
+  readonly?: boolean;
   /**
    * 复制字典项时的取值方式：
    * - 'value'：仅复制 item.value

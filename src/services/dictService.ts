@@ -21,7 +21,7 @@ const DEFAULT_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
 const DICTS: DictCategory[] = [
   { key: 'tenant', name: '租户' },
   { key: 'swimlane', name: '泳道' },
-  { key: 'appkey', name: 'appkey', cacheTtl: 7 * 24 * 60 * 60 * 1000, copyValue: 'value' }, // 7 天
+  { key: 'appkey', name: 'appkey', cacheTtl: 7 * 24 * 60 * 60 * 1000, copyValue: 'value', readonly: true }, // 7 天
 ];
 
 const DICT_ITEMS: Record<string, DictItem[]> = {

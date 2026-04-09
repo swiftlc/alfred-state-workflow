@@ -729,6 +729,7 @@ export default function registerStates(app: Workflow): void {
     let dictItems = cached;
     const dictName = dicts.find((d) => d.key === dictKey)?.name ?? dictKey;
 
+    const dictConfig = dicts.find((d) => d.key === dictKey);
     const pinnedMap = DictPinManager.getAll();
     const recentMap = DictRecentManager.getRecentMap(dictKey);
     const pinKey = (item: { id?: string; name: string }) => `${dictKey}:${item.id ?? item.name}`;
@@ -819,7 +820,7 @@ export default function registerStates(app: Workflow): void {
         }
       } else {
         const canModify = !item.isManual;
-        const canDelete = canModify && dictKey !== 'appkey' && !!item.id;
+        const canDelete = canModify && !dictConfig?.readonly && !!item.id;
         const mods: Record<string, { subtitle: string; action: string; payload: Record<string, unknown> }> = {};
         const hints: string[] = [];
 
