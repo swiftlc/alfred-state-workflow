@@ -72,7 +72,7 @@ export default function registerStates(app: Workflow): void {
       };
     }
 
-    const COMPLETED_DISPLAY_MS = 6000;
+    const COMPLETED_DISPLAY_MS = wf.taskCompletedDisplayMs;
 
     if (task.status === 'done' || task.status === 'error' || task.status === 'cancelled') {
       const completedAt = task.completedAt ?? Date.now();
@@ -141,9 +141,10 @@ export default function registerStates(app: Workflow): void {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
 
-    // 0. 快捷指令区：仅在 query 以 > 开头时展示
-    if (query.startsWith('>')) {
-      const aliasQuery = query.slice(1).trim();
+    // 0. 快捷指令区：仅在 query 以 aliasPrefix 开头时展示
+    const aliasPrefix = wf.aliasPrefix;
+    if (query.startsWith(aliasPrefix)) {
+      const aliasQuery = query.slice(aliasPrefix.length).trim();
       const aliases = AliasManager.getAll();
       const matchedAliases = aliasQuery
         ? aliases.filter(alias => matchQuery(aliasQuery, alias.alias, alias.title))

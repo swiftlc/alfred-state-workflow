@@ -12,6 +12,10 @@ const CONTEXT_FILE = path.join(__dirname, '../../data/context.json');
 interface WorkflowOptions {
   bundleId?: string;
   triggerName?: string;
+  /** 快捷指令触发前缀，默认 '>' */
+  aliasPrefix?: string;
+  /** 任务完成后结果展示时长（毫秒），默认 6000 */
+  taskCompletedDisplayMs?: number;
 }
 
 /** item.mods 中每个修饰键的描述（在 createItem 中构造时使用） */
@@ -29,6 +33,8 @@ interface ActionOptions {
 class Workflow {
   bundleId: string;
   triggerName: string;
+  aliasPrefix: string;
+  taskCompletedDisplayMs: number;
   states: Record<string, StateHandler>;
   actions: Record<string, ActionHandler>;
   actionOptions: Record<string, ActionOptions>;
@@ -42,6 +48,8 @@ class Workflow {
       process.env['alfred_workflow_bundleid'] ??
       'com.example.workflow';
     this.triggerName = options.triggerName ?? 'flow';
+    this.aliasPrefix = options.aliasPrefix ?? '>';
+    this.taskCompletedDisplayMs = options.taskCompletedDisplayMs ?? 6000;
     this.states = {};
     this.actions = {};
     this.actionOptions = {};
