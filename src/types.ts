@@ -15,6 +15,8 @@ export interface DictCategory {
   fetchItems?: () => Promise<DictItem[]>;
   /** 接口不可用时的兜底数据，不配置则降级返回空数组 */
   fallbackItems?: DictItem[];
+  /** 是否允许修改字典条目描述，默认 true；设为 false 时该字典不出现在「修改描述」功能中 */
+  allowDescriptionEdit?: boolean;
   /**
    * 复制字典项时的取值方式：
    * - 'value'：仅复制 item.value
@@ -154,6 +156,8 @@ export interface Feature {
   type?: 'split_by_dict' | string;
   /** 当 type 为 split_by_dict 时，排除指定 category key，不对这些字典进行裂变 */
   excludeKeys?: string[];
+  /** 当 type 为 split_by_dict 时，动态排除字典：返回 true 则排除该字典 */
+  excludeWhen?: (dict: DictCategory) => boolean;
   /** 附加条件：返回 false 时不展示此功能 */
   condition?: (data: ContextData) => boolean;
   /** 是否记录到历史，默认 true */

@@ -236,6 +236,7 @@ export default function registerStates(app: Workflow): void {
         // 计算有多少个字典项可以执行此 feature
         const availableDicts = dicts.filter((dict) => {
           if (feature.excludeKeys?.includes(dict.key)) return false;
+          if (feature.excludeWhen?.(dict)) return false;
           return !!(data[dict.key] as DictItem | undefined);
         });
         if (availableDicts.length === 0) continue;
@@ -502,6 +503,7 @@ export default function registerStates(app: Workflow): void {
 
     for (const dict of dicts) {
       if (feature.excludeKeys?.includes(dict.key)) continue;
+      if (feature.excludeWhen?.(dict)) continue;
       const selected = data[dict.key] as DictItem | undefined;
       if (!selected) continue;
 

@@ -9,7 +9,7 @@ import TaskManager from '../core/TaskManager';
 import WorkspaceManager from '../core/WorkspaceManager';
 import AliasManager from '../core/AliasManager';
 import Logger from '../core/Logger';
-import dictService from '../services/dictService';
+import dictService, {DictService} from '../services/dictService';
 import {PROXY_BASE_URL} from '../config/constants';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
@@ -158,7 +158,7 @@ export default function registerActions(app: Workflow): void {
     }
 
     await http.delete(`${PROXY_BASE_URL}/dictionaries/${dictItemId}`);
-    CacheManager.clear(`dict_items_${dictKey}`);
+    CacheManager.clear(DictService.getCacheKey(dictKey));
     sendNotification(`已删除: ${dictItemName ?? dictItemId}`, '删除成功');
     wf.triggerAlfred(encodeContext({ state: 'select_dict', dictKey, data: context.data }));
   });

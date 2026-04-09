@@ -5,6 +5,7 @@ import CacheManager from '../core/CacheManager';
 import {copyToClipboard, openUrl, sendNotification} from '../core/utils';
 import {icon} from '../core/icons';
 import {PROXY_BASE_URL} from './constants';
+import {DictService} from '../services/dictService';
 import type {ContextData, DictItem, Feature} from '../types';
 
 export {PROXY_BASE_URL};
@@ -66,7 +67,7 @@ const builtInFeatures: Feature[] = [
     description: (data: ContextData) =>
       `当前描述：${(data['_currentSelected'] as DictItem | undefined)?.description ?? ''}`,
     requiredKeys: [],
-    excludeKeys:["appkey"],
+    excludeWhen: (dict) => dict.allowDescriptionEdit === false,
     action: 'modify_dict_desc',
     type: 'split_by_dict',
     recordHistory: false,
@@ -91,7 +92,7 @@ const builtInFeatures: Feature[] = [
         headers: { 'Content-Type': 'application/json' },
       });
       const dictKey = String(currentDict.key);
-      CacheManager.clear(`dict_items_${dictKey}`);
+      CacheManager.clear(DictService.getCacheKey(dictKey));
       // 同步更新 context 里已选中条目的 description，避免 feature item 展示旧值
       if (context.data[dictKey]) {
         (context.data[dictKey] as DictItem).description = input1.value;

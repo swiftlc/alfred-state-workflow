@@ -65,6 +65,7 @@ const DICTS: DictCategory[] = [
     cacheTtl: 7 * 24 * 60 * 60 * 1000,
     copyValue: 'value',
     readonly: true,
+    allowDescriptionEdit: false,
     fetchItems: async () => {
       const response = await http.proxy<OctoAppsResponse>('GET', APPKEY_DEST_URL);
       if (response && response.success && Array.isArray(response.data)) {
@@ -78,6 +79,11 @@ const DICTS: DictCategory[] = [
 // ─── DictService ─────────────────────────────────────────────────────────────────
 
 class DictService {
+  /** 字典列表的统一缓存 key，外部需要清缓存时通过此方法获取，避免命名分散 */
+  static getCacheKey(dictKey: string): string {
+    return `dict_items_${dictKey}`;
+  }
+
   /** 获取所有字典类型 */
   async getDictionaries(): Promise<DictCategory[]> {
     return DICTS;
@@ -88,7 +94,7 @@ class DictService {
    * 返回 null 表示缓存未命中（需要发起请求）。
    */
   async getCachedItems(dictKey: string): Promise<DictItem[] | null> {
-    return CacheManager.get<DictItem[]>(`dict_items_${dictKey}`);
+    return CacheManager.get<DictItem[]>(DictService.getCacheKey(dictKey));
   }
 
   /** 获取指定字典下的所有选项（优先缓存，缓存未命中则发起请求） */
@@ -97,7 +103,7 @@ class DictService {
     const ttl = dictConfig?.cacheTtl ?? DEFAULT_CACHE_TTL;
 
     return (await CacheManager.get<DictItem[]>(
-      `dict_items_${dictKey}`,
+      DictService.getCacheKey(dictKey),
       async () => {
         // 有自定义 fetchItems：直接调用，不走默认 REST 接口
         if (dictConfig?.fetchItems) {
@@ -125,5 +131,6 @@ class DictService {
   }
 }
 
+export { DictService };
 export default new DictService();
 
