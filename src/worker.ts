@@ -17,6 +17,11 @@ async function main(): Promise<void> {
     return;
   }
 
+  // spawnWorker 不会预先 initTask，这里按需初始化
+  if (!TaskManager.getTask(jobId)) {
+    TaskManager.initTask(jobId, taskName);
+  }
+
   const handler = app.tasks[taskName];
   if (!handler) {
     TaskManager.updateTask(jobId, { status: 'error', message: `Task ${taskName} not found` });

@@ -4,6 +4,8 @@
 export interface DictCategory {
   key: string;
   name: string;
+  /** 字典列表缓存有效期（毫秒），不填默认 5 分钟 */
+  cacheTtl?: number;
 }
 
 /** 字典选项（某个字典类型下的一条具体数据） */

@@ -704,8 +704,29 @@ export default function registerStates(app: Workflow): void {
       return [];
     }
 
-    let dictItems = await dictService.getDictionaryItems(dictKey);
+    // 非阻塞加载：优先读缓存，缓存未命中则展示 loading 并启动后台预加载
+    const cached = await dictService.getCachedItems(dictKey);
     const dicts = await dictService.getDictionaries();
+
+    if (cached === null) {
+      // 缓存未命中：静默启动后台预加载 worker，展示 loading item，rerun 轮询直到缓存就绪
+      wf.spawnWorker('_prefetch_dict', { ...context, _prefetchDictKey: dictKey });
+      const dictName = dicts.find((d) => d.key === dictKey)?.name ?? dictKey;
+      const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
+      return {
+        rerun: 0.3,
+        items: [
+          {
+            title: `${spinner} 正在加载${dictName}列表...`,
+            subtitle: '数据加载中，请稍候',
+            valid: false,
+            icon: { path: Icons.context },
+          } as AlfredItem,
+        ],
+      };
+    }
+
+    let dictItems = cached;
     const dictName = dicts.find((d) => d.key === dictKey)?.name ?? dictKey;
 
     const pinnedMap = DictPinManager.getAll();

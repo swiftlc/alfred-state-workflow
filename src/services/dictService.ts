@@ -6,7 +6,9 @@
  * 2. GET /api/v1/dicts/:key/items → 返回指定字典下的所有选项
  *
  * 特殊字典：
- * - appkey: 固定写死 category，条目通过代理接口动态获取，缓存 7 天
+ * - appkey: 固定写死 category，条目通过代理接口动态获取
+ *
+ * 缓存 TTL 通过 DictCategory.cacheTtl 配置，不填默认 5 分钟。
  */
 
 import CacheManager from '../core/CacheManager';
@@ -14,10 +16,12 @@ import {http} from '../core/HttpClient';
 import type {DictCategory, DictItem} from '../types';
 import {PROXY_BASE_URL} from '../config/features';
 
+const DEFAULT_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
+
 const DICTS: DictCategory[] = [
   { key: 'tenant', name: '租户' },
   { key: 'swimlane', name: '泳道' },
-  { key: 'appkey', name: 'appkey' },
+  { key: 'appkey', name: 'appkey', cacheTtl: 7 * 24 * 60 * 60 * 1000 }, // 7 天
 ];
 
 const DICT_ITEMS: Record<string, DictItem[]> = {
@@ -56,49 +60,43 @@ interface OctoAppsResponse {
 const APPKEY_DEST_URL =
   'https://octo.mws-test.sankuai.com/api/octo/v2/common/apps?mis=liucheng58';
 
-/** appkey 缓存 7 天 */
-const APPKEY_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
-
 class DictService {
   /** 获取所有字典类型 */
   async getDictionaries(): Promise<DictCategory[]> {
     return DICTS;
   }
 
-  /** 通过代理接口获取 appkey 列表，缓存 7 天 */
-  private async fetchAppkeyItems(): Promise<DictItem[]> {
-    return CacheManager.get<DictItem[]>(
-      'dict_items_appkey',
-      async () => {
-        const response = await http.proxy<OctoAppsResponse>(
-          'GET',
-          APPKEY_DEST_URL
-        );
-        if (response && response.success && Array.isArray(response.data)) {
-          return response.data.map((appkey) => ({
-            id: appkey,
-            name: appkey,
-            value: appkey,
-          }));
-        }
-        return [];
-      },
-      APPKEY_CACHE_TTL
-    ) as Promise<DictItem[]>;
+  private getCacheTtl(dictKey: string): number {
+    return DICTS.find((d) => d.key === dictKey)?.cacheTtl ?? DEFAULT_CACHE_TTL;
   }
 
-  /** 获取指定字典下的所有选项 */
+  /**
+   * 仅读取缓存，不发起网络请求。
+   * 返回 null 表示缓存未命中（需要发起请求）。
+   */
+  async getCachedItems(dictKey: string): Promise<DictItem[] | null> {
+    return CacheManager.get<DictItem[]>(`dict_items_${dictKey}`);
+  }
+
+  /** 获取指定字典下的所有选项（优先缓存，缓存未命中则发起请求） */
   async getDictionaryItems(dictKey: string): Promise<DictItem[]> {
-    // appkey 字典通过代理接口获取，缓存 7 天
+    const ttl = this.getCacheTtl(dictKey);
+
     if (dictKey === 'appkey') {
-      try {
-        return await this.fetchAppkeyItems();
-      } catch {
-        return [];
-      }
+      return (await CacheManager.get<DictItem[]>(
+        'dict_items_appkey',
+        async () => {
+          const response = await http.proxy<OctoAppsResponse>('GET', APPKEY_DEST_URL);
+          if (response && response.success && Array.isArray(response.data)) {
+            return response.data.map((appkey) => ({ id: appkey, name: appkey, value: appkey }));
+          }
+          return [];
+        },
+        ttl
+      )) ?? [];
     }
 
-    return CacheManager.get<DictItem[]>(
+    return (await CacheManager.get<DictItem[]>(
       `dict_items_${dictKey}`,
       async () => {
         try {
@@ -117,8 +115,8 @@ class DictService {
           return DICT_ITEMS[dictKey] ?? [];
         }
       },
-      5 * 60 * 1000 // 缓存 5 分钟
-    ) as Promise<DictItem[]>;
+      ttl
+    )) ?? [];
   }
 }
 

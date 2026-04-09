@@ -9,6 +9,7 @@ import TaskManager from '../core/TaskManager';
 import WorkspaceManager from '../core/WorkspaceManager';
 import AliasManager from '../core/AliasManager';
 import Logger from '../core/Logger';
+import dictService from '../services/dictService';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
 
@@ -17,6 +18,18 @@ import type {DictItem} from '../types';
  * 对应 src/config/features.ts 中的 action 字段
  */
 export default function registerActions(app: Workflow): void {
+  // 后台任务：预加载字典列表数据并写入缓存
+  app.onTask('_prefetch_dict', async (task, context) => {
+    const dictKey = context['_prefetchDictKey'] as string | undefined;
+    if (!dictKey) {
+      task.update(100, '参数缺失');
+      return;
+    }
+    task.update(10, '正在加载字典数据...');
+    const items = await dictService.getDictionaryItems(dictKey);
+    task.update(100, `已加载 ${items.length} 条数据`);
+  });
+
   // 后台任务：预加载 fetchOptions 数据并写入缓存
   app.onTask('_prefetch_options', async (task, context) => {
     const featureId = context['_prefetchFeatureId'] as string | undefined;
