@@ -13,6 +13,10 @@ import dictService, {DictService} from '../services/dictService';
 import {
   PROXY_BASE_URL,
   DEFAULT_STATE,
+  STATE_SELECT_DICT,
+  STATE_TASK_MANAGE,
+  STATE_WORKSPACE_MANAGE,
+  STATE_ALIAS_MANAGE,
   FIELD_CURRENT_SELECTED,
   FIELD_CURRENT_DICT,
   FIELD_PREFETCH_DICT_KEY,
@@ -151,7 +155,7 @@ export default function registerActions(app: Workflow): void {
     if (!dictPinKey || !dictKey) return;
 
     DictPinManager.toggle(dictPinKey);
-    wf.triggerAlfred(encodeContext({ state: 'select_dict', dictKey, data: context.data }));
+    wf.triggerAlfred(encodeContext({ state: STATE_SELECT_DICT, dictKey, data: context.data }));
   });
 
   // 动作：删除字典条目（Alt+Enter 触发）
@@ -168,7 +172,7 @@ export default function registerActions(app: Workflow): void {
     await http.delete(`${PROXY_BASE_URL}/dictionaries/${dictItemId}`);
     CacheManager.clear(DictService.getCacheKey(dictKey));
     sendNotification(`已删除: ${dictItemName ?? dictItemId}`, '删除成功');
-    wf.triggerAlfred(encodeContext({ state: 'select_dict', dictKey, data: context.data }));
+    wf.triggerAlfred(encodeContext({ state: STATE_SELECT_DICT, dictKey, data: context.data }));
   });
 
   // 动作：固定/取消固定历史记录
@@ -217,7 +221,7 @@ export default function registerActions(app: Workflow): void {
       const file = TaskManager.getJobFile(jobId);
       if (existsSync(file)) unlinkSync(file);
     }
-    const nextState = context.returnState ?? 'task_manage';
+    const nextState = context.returnState ?? STATE_TASK_MANAGE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   });
 
@@ -225,7 +229,7 @@ export default function registerActions(app: Workflow): void {
   app.onAction('clear_all_tasks', async (context, wf) => {
     TaskManager.clearTasks(['done', 'error', 'cancelled']);
     sendNotification('已清除所有结束的任务记录');
-    const nextState = context.returnState ?? 'task_manage';
+    const nextState = context.returnState ?? STATE_TASK_MANAGE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   });
 
@@ -259,7 +263,7 @@ export default function registerActions(app: Workflow): void {
     const workspace = WorkspaceManager.add(workspaceName.trim(), data);
     Logger.info(`保存工作区: ${workspace.name}`, workspace as unknown as object);
     sendNotification(`工作区「${workspace.name}」已保存`, 'Workflow');
-    wf.triggerAlfred(encodeContext({ state: 'workspace_manage', data }));
+    wf.triggerAlfred(encodeContext({ state: STATE_WORKSPACE_MANAGE, data }));
   });
 
   // 动作：删除工作区
@@ -269,7 +273,7 @@ export default function registerActions(app: Workflow): void {
 
     WorkspaceManager.delete(workspaceId);
     sendNotification('工作区已删除', 'Workflow');
-    const nextState = (context.returnState as string | undefined) ?? 'workspace_manage';
+    const nextState = (context.returnState as string | undefined) ?? STATE_WORKSPACE_MANAGE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   });
 
@@ -328,7 +332,7 @@ export default function registerActions(app: Workflow): void {
 
     Logger.info(`保存别名: ${alias.alias} → ${alias.action}`, alias as unknown as object);
     sendNotification(`快捷指令「${alias.alias}」已保存 → ${alias.title}`, 'Workflow');
-    wf.triggerAlfred(encodeContext({ state: 'alias_manage', data }));
+    wf.triggerAlfred(encodeContext({ state: STATE_ALIAS_MANAGE, data }));
   });
 
   // 动作：重命名快捷指令触发词
@@ -349,7 +353,7 @@ export default function registerActions(app: Workflow): void {
     if (updated) {
       sendNotification(`已重命名为「${updated.alias}」`, 'Workflow');
     }
-    wf.triggerAlfred(encodeContext({ state: 'alias_manage', data: context.data }));
+    wf.triggerAlfred(encodeContext({ state: STATE_ALIAS_MANAGE, data: context.data }));
   });
 
   // 动作：删除快捷指令
@@ -359,7 +363,7 @@ export default function registerActions(app: Workflow): void {
 
     AliasManager.delete(aliasId);
     sendNotification('快捷指令已删除', 'Workflow');
-    const nextState = (context.returnState as string | undefined) ?? 'alias_manage';
+    const nextState = (context.returnState as string | undefined) ?? STATE_ALIAS_MANAGE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   });
 }

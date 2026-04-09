@@ -4,7 +4,7 @@ import fs from 'fs';
 import {decodeContext, encodeContext} from './utils';
 import TaskManager from './TaskManager';
 import HistoryManager from './HistoryManager';
-import {DEFAULT_STATE, FIELD_PREFETCH_JOB_ID, FIELD_SILENT_ON_SUCCESS} from '../config/constants';
+import {DEFAULT_STATE, FIELD_PREFETCH_JOB_ID, FIELD_SILENT_ON_SUCCESS, STATE_PROGRESS} from '../config/constants';
 import Logger from './Logger';
 import type {ActionHandler, AlfredFilterOutput, AlfredItem, Context, StateHandler, TaskHandler,} from '../types';
 
@@ -160,7 +160,7 @@ class Workflow {
     child.unref();
 
     const nextArg = encodeContext({
-      state: 'progress',
+      state: STATE_PROGRESS,
       jobId,
       data: context.data,
       returnState: context.returnState,

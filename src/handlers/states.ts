@@ -3,6 +3,19 @@ import features from '../config/features';
 import CacheManager from '../core/CacheManager';
 import {
   DEFAULT_STATE,
+  STATE_HOME,
+  STATE_PROGRESS,
+  STATE_MANAGE,
+  STATE_SELECT_DICT,
+  STATE_INPUT,
+  STATE_SPLIT_FEATURE,
+  STATE_HISTORY_MANAGE,
+  STATE_TASK_MANAGE,
+  STATE_WORKSPACE_MANAGE,
+  STATE_WORKSPACE_SAVE,
+  STATE_ALIAS_MANAGE,
+  STATE_ALIAS_SAVE,
+  STATE_ALIAS_RENAME,
   FIELD_CURRENT_DICT,
   FIELD_CURRENT_SELECTED,
   FIELD_SILENT_ON_SUCCESS,
@@ -48,7 +61,7 @@ export default function registerStates(app: Workflow): void {
    * 状态：任务进度展示 (progress)
    * 使用 Alfred 的 rerun 特性动态刷新进度
    */
-  app.onState('progress', async (context, wf) => {
+  app.onState(STATE_PROGRESS, async (context, wf) => {
     const jobId = context.jobId ?? '';
     const task = TaskManager.getTask(jobId);
 
@@ -145,7 +158,7 @@ export default function registerStates(app: Workflow): void {
   /**
    * 状态：主页 (home)
    */
-  app.onState('home', async (context, wf) => {
+  app.onState(STATE_HOME, async (context, wf) => {
     const data = context.data ?? {};
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
@@ -233,7 +246,7 @@ export default function registerStates(app: Workflow): void {
       const subtitle = selected ? '点击重新选择' : '点击选择';
 
       if (matchQuery(query, dict.name, selected?.name)) {
-        items.push(wf.createRerunItem(title, subtitle, 'select_dict', { dictKey: dict.key, data }, {}, Icons.context));
+        items.push(wf.createRerunItem(title, subtitle, STATE_SELECT_DICT, { dictKey: dict.key, data }, {}, Icons.context));
       }
     }
 
@@ -273,7 +286,7 @@ export default function registerStates(app: Workflow): void {
 
           if (feature.requiredInputs && feature.requiredInputs.length > 0) {
             readyItems.push(
-              wf.createRerunItem(itemTitle, itemSubtitle, 'input_state', {
+              wf.createRerunItem(itemTitle, itemSubtitle, STATE_INPUT, {
                 data: contextData,
                 dictKey: dict.key,
                 pendingAction: feature.id,
@@ -293,7 +306,7 @@ export default function registerStates(app: Workflow): void {
                   subtitle: `⚡ 存为快捷指令: ${featureName}`,
                   action: 'rerun',
                   payload: {
-                    nextState: 'alias_save',
+                    nextState: STATE_ALIAS_SAVE,
                     data: contextData,
                     pendingAction: feature.action,
                     aliasTitle: featureName,
@@ -314,7 +327,7 @@ export default function registerStates(app: Workflow): void {
         if (!matchQuery(query, entryTitle, entrySubtitle)) continue;
 
         readyItems.push(
-          wf.createRerunItem(entryTitle, entrySubtitle, 'split_feature', {
+          wf.createRerunItem(entryTitle, entrySubtitle, STATE_SPLIT_FEATURE, {
             data,
             pendingFeatureId: feature.id,
           }, {}, featureIconPath)
@@ -341,7 +354,7 @@ export default function registerStates(app: Workflow): void {
             wf.createRerunItem(
               `${featureName}`,
               `${featureDescription}`,
-              'input_state',
+              STATE_INPUT,
               { data, pendingAction: feature.id, inputIndex: 0 },
               {},
               featureIconPath
@@ -359,7 +372,7 @@ export default function registerStates(app: Workflow): void {
                 subtitle: `⚡ 存为快捷指令: ${featureName}`,
                 action: 'rerun',
                 payload: {
-                  nextState: 'alias_save',
+                  nextState: STATE_ALIAS_SAVE,
                   data,
                   pendingAction: feature.action,
                   aliasTitle: featureName,
@@ -378,7 +391,7 @@ export default function registerStates(app: Workflow): void {
           wf.createRerunItem(
             `⚙️ 配置: ${featureName}`,
             `缺少上下文: ${missingNames} (点击开始配置)`,
-            'select_dict',
+            STATE_SELECT_DICT,
             { dictKey: missingKeys[0], data, pendingAction: feature.id },
             {},
             featureIconPath
@@ -408,8 +421,8 @@ export default function registerStates(app: Workflow): void {
       ? `历史 / 任务 / 工作区 / 快捷指令  ·  ${manageBadges.join('  ')}`
       : '历史 / 任务 / 工作区 / 快捷指令';
 
-    if (matchQuery(query, '管理', 'manage', '历史', '任务', '工作区', '快捷指令', '缓存', '上下文')) {
-      items.push(wf.createRerunItem('⚙️ 管理', manageSubtitle, 'manage', { data }, {}, Icons.workflow));
+    if (matchQuery(query, '管理', STATE_MANAGE, '历史', '任务', '工作区', '快捷指令', '缓存', '上下文')) {
+      items.push(wf.createRerunItem('⚙️ 管理', manageSubtitle, STATE_MANAGE, { data }, {}, Icons.workflow));
     }
 
     return items;
@@ -419,7 +432,7 @@ export default function registerStates(app: Workflow): void {
    * 状态：管理中心 (manage)
    * 汇聚历史记录、任务中心、工作区、快捷指令、清空上下文、刷新缓存等管理类操作
    */
-  app.onState('manage', async (context, wf) => {
+  app.onState(STATE_MANAGE, async (context, wf) => {
     const query = context.query ?? '';
     const data = context.data ?? {};
     const items: AlfredItem[] = [];
@@ -431,7 +444,7 @@ export default function registerStates(app: Workflow): void {
         wf.createRerunItem(
           '📚 历史记录',
           `共 ${history.length} 条记录`,
-          'history_manage',
+          STATE_HISTORY_MANAGE,
           { data },
           {},
           Icons.history
@@ -449,7 +462,7 @@ export default function registerStates(app: Workflow): void {
       const taskSubtitle = tasks.length > 0
         ? `共 ${tasks.length} 条任务记录`
         : '暂无后台任务';
-      items.push(wf.createRerunItem(taskTitle, taskSubtitle, 'task_manage', { data }, {}, Icons.task));
+      items.push(wf.createRerunItem(taskTitle, taskSubtitle, STATE_TASK_MANAGE, { data }, {}, Icons.task));
     }
 
     // 工作区管理
@@ -459,7 +472,7 @@ export default function registerStates(app: Workflow): void {
         ? `已保存 ${workspaces.length} 个工作区`
         : '保存当前上下文为工作区，下次一键恢复';
       items.push(
-        wf.createRerunItem('🗂️ 工作区管理', wsSubtitle, 'workspace_manage', { data }, {}, Icons.workspace)
+        wf.createRerunItem('🗂️ 工作区管理', wsSubtitle, STATE_WORKSPACE_MANAGE, { data }, {}, Icons.workspace)
       );
     }
 
@@ -470,7 +483,7 @@ export default function registerStates(app: Workflow): void {
         ? `已保存 ${aliases.length} 条快捷指令`
         : '将功能操作绑定为触发词，一步直达执行';
       items.push(
-        wf.createRerunItem('⚡ 快捷指令', aliasSubtitle, 'alias_manage', { data }, {}, Icons.alias)
+        wf.createRerunItem('⚡ 快捷指令', aliasSubtitle, STATE_ALIAS_MANAGE, { data }, {}, Icons.alias)
       );
     }
 
@@ -496,7 +509,7 @@ export default function registerStates(app: Workflow): void {
    * 状态：split_by_dict 功能二级展开 (split_feature)
    * 展示某个 split_by_dict feature 下所有字典项的具体操作条目
    */
-  app.onState('split_feature', async (context, wf) => {
+  app.onState(STATE_SPLIT_FEATURE, async (context, wf) => {
     const query = context.query ?? '';
     const data = context.data ?? {};
     const pendingFeatureId = context['pendingFeatureId'] as string | undefined;
@@ -537,7 +550,7 @@ export default function registerStates(app: Workflow): void {
       const featureIconPath = feature.icon?.path;
       if (feature.requiredInputs && feature.requiredInputs.length > 0) {
         items.push(
-          wf.createRerunItem(itemTitle, itemSubtitle, 'input_state', {
+          wf.createRerunItem(itemTitle, itemSubtitle, STATE_INPUT, {
             data: contextData,
             dictKey: dict.key,
             pendingAction: feature.id,
@@ -557,7 +570,7 @@ export default function registerStates(app: Workflow): void {
               subtitle: `⚡ 存为快捷指令: ${featureName}`,
               action: 'rerun',
               payload: {
-                nextState: 'alias_save',
+                nextState: STATE_ALIAS_SAVE,
                 data: contextData,
                 pendingAction: feature.action,
                 aliasTitle: featureName,
@@ -576,7 +589,7 @@ export default function registerStates(app: Workflow): void {
   /**
    * 状态：历史记录管理 (history_manage)
    */
-  app.onState('history_manage', async (context, wf) => {
+  app.onState(STATE_HISTORY_MANAGE, async (context, wf) => {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
     const history = HistoryManager.getHistory();
@@ -606,12 +619,12 @@ export default function registerStates(app: Workflow): void {
               cmd: {
                 subtitle: record.isPinned ? '取消固定' : '固定此记录',
                 action: 'toggle_pin',
-                payload: { id: record.id, returnState: 'history_manage' },
+                payload: { id: record.id, returnState: STATE_HISTORY_MANAGE },
               },
               alt: {
                 subtitle: '删除此记录',
                 action: 'delete_history',
-                payload: { id: record.id, returnState: 'history_manage' },
+                payload: { id: record.id, returnState: STATE_HISTORY_MANAGE },
               },
             },
             Icons.history
@@ -631,7 +644,7 @@ export default function registerStates(app: Workflow): void {
   /**
    * 状态：任务管理 (task_manage)
    */
-  app.onState('task_manage', async (context, wf) => {
+  app.onState(STATE_TASK_MANAGE, async (context, wf) => {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
     const tasks = TaskManager.getAllTasks();
@@ -647,7 +660,7 @@ export default function registerStates(app: Workflow): void {
       let taskEmoji = '⏳';
       let subtitle = '';
       let action = 'rerun';
-      let payload: Record<string, unknown> = { nextState: 'progress', jobId: task.id, data: context.data };
+      let payload: Record<string, unknown> = { nextState: STATE_PROGRESS, jobId: task.id, data: context.data };
       let mods: Record<string, { subtitle: string; action: string; payload: Record<string, unknown> }> = {};
 
       if (task.status === 'running') {
@@ -658,7 +671,7 @@ export default function registerStates(app: Workflow): void {
           cmd: {
             subtitle: '🛑 取消任务',
             action: 'cancel_task',
-            payload: { jobId: task.id, returnState: 'task_manage' },
+            payload: { jobId: task.id, returnState: STATE_TASK_MANAGE },
           },
         };
       } else if (task.status === 'done') {
@@ -666,19 +679,19 @@ export default function registerStates(app: Workflow): void {
         taskEmoji = '✅';
         subtitle = `[已完成] ${task.message} (回车清除记录)`;
         action = 'clear_task';
-        payload = { jobId: task.id, returnState: 'task_manage' };
+        payload = { jobId: task.id, returnState: STATE_TASK_MANAGE };
       } else if (task.status === 'error') {
         hasDoneOrError = true;
         taskEmoji = '❌';
         subtitle = `[失败] ${task.message} (回车清除记录)`;
         action = 'clear_task';
-        payload = { jobId: task.id, returnState: 'task_manage' };
+        payload = { jobId: task.id, returnState: STATE_TASK_MANAGE };
       } else if (task.status === 'cancelled') {
         hasDoneOrError = true;
         taskEmoji = '🛑';
         subtitle = `[已取消] ${task.message} (回车清除记录)`;
         action = 'clear_task';
-        payload = { jobId: task.id, returnState: 'task_manage' };
+        payload = { jobId: task.id, returnState: STATE_TASK_MANAGE };
       }
 
       const title = `${taskEmoji} 任务: ${task.name}`;
@@ -690,7 +703,7 @@ export default function registerStates(app: Workflow): void {
     if (hasDoneOrError && matchQuery(query, '清除已完成任务')) {
       items.push(
         wf.createItem('🧹 清除所有已结束任务', '清除所有已完成、失败或取消的任务记录', 'clear_all_tasks', {
-          returnState: 'task_manage',
+          returnState: STATE_TASK_MANAGE,
         }, {}, Icons.task)
       );
     }
@@ -702,7 +715,7 @@ export default function registerStates(app: Workflow): void {
   /**
    * 状态：选择字典项 (select_dict)
    */
-  app.onState('select_dict', async (context, wf) => {
+  app.onState(STATE_SELECT_DICT, async (context, wf) => {
     const dictKey = context['dictKey'] as string ?? '';
     const data = context.data ?? {};
     const pendingAction = context.pendingAction;
@@ -803,7 +816,7 @@ export default function registerStates(app: Workflow): void {
           const nextDictName = dicts.find((d) => d.key === missingKeys[0])?.name ?? missingKeys[0] ?? '';
           subtitle = `(下一步: 选择${nextDictName})`;
           items.push(
-            wf.createRerunItem(title, subtitle, 'select_dict', {
+            wf.createRerunItem(title, subtitle, STATE_SELECT_DICT, {
               dictKey: missingKeys[0],
               data: newData,
               pendingAction,
@@ -813,7 +826,7 @@ export default function registerStates(app: Workflow): void {
           const nextInput = feature.requiredInputs[0]!;
           subtitle = `(下一步: 输入${nextInput.label})`;
           items.push(
-            wf.createRerunItem(title, subtitle, 'input_state', {
+            wf.createRerunItem(title, subtitle, STATE_INPUT, {
               data: newData,
               pendingAction,
               inputIndex: 0,
@@ -873,7 +886,7 @@ export default function registerStates(app: Workflow): void {
   /**
    * 状态：手动输入参数 (input_state)
    */
-  app.onState('input_state', async (context, wf) => {
+  app.onState(STATE_INPUT, async (context, wf) => {
     let data = context.data ?? {};
     const pendingAction = context.pendingAction;
     let inputIndex = (context.inputIndex as number | undefined) ?? 0;
@@ -886,7 +899,7 @@ export default function registerStates(app: Workflow): void {
         subtitle: `⚡ 存为快捷指令: ${featureName}`,
         action: 'rerun',
         payload: {
-          nextState: 'alias_save',
+          nextState: STATE_ALIAS_SAVE,
           data: snapData,
           pendingAction: feature!.action,
           aliasTitle: featureName,
@@ -925,7 +938,7 @@ export default function registerStates(app: Workflow): void {
           // 缓存未命中，启动后台 task 发起请求，自动跳转 progress 状态展示加载进度
           wf.startTask('_prefetch_options', {
             ...context,
-            returnState: 'input_state',
+            returnState: STATE_INPUT,
             [FIELD_SILENT_ON_SUCCESS]: true,
             [FIELD_PREFETCH_FEATURE_ID]: pendingAction,
             [FIELD_PREFETCH_INPUT_INDEX]: inputIndex,
@@ -952,7 +965,7 @@ export default function registerStates(app: Workflow): void {
               wf.createRerunItem(
                 '⚠️ 加载失败，点击重试',
                 `${currentInput.label} 数据为空，点击重新加载`,
-                'input_state',
+                STATE_INPUT,
                 { data, pendingAction, inputIndex },
                 {},
                 featureIconPath
@@ -985,7 +998,7 @@ export default function registerStates(app: Workflow): void {
                 wf.createRerunItem(
                   title,
                   `${featureName} - ${subtitle}`,
-                  'input_state',
+                  STATE_INPUT,
                   { data: newData, pendingAction, inputIndex: inputIndex + 1 },
                   makeAliasMod(featureName, featureDescription, newData),
                   featureIconPath
@@ -1038,7 +1051,7 @@ export default function registerStates(app: Workflow): void {
                   wf.createRerunItem(
                     title,
                     `${featureName} - ${subtitle}`,
-                    'input_state',
+                    STATE_INPUT,
                     { data: newData, pendingAction, inputIndex: inputIndex + 1 },
                     makeAliasMod(featureName, featureDescription, newData),
                     featureIconPath
@@ -1052,7 +1065,7 @@ export default function registerStates(app: Workflow): void {
             wf.createRerunItem(
               '⚠️ 加载失败，点击重试',
               (err as Error).message,
-              'input_state',
+              STATE_INPUT,
               { data, pendingAction, inputIndex },
               {},
               featureIconPath
@@ -1087,7 +1100,7 @@ export default function registerStates(app: Workflow): void {
             wf.createRerunItem(
               `✅ 确认输入: ${query}`,
               `继续配置 ${featureName} (下一步: 输入${nextInput.label})`,
-              'input_state',
+              STATE_INPUT,
               { data: newData, pendingAction, inputIndex: inputIndex + 1 },
               makeAliasMod(featureName, featureDescription, newData),
               featureIconPath
@@ -1115,7 +1128,7 @@ export default function registerStates(app: Workflow): void {
         wf.createRerunItem(
           `← 上一步: ${prevInput.label}`,
           `重新选择「${prevInput.label}」`,
-          'input_state',
+          STATE_INPUT,
           { data: prevData, pendingAction, inputIndex: prevIndex },
           {},
           Icons.workflow
@@ -1131,7 +1144,7 @@ export default function registerStates(app: Workflow): void {
    * 状态：工作区管理 (workspace_manage)
    * 展示所有已保存的工作区快照，支持加载和删除
    */
-  app.onState('workspace_manage', async (context, wf) => {
+  app.onState(STATE_WORKSPACE_MANAGE, async (context, wf) => {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
     const workspaces = WorkspaceManager.getAll();
@@ -1145,7 +1158,7 @@ export default function registerStates(app: Workflow): void {
         wf.createRerunItem(
           '💾 将当前上下文保存为工作区...',
           `当前: ${suggestedName}  (点击进入命名)`,
-          'workspace_save',
+          STATE_WORKSPACE_SAVE,
           { data: currentData },
           {},
           Icons.workspace
@@ -1179,7 +1192,7 @@ export default function registerStates(app: Workflow): void {
               alt: {
                 subtitle: '🗑️ 删除此工作区',
                 action: 'delete_workspace',
-                payload: { workspaceId: ws.id, returnState: 'workspace_manage', data: currentData },
+                payload: { workspaceId: ws.id, returnState: STATE_WORKSPACE_MANAGE, data: currentData },
               },
             },
             Icons.workspace
@@ -1196,7 +1209,7 @@ export default function registerStates(app: Workflow): void {
    * 状态：命名并保存工作区 (workspace_save)
    * 用户在搜索框输入工作区名称后回车保存
    */
-  app.onState('workspace_save', async (context, wf) => {
+  app.onState(STATE_WORKSPACE_SAVE, async (context, wf) => {
     const query = context.query ?? '';
     const data = context.data ?? {};
     const items: AlfredItem[] = [];
@@ -1247,7 +1260,7 @@ export default function registerStates(app: Workflow): void {
       );
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回工作区列表', 'workspace_manage', { data }, {}, Icons.workspace));
+    items.push(wf.createRerunItem('🔙 返回', '返回工作区列表', STATE_WORKSPACE_MANAGE, { data }, {}, Icons.workspace));
     return items;
   });
 
@@ -1255,7 +1268,7 @@ export default function registerStates(app: Workflow): void {
    * 状态：快捷指令管理 (alias_manage)
    * 展示所有已保存的快捷指令，支持执行和删除
    */
-  app.onState('alias_manage', async (context, wf) => {
+  app.onState(STATE_ALIAS_MANAGE, async (context, wf) => {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
     const allAliases = AliasManager.getAll();
@@ -1286,12 +1299,12 @@ export default function registerStates(app: Workflow): void {
               cmd: {
                 subtitle: '✏️ 重命名触发词',
                 action: 'rerun',
-                payload: { nextState: 'alias_rename', aliasId: alias.id, aliasCurrentName: alias.alias, data: currentData },
+                payload: { nextState: STATE_ALIAS_RENAME, aliasId: alias.id, aliasCurrentName: alias.alias, data: currentData },
               },
               alt: {
                 subtitle: '🗑️ 删除此快捷指令',
                 action: 'delete_alias',
-                payload: { aliasId: alias.id, returnState: 'alias_manage', data: currentData },
+                payload: { aliasId: alias.id, returnState: STATE_ALIAS_MANAGE, data: currentData },
               },
             },
             Icons.alias
@@ -1309,7 +1322,7 @@ export default function registerStates(app: Workflow): void {
    * 用户输入触发词后，提示确认保存
    * 必须携带 pendingAction + aliasTitle 才有实际意义
    */
-  app.onState('alias_save', async (context, wf) => {
+  app.onState(STATE_ALIAS_SAVE, async (context, wf) => {
     const query = context.query ?? '';
     const data = context.data ?? {};
     const pendingAction = context['pendingAction'] as string | undefined;
@@ -1325,7 +1338,7 @@ export default function registerStates(app: Workflow): void {
         valid: false,
         icon: icon('alias'),
       });
-      items.push(wf.createRerunItem('🔙 返回', '返回别名列表', 'alias_manage', { data }, {}, Icons.alias));
+      items.push(wf.createRerunItem('🔙 返回', '返回别名列表', STATE_ALIAS_MANAGE, { data }, {}, Icons.alias));
       return items;
     }
 
@@ -1381,7 +1394,7 @@ export default function registerStates(app: Workflow): void {
       });
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', 'alias_manage', { data }, {}, Icons.alias));
+    items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', STATE_ALIAS_MANAGE, { data }, {}, Icons.alias));
     return items;
   });
 
@@ -1389,7 +1402,7 @@ export default function registerStates(app: Workflow): void {
    * 状态：重命名快捷指令触发词 (alias_rename)
    * 用户输入新触发词后确认保存
    */
-  app.onState('alias_rename', async (context, wf) => {
+  app.onState(STATE_ALIAS_RENAME, async (context, wf) => {
     const query = context.query ?? '';
     const data = context.data ?? {};
     const aliasId = context['aliasId'] as string | undefined;
@@ -1398,7 +1411,7 @@ export default function registerStates(app: Workflow): void {
 
     if (!aliasId) {
       items.push({ title: '⚠️ 参数缺失', subtitle: '无法找到要重命名的快捷指令', valid: false, icon: icon('alias') });
-      items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', 'alias_manage', { data }, {}, Icons.alias));
+      items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', STATE_ALIAS_MANAGE, { data }, {}, Icons.alias));
       return items;
     }
 
@@ -1442,7 +1455,7 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', 'alias_manage', { data }, {}, Icons.alias));
+    items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', STATE_ALIAS_MANAGE, { data }, {}, Icons.alias));
     return items;
   });
 }

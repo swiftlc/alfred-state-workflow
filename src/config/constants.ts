@@ -1,8 +1,24 @@
 /** 本地代理服务地址 */
 export const PROXY_BASE_URL = 'http://127.0.0.1:8080';
 
+// ─── 状态名称 ─────────────────────────────────────────────────────────────────
+
 /** 默认/回退 state 名称 */
 export const DEFAULT_STATE = 'home';
+
+export const STATE_HOME = 'home';
+export const STATE_PROGRESS = 'progress';
+export const STATE_MANAGE = 'manage';
+export const STATE_SELECT_DICT = 'select_dict';
+export const STATE_INPUT = 'input_state';
+export const STATE_SPLIT_FEATURE = 'split_feature';
+export const STATE_HISTORY_MANAGE = 'history_manage';
+export const STATE_TASK_MANAGE = 'task_manage';
+export const STATE_WORKSPACE_MANAGE = 'workspace_manage';
+export const STATE_WORKSPACE_SAVE = 'workspace_save';
+export const STATE_ALIAS_MANAGE = 'alias_manage';
+export const STATE_ALIAS_SAVE = 'alias_save';
+export const STATE_ALIAS_RENAME = 'alias_rename';
 
 // ─── 内部上下文字段名 ─────────────────────────────────────────────────────────────
 // 以下字段名在 context.data 中作为框架内部临时字段使用，以 _ 开头与业务字段区分
