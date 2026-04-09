@@ -9,6 +9,11 @@ export interface DictCategory {
   /** 只读字典：禁止删除条目（仍可置顶/修改描述），默认 false */
   readonly?: boolean;
   /**
+   * 自定义条目获取函数。配置后 getDictionaryItems 直接调用此函数，
+   * 不再走默认的 REST 接口。缓存逻辑（cacheTtl）仍由框架统一管理。
+   */
+  fetchItems?: () => Promise<DictItem[]>;
+  /**
    * 复制字典项时的取值方式：
    * - 'value'：仅复制 item.value
    * - 'json'：复制完整 JSON（默认）
