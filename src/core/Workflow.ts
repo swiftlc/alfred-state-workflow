@@ -21,11 +21,17 @@ interface ModDef {
   payload?: Record<string, unknown>;
 }
 
+interface ActionOptions {
+  /** 为 true 时，action 执行后框架不自动合并保存 context（适用于只改状态不改数据的操作） */
+  skipContextSave?: boolean;
+}
+
 class Workflow {
   bundleId: string;
   triggerName: string;
   states: Record<string, StateHandler>;
   actions: Record<string, ActionHandler>;
+  actionOptions: Record<string, ActionOptions>;
   tasks: Record<string, TaskHandler>;
   /** 标记当前 action 是否已触发状态跳转，防止 runAction 末尾重复 saveContext */
   _stateChanged: boolean;
@@ -38,6 +44,7 @@ class Workflow {
     this.triggerName = options.triggerName ?? 'flow';
     this.states = {};
     this.actions = {};
+    this.actionOptions = {};
     this.tasks = {};
     this._stateChanged = false;
     this.ensureContextFileExists();
@@ -110,8 +117,11 @@ class Workflow {
     this.states[stateName] = handler;
   }
 
-  onAction(actionName: string, handler: ActionHandler): void {
+  onAction(actionName: string, handler: ActionHandler, options: ActionOptions = {}): void {
     this.actions[actionName] = handler;
+    if (Object.keys(options).length > 0) {
+      this.actionOptions[actionName] = options;
+    }
   }
 
   onTask(taskName: string, handler: TaskHandler): void {
@@ -306,9 +316,7 @@ class Workflow {
 
         if (
           !this._stateChanged &&
-          action !== 'toggle_pin' &&
-          action !== 'delete_history' &&
-          action !== 'refresh_cache'
+          !this.actionOptions[action]?.skipContextSave
         ) {
           // 将 action 携带的 data 与持久化上下文的 data 合并，action data 优先覆盖
           const persisted = this.loadContext();

@@ -10,6 +10,7 @@ import WorkspaceManager from '../core/WorkspaceManager';
 import AliasManager from '../core/AliasManager';
 import Logger from '../core/Logger';
 import dictService from '../services/dictService';
+import {PROXY_BASE_URL} from '../config/constants';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
 
@@ -122,7 +123,7 @@ export default function registerActions(app: Workflow): void {
     CacheManager.clearAll();
     sendNotification('缓存已清空，下次查询将重新获取数据', '刷新成功');
     wf.triggerAlfred(encodeContext({ state: 'home', data: context.data }));
-  });
+  }, { skipContextSave: true });
 
   // 动作：选择字典条目（记录最近使用，跳转 home）
   app.onAction('select_dict_item', async (context, wf) => {
@@ -156,7 +157,6 @@ export default function registerActions(app: Workflow): void {
       return;
     }
 
-    const PROXY_BASE_URL = 'http://127.0.0.1:8080';
     await http.delete(`${PROXY_BASE_URL}/dictionaries/${dictItemId}`);
     CacheManager.clear(`dict_items_${dictKey}`);
     sendNotification(`已删除: ${dictItemName ?? dictItemId}`, '删除成功');
@@ -168,14 +168,14 @@ export default function registerActions(app: Workflow): void {
     if (context.id) HistoryManager.togglePin(context.id);
     const nextState = context.returnState ?? 'home';
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
-  });
+  }, { skipContextSave: true });
 
   // 动作：删除单条历史记录
   app.onAction('delete_history', async (context, wf) => {
     if (context.id) HistoryManager.deleteHistory(context.id);
     const nextState = context.returnState ?? 'home';
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
-  });
+  }, { skipContextSave: true });
 
   // 动作：清空所有未固定的历史记录
   app.onAction('clear_history', async (context, wf) => {

@@ -4,9 +4,10 @@ import Logger from '../core/Logger';
 import CacheManager from '../core/CacheManager';
 import {copyToClipboard, openUrl, sendNotification} from '../core/utils';
 import {icon} from '../core/icons';
+import {PROXY_BASE_URL} from './constants';
 import type {ContextData, DictItem, Feature} from '../types';
 
-export const PROXY_BASE_URL = 'http://127.0.0.1:8080';
+export {PROXY_BASE_URL};
 
 /**
  * 功能矩阵配置
