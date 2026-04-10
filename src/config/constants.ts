@@ -20,6 +20,17 @@ export const STATE_ALIAS_MANAGE = 'alias_manage';
 export const STATE_ALIAS_SAVE = 'alias_save';
 export const STATE_ALIAS_RENAME = 'alias_rename';
 
+// ─── rerun 刷新间隔（秒） ─────────────────────────────────────────────────────────
+
+/** 任务运行中进度轮询间隔 */
+export const RERUN_INTERVAL_PROGRESS = 0.2;
+/** 字典/选项加载中轮询间隔 */
+export const RERUN_INTERVAL_LOADING = 0.3;
+/** 任务完成后展示结果期间的轮询间隔 */
+export const RERUN_INTERVAL_COMPLETED = 0.5;
+/** 任务管理页运行中刷新间隔 */
+export const RERUN_INTERVAL_TASK_LIST = 1;
+
 // ─── 内部上下文字段名 ─────────────────────────────────────────────────────────────
 // 以下字段名在 context.data 中作为框架内部临时字段使用，以 _ 开头与业务字段区分
 

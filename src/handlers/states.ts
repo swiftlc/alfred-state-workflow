@@ -16,6 +16,10 @@ import {
   STATE_ALIAS_MANAGE,
   STATE_ALIAS_SAVE,
   STATE_ALIAS_RENAME,
+  RERUN_INTERVAL_PROGRESS,
+  RERUN_INTERVAL_LOADING,
+  RERUN_INTERVAL_COMPLETED,
+  RERUN_INTERVAL_TASK_LIST,
   FIELD_CURRENT_DICT,
   FIELD_CURRENT_SELECTED,
   FIELD_SILENT_ON_SUCCESS,
@@ -39,6 +43,15 @@ const SPINNERS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇',
 /** 检查某个功能还缺少哪些字典上下文 */
 function getMissingKeys(feature: Feature, data: ContextData): string[] {
   return feature.requiredKeys.filter((key) => !data[key]);
+}
+
+/**
+ * 格式化字典条目的副标题：value 与 description 相同时只展示一个，否则用双空格拼接
+ */
+function formatDictSubtitle(item: { value?: string; description?: string }): string {
+  return item.value === item.description
+    ? (item.value ?? '')
+    : [item.value, item.description].filter(Boolean).join('  ');
 }
 
 /** 将历史记录的 data 格式化为可读字符串 */
@@ -74,7 +87,7 @@ export default function registerStates(app: Workflow): void {
       TaskManager.updateTask(jobId, { spinnerIdx: (task.spinnerIdx ?? 0) + 1 });
 
       return {
-        rerun: 0.2,
+        rerun: RERUN_INTERVAL_PROGRESS,
         items: [
           {
             title: `${spinner} ${task.progress}% - ${task.message}`,
@@ -138,7 +151,7 @@ export default function registerStates(app: Workflow): void {
         : wf.createRerunItem('', '', DEFAULT_STATE, { data: context.data }).arg;
 
       return {
-        rerun: 0.5,
+        rerun: RERUN_INTERVAL_COMPLETED,
         items: [
           {
             title,
@@ -278,9 +291,7 @@ export default function registerStates(app: Workflow): void {
           const featureName = typeof feature.name === 'function' ? feature.name(contextData) : feature.name;
           const featureDescription = typeof feature.description === 'function' ? feature.description(contextData) : feature.description;
           const itemTitle = feature.label ?? (typeof feature.name === 'string' ? feature.name : featureName);
-          const itemSubtitle = selected.value === selected.description
-            ? (selected.value ?? '')
-            : [selected.value, selected.description].filter(Boolean).join('  ');
+          const itemSubtitle = formatDictSubtitle(selected);
 
           if (!matchQuery(query, itemTitle, featureName, selected.name, itemSubtitle)) continue;
 
@@ -541,9 +552,7 @@ export default function registerStates(app: Workflow): void {
 
       // 展示字典项本身的信息，不重复展示功能名称
       const itemTitle = selected.name;
-      const itemSubtitle = selected.value === selected.description
-        ? (selected.value ?? '')
-        : [selected.value, selected.description].filter(Boolean).join('  ');
+      const itemSubtitle = formatDictSubtitle(selected);
 
       if (!matchQuery(query, selected.name, selected.value, selected.description)) continue;
 
@@ -709,7 +718,7 @@ export default function registerStates(app: Workflow): void {
     }
 
     items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data: context.data }, {}, Icons.workflow));
-    return hasRunning ? { rerun: 1, items } : items;
+    return hasRunning ? { rerun: RERUN_INTERVAL_TASK_LIST, items } : items;
   });
 
   /**
@@ -739,7 +748,7 @@ export default function registerStates(app: Workflow): void {
       const dictName = dicts.find((d) => d.key === dictKey)?.name ?? dictKey;
       const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
       return {
-        rerun: 0.3,
+        rerun: RERUN_INTERVAL_LOADING,
         items: [
           {
             title: `${spinner} 正在加载${dictName}列表...`,
@@ -798,9 +807,7 @@ export default function registerStates(app: Workflow): void {
       const title = item.isManual ? `✏️ 手动输入: ${item.name}` : `${titlePrefix}${item.name}`;
       let subtitle = item.isManual
         ? `将 ${item.name} 设置为当前 ${dictName} (手动输入)`
-        : item.value === item.description
-          ? (item.value ?? '')
-          : `${item.value ?? ''}  ${item.description ?? ''}`;
+        : formatDictSubtitle(item);
 
       if (pendingAction) {
         const feature = features.find((f) => f.id === pendingAction);
