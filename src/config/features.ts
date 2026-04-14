@@ -375,6 +375,7 @@ const builtInFeatures: Feature[] = [
         key: 'msg_datetime',
         label: '查询时间',
         placeholder: '如: 2h、30m、1d、22:00、2026-04-14 17:00:00，留空=当前时间',
+        previewValue: (input: string) => resolveQueryDatetime(input || undefined),
       },
       {
         key: 'swimlane_filter',

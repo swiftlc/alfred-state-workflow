@@ -146,6 +146,11 @@ export interface RequiredInput {
    * 不填默认 60 秒。
    */
   cacheTtl?: number;
+  /**
+   * 输入预览函数：将用户输入转换为更易读的展示文本，附加在 item title 后。
+   * 例如将 "2h" 转换为 "→ 2026-04-14 15:30:00"，让用户实时确认解析结果。
+   */
+  previewValue?: (input: string) => string;
 }
 
 /** 功能定义 */

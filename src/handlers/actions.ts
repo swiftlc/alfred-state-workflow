@@ -63,6 +63,27 @@ export default function registerActions(app: Workflow): void {
     task.update(100, `已加载 ${result.length} 条数据`);
   });
 
+  // 后台任务：预加载消费者组列表并写入缓存
+  app.onTask('_prefetch_consumers', async (task, context) => {
+    const topicId = context['_consumerTopicId'] as string | undefined;
+    const cacheKey = context['_consumerCacheKey'] as string | undefined;
+    if (!topicId || !cacheKey) {
+      task.update(100, '参数缺失');
+      return;
+    }
+    task.update(10, '正在加载消费者组...');
+    const destUrl = `https://mafka.mws-test.sankuai.com/mafka/restful/consumer/listByTopicId?topicId=${topicId}&pageNum=1&limit=100&type=3&content=&auth=-1`;
+    const response = await http.proxy<{ code: number; msg: string; data: Array<{ id: number; name: string; appkey: string; remark: string | null; status: number; environment: string; topicName: string }> }>('GET', destUrl, {
+      headers: { 'm-appkey': 'fe_mafka-fe' },
+    });
+    if (response?.code === 0 && Array.isArray(response.data)) {
+      CacheManager.set(cacheKey, response.data, 2 * 60 * 1000); // 缓存 2 分钟
+      task.update(100, `已加载 ${response.data.length} 个消费者组`);
+    } else {
+      task.update(100, '加载失败');
+    }
+  });
+
   // 动作：租户泳道登录（耗时，使用后台任务）
   app.onAction('login', async (context, wf) => {
     wf.startTask('login_task', context);

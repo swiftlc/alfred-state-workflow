@@ -1095,9 +1095,14 @@ export default function registerStates(app: Workflow): void {
         const featureDescription =
           typeof feature.description === 'function' ? feature.description(newData) : feature.description;
 
+        const preview = currentInput.previewValue?.(query);
+        const confirmTitle = preview
+          ? `✅ 确认输入: ${query}  →  ${preview}`
+          : `✅ 确认输入: ${query}`;
+
         if (isLastInput) {
           items.push(
-            wf.createItem(`✅ 确认输入: ${query}`, `配置完成，按回车直接执行 [${featureName}]`, feature.action, {
+            wf.createItem(confirmTitle, `配置完成，按回车直接执行 [${featureName}]`, feature.action, {
               data: newData,
               historyTitle: `${featureName}`,
               historySubtitle: featureDescription,
@@ -1108,7 +1113,7 @@ export default function registerStates(app: Workflow): void {
           const nextInput = feature.requiredInputs![inputIndex + 1]!;
           items.push(
             wf.createRerunItem(
-              `✅ 确认输入: ${query}`,
+              confirmTitle,
               `继续配置 ${featureName} (下一步: 输入${nextInput.label})`,
               STATE_INPUT,
               { data: newData, pendingAction, inputIndex: inputIndex + 1 },
@@ -1517,12 +1522,13 @@ export default function registerStates(app: Workflow): void {
     return items;
   });
 
-  // ─── kafka_consumers：消费者组列表 ───────────────────────────────────────────
+  // ─── kafka_consumers：消费者组列表（非阻塞加载） ─────────────────────────────
 
   app.onState(STATE_KAFKA_CONSUMERS, async (context, wf) => {
     const data = context.data ?? {};
     const query = context.query ?? '';
     const topic = data['kafka_topic'] as DictItem | undefined;
+    const appkey = data['appkey'] as DictItem | undefined;
     const items: AlfredItem[] = [];
 
     const topicId = topic ? (topic as unknown as Record<string, string>)['_topicId'] ?? '' : '';
@@ -1536,51 +1542,74 @@ export default function registerStates(app: Workflow): void {
       return items;
     }
 
-    try {
-      const destUrl = `https://mafka.mws-test.sankuai.com/mafka/restful/consumer/listByTopicId?topicId=${topicId}&pageNum=1&limit=100&type=3&content=&auth=-1`;
-      const response = await http.proxy<{ code: number; msg: string; data: Array<{ id: number; name: string; appkey: string; remark: string | null; status: number; environment: string; topicName: string }> }>('GET', destUrl, {
-        headers: { 'm-appkey': 'fe_mafka-fe' },
+    // 非阻塞加载：优先读缓存，缓存未命中时启动后台预加载
+    const cacheKey = `kafka_consumers:${topicId}`;
+    type ConsumerGroup = { id: number; name: string; appkey: string; remark: string | null; status: number; environment: string; topicName: string };
+    const cached = await CacheManager.get<ConsumerGroup[]>(cacheKey);
+
+    if (cached === null) {
+      wf.spawnWorker('_prefetch_consumers', {
+        ...context,
+        _consumerTopicId: topicId,
+        _consumerCacheKey: cacheKey,
       });
+      const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
+      return {
+        rerun: RERUN_INTERVAL_LOADING,
+        items: [{
+          title: `${spinner} 正在加载消费者组...`,
+          subtitle: topicLabel,
+          valid: false,
+        } as AlfredItem],
+      };
+    }
 
-      if (response?.code === 0 && Array.isArray(response.data)) {
-        const groups = response.data;
+    const groups = cached;
 
-        if (groups.length === 0) {
-          items.push({ title: '暂无消费者组', subtitle: topicLabel, valid: false });
-        } else {
-          // 复制全部按钮
-          const allJson = JSON.stringify(groups.map((g) => ({ name: g.name, appkey: g.appkey, remark: g.remark, environment: g.environment })), null, 2);
-          if (matchQuery(query, '复制全部', `共 ${groups.length} 个消费者组`)) {
-            items.push(
-              wf.createItem(
-                `复制全部（${groups.length} 个）`,
-                `复制所有消费者组 JSON`,
-                'copy_value',
-                { copyValue: allJson, copyName: `${topicLabel} 全部消费者组` }
-              )
-            );
-          }
+    // 构造 topic 基础信息（合并到每条 JSON 中）
+    const topicInfo = {
+      topicId,
+      topicName: topic?.description ?? topic?.name ?? '',   // description 存的是 topic 技术名
+      topicRemark: topic?.name ?? '',                        // name 存的是 remark
+      appkey: appkey?.value ?? appkey?.name ?? '',
+    };
 
-          // 每个消费者组一个 item
-          for (const g of groups) {
-            const title = g.name;
-            const subtitle = `${g.appkey}  [${g.environment}]${g.remark ? `  ${g.remark}` : ''}`;
-            if (!matchQuery(query, title, subtitle, g.appkey, g.remark ?? '')) continue;
-
-            const singleJson = JSON.stringify({ name: g.name, appkey: g.appkey, remark: g.remark, environment: g.environment }, null, 2);
-            items.push(
-              wf.createItem(title, subtitle, 'copy_value', {
-                copyValue: singleJson,
-                copyName: g.name,
-              })
-            );
-          }
-        }
-      } else {
-        items.push({ title: '查询失败', subtitle: response?.msg ?? '接口异常', valid: false });
+    if (groups.length === 0) {
+      items.push({ title: '暂无消费者组', subtitle: topicLabel, valid: false });
+    } else {
+      // 复制全部按钮
+      const allPayload = {
+        topic: topicInfo,
+        consumers: groups.map((g) => ({ name: g.name, appkey: g.appkey, remark: g.remark, environment: g.environment })),
+      };
+      if (matchQuery(query, '复制全部', `共 ${groups.length} 个消费者组`)) {
+        items.push(
+          wf.createItem(
+            `复制全部（${groups.length} 个）`,
+            `含 topic 信息，复制为 JSON`,
+            'copy_value',
+            { copyValue: JSON.stringify(allPayload, null, 2), copyName: `${topicLabel} 全部消费者组` }
+          )
+        );
       }
-    } catch (err) {
-      items.push({ title: '查询失败', subtitle: (err as Error).message, valid: false });
+
+      // 每个消费者组一个 item
+      for (const g of groups) {
+        const title = g.name;
+        const subtitle = `${g.appkey}  [${g.environment}]${g.remark ? `  ${g.remark}` : ''}`;
+        if (!matchQuery(query, title, subtitle, g.appkey, g.remark ?? '')) continue;
+
+        const singlePayload = {
+          topic: topicInfo,
+          consumer: { name: g.name, appkey: g.appkey, remark: g.remark, environment: g.environment },
+        };
+        items.push(
+          wf.createItem(title, subtitle, 'copy_value', {
+            copyValue: JSON.stringify(singlePayload, null, 2),
+            copyName: g.name,
+          })
+        );
+      }
     }
 
     items.push(wf.createRerunItem('🔙 返回', topicLabel, STATE_KAFKA_OPS, { data }, {}, Icons.workflow));
