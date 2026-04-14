@@ -364,7 +364,7 @@ const builtInFeatures: Feature[] = [
     condition: () => false, // 不在主菜单展示，由 kafka_ops 状态直接渲染
     actionHandler: async (context) => {
       const topic = context.data['kafka_topic'] as DictItem;
-      const topicId = topic.value ?? topic.id ?? '';
+      const topicId = (topic as unknown as Record<string, string>)['_topicId'] ?? '';
       try {
         const destUrl = `${MAFKA_BASE_URL}/mafka/restful/consumer/listByTopicId?topicId=${topicId}&pageNum=1&limit=100&type=3&content=&auth=-1`;
         const response = await http.proxy<MafkaConsumerListResponse>('GET', destUrl, {
@@ -428,7 +428,7 @@ const builtInFeatures: Feature[] = [
     ],
     actionHandler: async (context) => {
       const topic = context.data['kafka_topic'] as DictItem;
-      const topicId = topic.value ?? topic.id ?? '';
+      const topicId = (topic as unknown as Record<string, string>)['_topicId'] ?? '';
       const datetimeInput = context.data['msg_datetime'] as DictItem | undefined;
       const swimlaneFilter = context.data['swimlane_filter'] as DictItem | undefined;
 
@@ -523,8 +523,8 @@ const builtInFeatures: Feature[] = [
       const messageBodyInput = context.data['message_body'] as DictItem | undefined;
       const sendSwimlane = context.data['send_swimlane'] as DictItem | undefined;
 
-      const topicId = Number(topic.value ?? topic.id ?? 0);
-      const appkeyValue = appkey?.value ?? appkey?.name ?? (topic as unknown as Record<string, unknown>)['appkey'] as string ?? '';
+      const topicId = Number((topic as unknown as Record<string, string>)['_topicId'] ?? 0);
+      const appkeyValue = appkey?.value ?? appkey?.name ?? '';
       const messageBody = messageBodyInput?.value ?? messageBodyInput?.name ?? '{}';
       // 泳道：优先 value（列表选择），其次 name（手动输入）
       const swimlaneCode = sendSwimlane?.value !== undefined && sendSwimlane.value !== ''
@@ -544,7 +544,7 @@ const builtInFeatures: Feature[] = [
             objectType: 'TOPIC',
             auditType: 'SEND_MESSAGE',
             content,
-            taskName: `${topic.name}_test`,
+            taskName: `${topic.description ?? topic.name}_test`,
             topicId,
             appkey: appkeyValue,
           },

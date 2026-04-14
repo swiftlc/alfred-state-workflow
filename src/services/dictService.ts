@@ -121,14 +121,14 @@ const DICTS: DictCategory[] = [
           return response.data.list
             .filter((t) => t.status === 1)
             .map((t) => ({
-              id: String(t.id),
-              // remark 作为主展示名（更易理解），topic name 作为 value 和 description
+              // name: remark 优先（更易理解），无 remark 则用 topic name
               name: t.remark ? t.remark : t.name,
-              value: String(t.id),
+              // value: topic name（接口参数 topicId 在 actionHandler 中单独取 _topicId）
+              value: t.name,
+              // description: topic name（subtitle 展示；与 name 相同时 formatDictSubtitle 会去重）
               description: t.name,
-              // 保留原始字段供后续使用
-              topicName: t.name,
-              topicRemark: t.remark ?? '',
+              // 保留 topicId 供 action 使用，不作为展示字段
+              _topicId: String(t.id),
             }));
         }
         return [];
