@@ -39,7 +39,7 @@ export default function registerActions(app: Workflow): void {
       return;
     }
     task.update(10, '正在加载字典数据...');
-    const items = await dictService.getDictionaryItems(dictKey);
+    const items = await dictService.getDictionaryItems(dictKey, context.data as import('../types').ContextData);
     task.update(100, `已加载 ${items.length} 条数据`);
   });
 

@@ -329,6 +329,216 @@ const builtInFeatures: Feature[] = [
       sendNotification(`已复制门店: ${poi.poiName} 的信息`, '复制成功');
     },
   },
+  // ─── Kafka 功能 ────────────────────────────────────────────────────────────────
+  {
+    id: 'kafka_consumer_groups',
+    name: (data: ContextData) => {
+      const topic = data['kafka_topic'] as DictItem | undefined;
+      return `查看消费者组${topic ? `: ${topic.name}` : ''}`;
+    },
+    description: '查看当前 Kafka Topic 下的所有消费者组',
+    requiredKeys: ['appkey', 'kafka_topic'],
+    icon: icon('task'),
+    action: 'kafka_consumer_groups_action',
+    actionHandler: async (context) => {
+      const topic = context.data['kafka_topic'] as DictItem;
+      const topicId = topic.value ?? topic.id ?? '';
+      try {
+        const destUrl = `${MAFKA_BASE_URL}/mafka/restful/consumer/listByTopicId?topicId=${topicId}&pageNum=1&limit=100&type=3&content=&auth=-1`;
+        const response = await http.proxy<MafkaConsumerListResponse>('GET', destUrl, {
+          headers: { 'm-appkey': 'fe_mafka-fe' },
+        });
+        if (response?.code === 0 && Array.isArray(response.data)) {
+          const groups = response.data;
+          const summary = groups
+            .map((g) => `• ${g.name}  [${g.environment}]  ${g.remark ?? ''}`)
+            .join('\n');
+          const text = `Topic: ${topic.name}\n共 ${groups.length} 个消费者组\n\n${summary}`;
+          copyToClipboard(text);
+          sendNotification(`已复制 ${groups.length} 个消费者组信息`, '查看消费者组');
+        } else {
+          sendNotification('查询失败或暂无消费者组', '查看消费者组');
+        }
+      } catch (err) {
+        sendNotification(`查询失败: ${(err as Error).message}`, '查看消费者组');
+      }
+    },
+  },
+  {
+    id: 'kafka_query_messages',
+    name: (data: ContextData) => {
+      const topic = data['kafka_topic'] as DictItem | undefined;
+      return `消息检索${topic ? `: ${topic.name}` : ''}`;
+    },
+    description: '按时间检索 Kafka Topic 消息，支持泳道过滤',
+    requiredKeys: ['appkey', 'kafka_topic'],
+    icon: icon('search'),
+    action: 'kafka_query_messages_action',
+    requiredInputs: [
+      {
+        key: 'msg_datetime',
+        label: '查询时间',
+        placeholder: '格式: YYYY-MM-DD HH:mm:ss，默认当前时间',
+      },
+      {
+        key: 'swimlane_filter',
+        label: '泳道过滤',
+        placeholder: '选择泳道过滤或不过滤',
+        fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
+          const swimlane = contextData['swimlane'] as DictItem | undefined;
+          const options: DictItem[] = [
+            { name: '全部消息（不过滤）', value: '', description: '返回所有泳道的消息' },
+          ];
+          if (swimlane?.value || swimlane?.name) {
+            const code = swimlane.value ?? swimlane.name;
+            options.push({
+              name: `仅当前泳道: ${swimlane.name}`,
+              value: code,
+              description: `tag 包含 ${code} 的消息`,
+            });
+          }
+          return options;
+        },
+      },
+    ],
+    actionHandler: async (context) => {
+      const topic = context.data['kafka_topic'] as DictItem;
+      const topicId = topic.value ?? topic.id ?? '';
+      const datetimeInput = context.data['msg_datetime'] as DictItem | undefined;
+      const swimlaneFilter = context.data['swimlane_filter'] as DictItem | undefined;
+
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const defaultDatetime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      const datetime =
+        datetimeInput?.value && datetimeInput.value !== datetimeInput.name
+          ? datetimeInput.value
+          : (datetimeInput?.name ?? defaultDatetime);
+
+      const swimlaneCode = swimlaneFilter?.value ?? '';
+
+      try {
+        const encodedDt = encodeURIComponent(datetime);
+        const destUrl = `${MAFKA_BASE_URL}/mafka/restful/message/timestamp/query?topicId=${topicId}&dateTime=${encodedDt}&limit=20`;
+        const response = await http.proxy<MafkaMessageQueryResponse>('GET', destUrl, {
+          headers: { 'm-appkey': 'fe_mafka-fe' },
+        });
+
+        if (response?.code === 0 && Array.isArray(response.data)) {
+          let messages = response.data;
+          if (swimlaneCode) {
+            messages = messages.filter((m) => m.tag && m.tag.includes(swimlaneCode));
+          }
+          if (messages.length === 0) {
+            sendNotification(
+              swimlaneCode ? `泳道 ${swimlaneCode} 无匹配消息` : '该时间点附近无消息',
+              '消息检索'
+            );
+            return;
+          }
+          const text = messages
+            .map((m) => `[${m.timestamp}] partition:${m.partitionId} tag:${m.tag ?? '-'}\n${m.content}`)
+            .join('\n\n---\n\n');
+          copyToClipboard(text);
+          sendNotification(
+            `已复制 ${messages.length} 条消息${swimlaneCode ? ` (泳道: ${swimlaneCode})` : ''}`,
+            '消息检索'
+          );
+        } else {
+          sendNotification('查询失败，请检查 Topic 或时间格式', '消息检索');
+        }
+      } catch (err) {
+        sendNotification(`查询失败: ${(err as Error).message}`, '消息检索');
+      }
+    },
+  },
+  {
+    id: 'kafka_send_message',
+    name: (data: ContextData) => {
+      const topic = data['kafka_topic'] as DictItem | undefined;
+      return `发送消息${topic ? `: ${topic.name}` : ''}`;
+    },
+    description: '向 Kafka Topic 发送测试消息',
+    requiredKeys: ['appkey', 'kafka_topic'],
+    icon: icon('login'),
+    action: 'kafka_send_message_action',
+    requiredInputs: [
+      {
+        key: 'message_body',
+        label: '消息体',
+        placeholder: '请输入 JSON 消息体，如 {"taskId":123}',
+      },
+      {
+        key: 'send_swimlane',
+        label: '发送泳道',
+        placeholder: '选择泳道或不指定',
+        fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
+          const swimlane = contextData['swimlane'] as DictItem | undefined;
+          const options: DictItem[] = [
+            { name: '不指定泳道', value: '', description: '发送到默认泳道' },
+          ];
+          if (swimlane?.value || swimlane?.name) {
+            const code = swimlane.value ?? swimlane.name;
+            options.push({
+              name: `当前泳道: ${swimlane.name}`,
+              value: code,
+              description: `发送到泳道 ${code}`,
+            });
+          }
+          return options;
+        },
+      },
+    ],
+    actionHandler: async (context) => {
+      const topic = context.data['kafka_topic'] as DictItem;
+      const appkey = context.data['appkey'] as DictItem;
+      const messageBodyInput = context.data['message_body'] as DictItem | undefined;
+      const sendSwimlane = context.data['send_swimlane'] as DictItem | undefined;
+
+      const topicId = Number(topic.value ?? topic.id ?? 0);
+      const appkeyValue = appkey.value ?? appkey.name ?? '';
+      const messageBody = messageBodyInput?.value ?? messageBodyInput?.name ?? '{}';
+      const swimlaneCode = sendSwimlane?.value ?? '';
+
+      const content = JSON.stringify({
+        topicId,
+        messages: messageBody,
+        swimlane: swimlaneCode,
+      });
+
+      try {
+        const destUrl = `${MAFKA_BASE_URL}/mafka/restful/audit/apply`;
+        const response = await http.proxy<MafkaSendResponse>('POST', destUrl, {
+          data: {
+            objectType: 'TOPIC',
+            auditType: 'SEND_MESSAGE',
+            content,
+            taskName: `${topic.name}_test`,
+            topicId,
+            appkey: appkeyValue,
+          },
+          headers: {
+            'm-appkey': 'fe_mafka-fe',
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response?.code === 0 && response.data?.applicantStatus === 'PASS') {
+          sendNotification(
+            `消息已发送${swimlaneCode ? ` → 泳道: ${swimlaneCode}` : ''}`,
+            `发送成功: ${topic.name}`
+          );
+        } else {
+          sendNotification(
+            `发送失败: ${response?.msg ?? '未知错误'}`,
+            '发送消息'
+          );
+        }
+      } catch (err) {
+        sendNotification(`发送失败: ${(err as Error).message}`, '发送消息');
+      }
+    },
+  },
 ];
 
 // ─── 内部类型（仅此文件使用） ──────────────────────────────────────────────────
@@ -377,6 +587,51 @@ interface PoiInfo {
 interface PoiResponse {
   status?: { code: number };
   poiList?: PoiInfo[];
+}
+
+// ─── mafka 相关常量和类型 ──────────────────────────────────────────────────────
+
+const MAFKA_BASE_URL = 'https://mafka.mws-test.sankuai.com';
+
+interface MafkaConsumerGroup {
+  id: number;
+  name: string;
+  appkey: string;
+  topicName: string;
+  remark: string | null;
+  status: number;
+  environment: string;
+}
+
+interface MafkaConsumerListResponse {
+  code: number;
+  msg: string;
+  data: MafkaConsumerGroup[];
+}
+
+interface MafkaMessage {
+  offset: number;
+  timestamp: string;
+  content: string;
+  partitionId: number;
+  msgId: string;
+  tag: string | null;
+  clusterName: string;
+}
+
+interface MafkaMessageQueryResponse {
+  code: number;
+  msg: string;
+  data: MafkaMessage[];
+}
+
+interface MafkaSendResponse {
+  code: number;
+  msg: string;
+  data: {
+    auditType: string;
+    applicantStatus: string;
+  };
 }
 
 // 合并内置功能和插件功能

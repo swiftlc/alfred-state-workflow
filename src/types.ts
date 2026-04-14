@@ -11,8 +11,14 @@ export interface DictCategory {
   /**
    * 自定义条目获取函数。配置后 getDictionaryItems 直接调用此函数，
    * 不再走默认的 REST 接口。缓存逻辑（cacheTtl）仍由框架统一管理。
+   * 可选接收 contextData，用于依赖其他字典值的动态字典（如 kafka_topic 依赖 appkey）。
    */
-  fetchItems?: () => Promise<DictItem[]>;
+  fetchItems?: (contextData?: ContextData) => Promise<DictItem[]>;
+  /**
+   * 自定义 cacheKey 生成函数，用于 context 相关的动态字典（如 kafka_topic 依赖 appkey）。
+   * 不配置时使用 DictService.getCacheKey(key) 默认规则。
+   */
+  getCacheKey?: (contextData?: ContextData) => string;
   /** 接口不可用时的兜底数据，不配置则降级返回空数组 */
   fallbackItems?: DictItem[];
   /** 是否允许修改字典条目描述，默认 true；设为 false 时该字典不出现在「修改描述」功能中 */

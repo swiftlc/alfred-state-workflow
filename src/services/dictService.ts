@@ -15,7 +15,7 @@
 
 import CacheManager from '../core/CacheManager';
 import {http} from '../core/HttpClient';
-import type {DictCategory, DictItem} from '../types';
+import type {DictCategory, DictItem, ContextData} from '../types';
 import {PROXY_BASE_URL} from '../config/features';
 
 const DEFAULT_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
@@ -31,6 +31,27 @@ interface OctoAppsResponse {
 
 const APPKEY_DEST_URL =
   'https://octo.mws-test.sankuai.com/api/octo/v2/common/apps?mis=liucheng58';
+
+const MAFKA_BASE_URL = 'https://mafka.mws-test.sankuai.com';
+
+// ─── mafka 接口类型 ────────────────────────────────────────────────────────────
+
+interface MafkaTopic {
+  id: number;
+  name: string;
+  appkey: string;
+  remark: string | null;
+  status: number;
+}
+
+interface MafkaTopicListResponse {
+  code: number;
+  msg: string;
+  data: {
+    total: number;
+    list: MafkaTopic[];
+  };
+}
 
 // ─── 字典定义 ────────────────────────────────────────────────────────────────────
 
@@ -74,14 +95,51 @@ const DICTS: DictCategory[] = [
       return [];
     },
   },
+  {
+    key: 'kafka_topic',
+    name: 'Kafka Topic',
+    cacheTtl: 5 * 60 * 1000,
+    readonly: true,
+    allowDescriptionEdit: false,
+    getCacheKey: (contextData?: ContextData) => {
+      const appkey = contextData?.['appkey'] as DictItem | undefined;
+      const appkeyValue = appkey?.value ?? appkey?.name ?? '';
+      return appkeyValue ? `dict_items_kafka_topic:${appkeyValue}` : 'dict_items_kafka_topic';
+    },
+    fetchItems: async (contextData?: ContextData) => {
+      const appkey = contextData?.['appkey'] as DictItem | undefined;
+      const appkeyValue = appkey?.value ?? appkey?.name ?? '';
+      if (!appkeyValue) return [];
+      try {
+        const destUrl = `${MAFKA_BASE_URL}/mafka/restful/topic/list?pageNum=1&limit=1000&type=2&content=${encodeURIComponent(appkeyValue)}&auth=2`;
+        const response = await http.proxy<MafkaTopicListResponse>('GET', destUrl, {
+          headers: { 'm-appkey': 'fe_mafka-fe' },
+        });
+        if (response?.code === 0 && Array.isArray(response.data?.list)) {
+          return response.data.list
+            .filter((t) => t.status === 1)
+            .map((t) => ({
+              id: String(t.id),
+              name: t.name,
+              value: String(t.id),
+              description: t.remark ?? '',
+            }));
+        }
+        return [];
+      } catch {
+        return [];
+      }
+    },
+    fallbackItems: [],
+  },
 ];
 
 // ─── DictService ─────────────────────────────────────────────────────────────────
 
 class DictService {
   /** 字典列表的统一缓存 key，外部需要清缓存时通过此方法获取，避免命名分散 */
-  static getCacheKey(dictKey: string): string {
-    return `dict_items_${dictKey}`;
+  static getCacheKey(dictKey: string, suffix?: string): string {
+    return suffix ? `dict_items_${dictKey}:${suffix}` : `dict_items_${dictKey}`;
   }
 
   /** 获取所有字典类型 */
@@ -93,21 +151,28 @@ class DictService {
    * 仅读取缓存，不发起网络请求。
    * 返回 null 表示缓存未命中（需要发起请求）。
    */
-  async getCachedItems(dictKey: string): Promise<DictItem[] | null> {
-    return CacheManager.get<DictItem[]>(DictService.getCacheKey(dictKey));
+  async getCachedItems(dictKey: string, contextData?: ContextData): Promise<DictItem[] | null> {
+    const dictConfig = DICTS.find((d) => d.key === dictKey);
+    const cacheKey = dictConfig?.getCacheKey
+      ? dictConfig.getCacheKey(contextData)
+      : DictService.getCacheKey(dictKey);
+    return CacheManager.get<DictItem[]>(cacheKey);
   }
 
   /** 获取指定字典下的所有选项（优先缓存，缓存未命中则发起请求） */
-  async getDictionaryItems(dictKey: string): Promise<DictItem[]> {
+  async getDictionaryItems(dictKey: string, contextData?: ContextData): Promise<DictItem[]> {
     const dictConfig = DICTS.find((d) => d.key === dictKey);
     const ttl = dictConfig?.cacheTtl ?? DEFAULT_CACHE_TTL;
+    const cacheKey = dictConfig?.getCacheKey
+      ? dictConfig.getCacheKey(contextData)
+      : DictService.getCacheKey(dictKey);
 
     return (await CacheManager.get<DictItem[]>(
-      DictService.getCacheKey(dictKey),
+      cacheKey,
       async () => {
         // 有自定义 fetchItems：直接调用，不走默认 REST 接口
         if (dictConfig?.fetchItems) {
-          return dictConfig.fetchItems();
+          return dictConfig.fetchItems(contextData);
         }
         // 默认：通过代理 REST 接口获取，失败时降级到本地兜底数据
         try {

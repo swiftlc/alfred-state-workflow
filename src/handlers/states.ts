@@ -739,7 +739,7 @@ export default function registerStates(app: Workflow): void {
     }
 
     // 非阻塞加载：优先读缓存，缓存未命中则展示 loading 并启动后台预加载
-    const cached = await dictService.getCachedItems(dictKey);
+    const cached = await dictService.getCachedItems(dictKey, context.data);
     const dicts = await dictService.getDictionaries();
 
     if (cached === null) {
