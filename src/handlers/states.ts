@@ -16,6 +16,7 @@ import {
   STATE_ALIAS_MANAGE,
   STATE_ALIAS_SAVE,
   STATE_ALIAS_RENAME,
+  STATE_KAFKA_OPS,
   RERUN_INTERVAL_PROGRESS,
   RERUN_INTERVAL_LOADING,
   RERUN_INTERVAL_COMPLETED,
@@ -1463,6 +1464,54 @@ export default function registerStates(app: Workflow): void {
     }
 
     items.push(wf.createRerunItem('🔙 返回', '返回快捷指令列表', STATE_ALIAS_MANAGE, { data }, {}, Icons.alias));
+    return items;
+  });
+
+  // ─── kafka_ops：mafka 二级操作菜单 ───────────────────────────────────────────
+
+  app.onState(STATE_KAFKA_OPS, async (context, wf) => {
+    const data = context.data ?? {};
+    const query = context.query ?? '';
+    const topic = data['kafka_topic'] as DictItem | undefined;
+    const items: AlfredItem[] = [];
+
+    // 展示当前 topic 信息
+    const topicLabel = topic
+      ? (topic.description ? `${topic.description}（${topic.name}）` : topic.name)
+      : '未选择 Topic';
+
+    // 从 features 中找到三个子操作
+    const kafkaFeatureIds = ['kafka_consumer_groups', 'kafka_query_messages', 'kafka_send_message'];
+    for (const featureId of kafkaFeatureIds) {
+      const feature = features.find((f) => f.id === featureId);
+      if (!feature) continue;
+      const featureName = typeof feature.name === 'function' ? feature.name(data) : feature.name;
+      const featureDescription = typeof feature.description === 'function' ? feature.description(data) : feature.description;
+      const featureIconPath = feature.icon?.path;
+
+      if (!matchQuery(query, featureName, featureDescription)) continue;
+
+      if (feature.requiredInputs && feature.requiredInputs.length > 0) {
+        items.push(
+          wf.createRerunItem(featureName, featureDescription, STATE_INPUT, {
+            data,
+            pendingAction: feature.id,
+            inputIndex: 0,
+          }, {}, featureIconPath)
+        );
+      } else {
+        items.push(
+          wf.createItem(featureName, featureDescription, feature.action, {
+            data,
+            historyTitle: featureName,
+            historySubtitle: featureDescription,
+            recordHistory: feature.recordHistory !== false,
+          }, {}, featureIconPath)
+        );
+      }
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', `当前 Topic: ${topicLabel}`, DEFAULT_STATE, { data }, {}, Icons.workflow));
     return items;
   });
 }

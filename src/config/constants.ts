@@ -19,6 +19,7 @@ export const STATE_WORKSPACE_SAVE = 'workspace_save';
 export const STATE_ALIAS_MANAGE = 'alias_manage';
 export const STATE_ALIAS_SAVE = 'alias_save';
 export const STATE_ALIAS_RENAME = 'alias_rename';
+export const STATE_KAFKA_OPS = 'kafka_ops';
 
 // ─── rerun 刷新间隔（秒） ─────────────────────────────────────────────────────────
 

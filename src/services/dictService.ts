@@ -97,21 +97,23 @@ const DICTS: DictCategory[] = [
   },
   {
     key: 'kafka_topic',
-    name: 'Kafka Topic',
+    name: 'mafka',
     cacheTtl: 5 * 60 * 1000,
     readonly: true,
     allowDescriptionEdit: false,
     getCacheKey: (contextData?: ContextData) => {
       const appkey = contextData?.['appkey'] as DictItem | undefined;
       const appkeyValue = appkey?.value ?? appkey?.name ?? '';
-      return appkeyValue ? `dict_items_kafka_topic:${appkeyValue}` : 'dict_items_kafka_topic';
+      return appkeyValue ? `dict_items_kafka_topic:${appkeyValue}` : 'dict_items_kafka_topic:__all__';
     },
     fetchItems: async (contextData?: ContextData) => {
       const appkey = contextData?.['appkey'] as DictItem | undefined;
       const appkeyValue = appkey?.value ?? appkey?.name ?? '';
-      if (!appkeyValue) return [];
       try {
-        const destUrl = `${MAFKA_BASE_URL}/mafka/restful/topic/list?pageNum=1&limit=1000&type=2&content=${encodeURIComponent(appkeyValue)}&auth=2`;
+        // 有 appkey：按 appkey 过滤（type=2）；无 appkey：查询全部（type=3）
+        const destUrl = appkeyValue
+          ? `${MAFKA_BASE_URL}/mafka/restful/topic/list?pageNum=1&limit=1000&type=2&content=${encodeURIComponent(appkeyValue)}&auth=2`
+          : `${MAFKA_BASE_URL}/mafka/restful/topic/list?pageNum=1&limit=1000&type=3&content=&auth=2`;
         const response = await http.proxy<MafkaTopicListResponse>('GET', destUrl, {
           headers: { 'm-appkey': 'fe_mafka-fe' },
         });
@@ -120,9 +122,13 @@ const DICTS: DictCategory[] = [
             .filter((t) => t.status === 1)
             .map((t) => ({
               id: String(t.id),
-              name: t.name,
+              // remark 作为主展示名（更易理解），topic name 作为 value 和 description
+              name: t.remark ? t.remark : t.name,
               value: String(t.id),
-              description: t.remark ?? '',
+              description: t.name,
+              // 保留原始字段供后续使用
+              topicName: t.name,
+              topicRemark: t.remark ?? '',
             }));
         }
         return [];

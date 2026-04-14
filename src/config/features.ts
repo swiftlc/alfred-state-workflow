@@ -2,9 +2,10 @@ import PluginManager from '../core/PluginManager';
 import {http} from '../core/HttpClient';
 import Logger from '../core/Logger';
 import CacheManager from '../core/CacheManager';
-import {copyToClipboard, openUrl, sendNotification} from '../core/utils';
+import {copyToClipboard, openUrl, sendNotification, encodeContext} from '../core/utils';
 import {icon} from '../core/icons';
-import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED} from './constants';
+import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS} from './constants';
+import {resolveQueryDatetime} from '../core/timeUtils';
 import {DictService} from '../services/dictService';
 import type {ContextData, DictItem, Feature} from '../types';
 
@@ -329,17 +330,38 @@ const builtInFeatures: Feature[] = [
       sendNotification(`已复制门店: ${poi.poiName} 的信息`, '复制成功');
     },
   },
-  // ─── Kafka 功能 ────────────────────────────────────────────────────────────────
+  // ─── Kafka 功能入口（二级菜单） ────────────────────────────────────────────────
+  {
+    id: 'kafka_menu',
+    name: (data: ContextData) => {
+      const topic = data['kafka_topic'] as DictItem | undefined;
+      const topicLabel = topic ? (topic.description ? `${topic.description}` : topic.name) : '';
+      return `mafka 操作${topicLabel ? `: ${topicLabel}` : ''}`;
+    },
+    description: (data: ContextData) => {
+      const topic = data['kafka_topic'] as DictItem | undefined;
+      return topic ? `查看消费者组 / 消息检索 / 发送消息 | Topic: ${topic.name}` : '请先选择 kafka_topic';
+    },
+    requiredKeys: ['kafka_topic'],
+    icon: icon('workflow'),
+    action: 'kafka_menu_action',
+    actionHandler: async (context, wf) => {
+      wf.triggerAlfred(encodeContext({ state: STATE_KAFKA_OPS, data: context.data }));
+    },
+  },
+  // ─── Kafka 子操作（仅在 kafka_ops 状态中展示，主菜单隐藏） ─────────────────────
   {
     id: 'kafka_consumer_groups',
     name: (data: ContextData) => {
       const topic = data['kafka_topic'] as DictItem | undefined;
-      return `查看消费者组${topic ? `: ${topic.name}` : ''}`;
+      const topicLabel = topic ? (topic.description ? topic.description : topic.name) : '';
+      return `查看消费者组${topicLabel ? `: ${topicLabel}` : ''}`;
     },
-    description: '查看当前 Kafka Topic 下的所有消费者组',
-    requiredKeys: ['appkey', 'kafka_topic'],
+    description: '查看当前 Kafka Topic 下的所有消费者组，复制到剪贴板',
+    requiredKeys: ['kafka_topic'],
     icon: icon('task'),
     action: 'kafka_consumer_groups_action',
+    condition: () => false, // 不在主菜单展示，由 kafka_ops 状态直接渲染
     actionHandler: async (context) => {
       const topic = context.data['kafka_topic'] as DictItem;
       const topicId = topic.value ?? topic.id ?? '';
@@ -350,10 +372,11 @@ const builtInFeatures: Feature[] = [
         });
         if (response?.code === 0 && Array.isArray(response.data)) {
           const groups = response.data;
+          const topicLabel = topic.description ? `${topic.description} (${topic.name})` : topic.name;
           const summary = groups
             .map((g) => `• ${g.name}  [${g.environment}]  ${g.remark ?? ''}`)
             .join('\n');
-          const text = `Topic: ${topic.name}\n共 ${groups.length} 个消费者组\n\n${summary}`;
+          const text = `Topic: ${topicLabel}\n共 ${groups.length} 个消费者组\n\n${summary}`;
           copyToClipboard(text);
           sendNotification(`已复制 ${groups.length} 个消费者组信息`, '查看消费者组');
         } else {
@@ -368,33 +391,35 @@ const builtInFeatures: Feature[] = [
     id: 'kafka_query_messages',
     name: (data: ContextData) => {
       const topic = data['kafka_topic'] as DictItem | undefined;
-      return `消息检索${topic ? `: ${topic.name}` : ''}`;
+      const topicLabel = topic ? (topic.description ? topic.description : topic.name) : '';
+      return `消息检索${topicLabel ? `: ${topicLabel}` : ''}`;
     },
-    description: '按时间检索 Kafka Topic 消息，支持泳道过滤',
-    requiredKeys: ['appkey', 'kafka_topic'],
+    description: '按时间检索消息，支持相对时间（2h、30m、1d2h）和绝对时间，可按泳道过滤',
+    requiredKeys: ['kafka_topic'],
     icon: icon('search'),
     action: 'kafka_query_messages_action',
+    condition: () => false,
     requiredInputs: [
       {
         key: 'msg_datetime',
         label: '查询时间',
-        placeholder: '格式: YYYY-MM-DD HH:mm:ss，默认当前时间',
+        placeholder: '如: 2h、30m、1d、22:00、2026-04-14 17:00:00，留空=当前时间',
       },
       {
         key: 'swimlane_filter',
         label: '泳道过滤',
-        placeholder: '选择泳道过滤或不过滤',
+        placeholder: '输入泳道code，或从列表选择，留空=不过滤',
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const swimlane = contextData['swimlane'] as DictItem | undefined;
           const options: DictItem[] = [
-            { name: '全部消息（不过滤）', value: '', description: '返回所有泳道的消息' },
+            { name: '不过滤（全部消息）', value: '', description: '返回所有泳道的消息' },
           ];
           if (swimlane?.value || swimlane?.name) {
             const code = swimlane.value ?? swimlane.name;
             options.push({
-              name: `仅当前泳道: ${swimlane.name}`,
+              name: `当前泳道: ${swimlane.name}`,
               value: code,
-              description: `tag 包含 ${code} 的消息`,
+              description: `仅展示 tag 包含 ${code} 的消息`,
             });
           }
           return options;
@@ -407,15 +432,16 @@ const builtInFeatures: Feature[] = [
       const datetimeInput = context.data['msg_datetime'] as DictItem | undefined;
       const swimlaneFilter = context.data['swimlane_filter'] as DictItem | undefined;
 
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const defaultDatetime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-      const datetime =
-        datetimeInput?.value && datetimeInput.value !== datetimeInput.name
-          ? datetimeInput.value
-          : (datetimeInput?.name ?? defaultDatetime);
+      // 支持相对/绝对时间解析
+      const rawDatetime = datetimeInput?.name && datetimeInput.name !== datetimeInput.value
+        ? datetimeInput.name
+        : (datetimeInput?.value ?? '');
+      const datetime = resolveQueryDatetime(rawDatetime || undefined);
 
-      const swimlaneCode = swimlaneFilter?.value ?? '';
+      // 泳道过滤：优先用 value（列表选择），其次用 name（手动输入）
+      const swimlaneCode = swimlaneFilter?.value !== undefined && swimlaneFilter.value !== ''
+        ? swimlaneFilter.value
+        : (swimlaneFilter?.name && swimlaneFilter.name !== '不过滤（全部消息）' ? swimlaneFilter.name : '');
 
       try {
         const encodedDt = encodeURIComponent(datetime);
@@ -431,7 +457,7 @@ const builtInFeatures: Feature[] = [
           }
           if (messages.length === 0) {
             sendNotification(
-              swimlaneCode ? `泳道 ${swimlaneCode} 无匹配消息` : '该时间点附近无消息',
+              swimlaneCode ? `泳道 ${swimlaneCode} 无匹配消息` : `${datetime} 附近无消息`,
               '消息检索'
             );
             return;
@@ -442,7 +468,7 @@ const builtInFeatures: Feature[] = [
           copyToClipboard(text);
           sendNotification(
             `已复制 ${messages.length} 条消息${swimlaneCode ? ` (泳道: ${swimlaneCode})` : ''}`,
-            '消息检索'
+            `消息检索 @ ${datetime}`
           );
         } else {
           sendNotification('查询失败，请检查 Topic 或时间格式', '消息检索');
@@ -456,12 +482,14 @@ const builtInFeatures: Feature[] = [
     id: 'kafka_send_message',
     name: (data: ContextData) => {
       const topic = data['kafka_topic'] as DictItem | undefined;
-      return `发送消息${topic ? `: ${topic.name}` : ''}`;
+      const topicLabel = topic ? (topic.description ? topic.description : topic.name) : '';
+      return `发送消息${topicLabel ? `: ${topicLabel}` : ''}`;
     },
-    description: '向 Kafka Topic 发送测试消息',
-    requiredKeys: ['appkey', 'kafka_topic'],
+    description: '向 Kafka Topic 发送测试消息，支持指定泳道',
+    requiredKeys: ['kafka_topic'],
     icon: icon('login'),
     action: 'kafka_send_message_action',
+    condition: () => false,
     requiredInputs: [
       {
         key: 'message_body',
@@ -471,7 +499,7 @@ const builtInFeatures: Feature[] = [
       {
         key: 'send_swimlane',
         label: '发送泳道',
-        placeholder: '选择泳道或不指定',
+        placeholder: '输入泳道code，或从列表选择，留空=不指定泳道',
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const swimlane = contextData['swimlane'] as DictItem | undefined;
           const options: DictItem[] = [
@@ -491,14 +519,17 @@ const builtInFeatures: Feature[] = [
     ],
     actionHandler: async (context) => {
       const topic = context.data['kafka_topic'] as DictItem;
-      const appkey = context.data['appkey'] as DictItem;
+      const appkey = context.data['appkey'] as DictItem | undefined;
       const messageBodyInput = context.data['message_body'] as DictItem | undefined;
       const sendSwimlane = context.data['send_swimlane'] as DictItem | undefined;
 
       const topicId = Number(topic.value ?? topic.id ?? 0);
-      const appkeyValue = appkey.value ?? appkey.name ?? '';
+      const appkeyValue = appkey?.value ?? appkey?.name ?? (topic as unknown as Record<string, unknown>)['appkey'] as string ?? '';
       const messageBody = messageBodyInput?.value ?? messageBodyInput?.name ?? '{}';
-      const swimlaneCode = sendSwimlane?.value ?? '';
+      // 泳道：优先 value（列表选择），其次 name（手动输入）
+      const swimlaneCode = sendSwimlane?.value !== undefined && sendSwimlane.value !== ''
+        ? sendSwimlane.value
+        : (sendSwimlane?.name && sendSwimlane.name !== '不指定泳道' ? sendSwimlane.name : '');
 
       const content = JSON.stringify({
         topicId,
@@ -526,7 +557,7 @@ const builtInFeatures: Feature[] = [
         if (response?.code === 0 && response.data?.applicantStatus === 'PASS') {
           sendNotification(
             `消息已发送${swimlaneCode ? ` → 泳道: ${swimlaneCode}` : ''}`,
-            `发送成功: ${topic.name}`
+            `发送成功: ${topic.description ?? topic.name}`
           );
         } else {
           sendNotification(
