@@ -1,4 +1,5 @@
 import dictService from '../services/dictService';
+import {http} from '../core/HttpClient';
 import features from '../config/features';
 import CacheManager from '../core/CacheManager';
 import {
@@ -17,6 +18,7 @@ import {
   STATE_ALIAS_SAVE,
   STATE_ALIAS_RENAME,
   STATE_KAFKA_OPS,
+  STATE_KAFKA_CONSUMERS,
   RERUN_INTERVAL_PROGRESS,
   RERUN_INTERVAL_LOADING,
   RERUN_INTERVAL_COMPLETED,
@@ -1512,6 +1514,76 @@ export default function registerStates(app: Workflow): void {
     }
 
     items.push(wf.createRerunItem('🔙 返回', `当前 Topic: ${topicLabel}`, DEFAULT_STATE, { data }, {}, Icons.workflow));
+    return items;
+  });
+
+  // ─── kafka_consumers：消费者组列表 ───────────────────────────────────────────
+
+  app.onState(STATE_KAFKA_CONSUMERS, async (context, wf) => {
+    const data = context.data ?? {};
+    const query = context.query ?? '';
+    const topic = data['kafka_topic'] as DictItem | undefined;
+    const items: AlfredItem[] = [];
+
+    const topicId = topic ? (topic as unknown as Record<string, string>)['_topicId'] ?? '' : '';
+    const topicLabel = topic
+      ? (topic.description ? `${topic.description}（${topic.name}）` : topic.name)
+      : '未选择 Topic';
+
+    if (!topicId) {
+      items.push({ title: '⚠️ 未选择 Topic', subtitle: '请先选择 kafka_topic', valid: false });
+      items.push(wf.createRerunItem('🔙 返回', '', STATE_KAFKA_OPS, { data }, {}, Icons.workflow));
+      return items;
+    }
+
+    try {
+      const destUrl = `https://mafka.mws-test.sankuai.com/mafka/restful/consumer/listByTopicId?topicId=${topicId}&pageNum=1&limit=100&type=3&content=&auth=-1`;
+      const response = await http.proxy<{ code: number; msg: string; data: Array<{ id: number; name: string; appkey: string; remark: string | null; status: number; environment: string; topicName: string }> }>('GET', destUrl, {
+        headers: { 'm-appkey': 'fe_mafka-fe' },
+      });
+
+      if (response?.code === 0 && Array.isArray(response.data)) {
+        const groups = response.data;
+
+        if (groups.length === 0) {
+          items.push({ title: '暂无消费者组', subtitle: topicLabel, valid: false });
+        } else {
+          // 复制全部按钮
+          const allJson = JSON.stringify(groups.map((g) => ({ name: g.name, appkey: g.appkey, remark: g.remark, environment: g.environment })), null, 2);
+          if (matchQuery(query, '复制全部', `共 ${groups.length} 个消费者组`)) {
+            items.push(
+              wf.createItem(
+                `复制全部（${groups.length} 个）`,
+                `复制所有消费者组 JSON`,
+                'copy_value',
+                { copyValue: allJson, copyName: `${topicLabel} 全部消费者组` }
+              )
+            );
+          }
+
+          // 每个消费者组一个 item
+          for (const g of groups) {
+            const title = g.name;
+            const subtitle = `${g.appkey}  [${g.environment}]${g.remark ? `  ${g.remark}` : ''}`;
+            if (!matchQuery(query, title, subtitle, g.appkey, g.remark ?? '')) continue;
+
+            const singleJson = JSON.stringify({ name: g.name, appkey: g.appkey, remark: g.remark, environment: g.environment }, null, 2);
+            items.push(
+              wf.createItem(title, subtitle, 'copy_value', {
+                copyValue: singleJson,
+                copyName: g.name,
+              })
+            );
+          }
+        }
+      } else {
+        items.push({ title: '查询失败', subtitle: response?.msg ?? '接口异常', valid: false });
+      }
+    } catch (err) {
+      items.push({ title: '查询失败', subtitle: (err as Error).message, valid: false });
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', topicLabel, STATE_KAFKA_OPS, { data }, {}, Icons.workflow));
     return items;
   });
 }

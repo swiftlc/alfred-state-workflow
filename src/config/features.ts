@@ -4,7 +4,7 @@ import Logger from '../core/Logger';
 import CacheManager from '../core/CacheManager';
 import {copyToClipboard, openUrl, sendNotification, encodeContext} from '../core/utils';
 import {icon} from '../core/icons';
-import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS} from './constants';
+import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS, STATE_KAFKA_CONSUMERS} from './constants';
 import {resolveQueryDatetime} from '../core/timeUtils';
 import {DictService} from '../services/dictService';
 import type {ContextData, DictItem, Feature} from '../types';
@@ -352,48 +352,19 @@ const builtInFeatures: Feature[] = [
   // ─── Kafka 子操作（仅在 kafka_ops 状态中展示，主菜单隐藏） ─────────────────────
   {
     id: 'kafka_consumer_groups',
-    name: (data: ContextData) => {
-      const topic = data['kafka_topic'] as DictItem | undefined;
-      const topicLabel = topic ? (topic.description ? topic.description : topic.name) : '';
-      return `查看消费者组${topicLabel ? `: ${topicLabel}` : ''}`;
-    },
-    description: '查看当前 Kafka Topic 下的所有消费者组，复制到剪贴板',
+    name: '查看消费者组',
+    description: '查看当前 Kafka Topic 下的所有消费者组',
     requiredKeys: ['kafka_topic'],
     icon: icon('task'),
     action: 'kafka_consumer_groups_action',
     condition: () => false, // 不在主菜单展示，由 kafka_ops 状态直接渲染
-    actionHandler: async (context) => {
-      const topic = context.data['kafka_topic'] as DictItem;
-      const topicId = (topic as unknown as Record<string, string>)['_topicId'] ?? '';
-      try {
-        const destUrl = `${MAFKA_BASE_URL}/mafka/restful/consumer/listByTopicId?topicId=${topicId}&pageNum=1&limit=100&type=3&content=&auth=-1`;
-        const response = await http.proxy<MafkaConsumerListResponse>('GET', destUrl, {
-          headers: { 'm-appkey': 'fe_mafka-fe' },
-        });
-        if (response?.code === 0 && Array.isArray(response.data)) {
-          const groups = response.data;
-          const topicLabel = topic.description ? `${topic.description} (${topic.name})` : topic.name;
-          const summary = groups
-            .map((g) => `• ${g.name}  [${g.environment}]  ${g.remark ?? ''}`)
-            .join('\n');
-          const text = `Topic: ${topicLabel}\n共 ${groups.length} 个消费者组\n\n${summary}`;
-          copyToClipboard(text);
-          sendNotification(`已复制 ${groups.length} 个消费者组信息`, '查看消费者组');
-        } else {
-          sendNotification('查询失败或暂无消费者组', '查看消费者组');
-        }
-      } catch (err) {
-        sendNotification(`查询失败: ${(err as Error).message}`, '查看消费者组');
-      }
+    actionHandler: async (context, wf) => {
+      wf.triggerAlfred(encodeContext({ state: STATE_KAFKA_CONSUMERS, data: context.data }));
     },
   },
   {
     id: 'kafka_query_messages',
-    name: (data: ContextData) => {
-      const topic = data['kafka_topic'] as DictItem | undefined;
-      const topicLabel = topic ? (topic.description ? topic.description : topic.name) : '';
-      return `消息检索${topicLabel ? `: ${topicLabel}` : ''}`;
-    },
+    name: '消息检索',
     description: '按时间检索消息，支持相对时间（2h、30m、1d2h）和绝对时间，可按泳道过滤',
     requiredKeys: ['kafka_topic'],
     icon: icon('search'),
@@ -480,11 +451,7 @@ const builtInFeatures: Feature[] = [
   },
   {
     id: 'kafka_send_message',
-    name: (data: ContextData) => {
-      const topic = data['kafka_topic'] as DictItem | undefined;
-      const topicLabel = topic ? (topic.description ? topic.description : topic.name) : '';
-      return `发送消息${topicLabel ? `: ${topicLabel}` : ''}`;
-    },
+    name: '发送消息',
     description: '向 Kafka Topic 发送测试消息，支持指定泳道',
     requiredKeys: ['kafka_topic'],
     icon: icon('login'),

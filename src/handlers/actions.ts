@@ -130,6 +130,14 @@ export default function registerActions(app: Workflow): void {
     );
   });
 
+  // 动作：直接复制 context.copyValue 到剪贴板（通用）
+  app.onAction('copy_value', async (context) => {
+    const value = context.copyValue ?? '';
+    const name = context.copyName ?? '内容';
+    copyToClipboard(String(value));
+    sendNotification(`已复制: ${name}`, '复制成功');
+  });
+
   // 动作：强制刷新缓存
   app.onAction('refresh_cache', async (context, wf) => {
     CacheManager.clearAll();

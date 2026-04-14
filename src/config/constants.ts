@@ -20,6 +20,7 @@ export const STATE_ALIAS_MANAGE = 'alias_manage';
 export const STATE_ALIAS_SAVE = 'alias_save';
 export const STATE_ALIAS_RENAME = 'alias_rename';
 export const STATE_KAFKA_OPS = 'kafka_ops';
+export const STATE_KAFKA_CONSUMERS = 'kafka_consumers';
 
 // ─── rerun 刷新间隔（秒） ─────────────────────────────────────────────────────────
 
