@@ -4,9 +4,10 @@ import Logger from '../core/Logger';
 import CacheManager from '../core/CacheManager';
 import {copyToClipboard, openUrl, sendNotification, encodeContext} from '../core/utils';
 import {icon} from '../core/icons';
-import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS, STATE_KAFKA_CONSUMERS} from './constants';
+import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS, STATE_KAFKA_CONSUMERS, STATE_KAFKA_MESSAGES, FIELD_MSG_CACHE_KEY, FIELD_MSG_DATETIME, FIELD_MSG_SWIMLANE, FIELD_MSG_BASE_TOPIC_ID} from './constants';
 import {resolveQueryDatetime} from '../core/timeUtils';
 import {DictService} from '../services/dictService';
+import {resolveEnvTopicId, MAFKA_BASE_URL} from '../services/mafkaService';
 import type {ContextData, DictItem, Feature} from '../types';
 
 export {PROXY_BASE_URL};
@@ -398,7 +399,7 @@ const builtInFeatures: Feature[] = [
         },
       },
     ],
-    actionHandler: async (context) => {
+    actionHandler: async (context, wf) => {
       const topic = context.data['kafka_topic'] as DictItem;
       const topicId = (topic as unknown as Record<string, string>)['_topicId'] ?? '';
       const datetimeInput = context.data['msg_datetime'] as DictItem | undefined;
@@ -410,44 +411,23 @@ const builtInFeatures: Feature[] = [
         : (datetimeInput?.value ?? '');
       const datetime = resolveQueryDatetime(rawDatetime || undefined);
 
-      // 泳道过滤：优先用 value（列表选择），其次用 name（手动输入）
+      // 优先用 value（列表选择），其次用 name（手动输入），空值=不过滤
       const swimlaneCode = swimlaneFilter?.value !== undefined && swimlaneFilter.value !== ''
         ? swimlaneFilter.value
         : (swimlaneFilter?.name && swimlaneFilter.name !== '不过滤（全部消息）' ? swimlaneFilter.name : '');
 
-      try {
-        const encodedDt = encodeURIComponent(datetime);
-        const destUrl = `${MAFKA_BASE_URL}/mafka/restful/message/timestamp/query?topicId=${topicId}&dateTime=${encodedDt}&limit=20`;
-        const response = await http.proxy<MafkaMessageQueryResponse>('GET', destUrl, {
-          headers: { 'm-appkey': 'fe_mafka-fe' },
-        });
+      // cacheKey 含 topicId + 时间 + 泳道，不同参数各自独立
+      const cacheKey = `kafka_messages:${topicId}:${datetime}:${swimlaneCode}`;
+      CacheManager.clear(cacheKey);
 
-        if (response?.code === 0 && Array.isArray(response.data)) {
-          let messages = response.data;
-          if (swimlaneCode) {
-            messages = messages.filter((m) => m.tag && m.tag.includes(swimlaneCode));
-          }
-          if (messages.length === 0) {
-            sendNotification(
-              swimlaneCode ? `泳道 ${swimlaneCode} 无匹配消息` : `${datetime} 附近无消息`,
-              '消息检索'
-            );
-            return;
-          }
-          const text = messages
-            .map((m) => `[${m.timestamp}] partition:${m.partitionId} tag:${m.tag ?? '-'}\n${m.content}`)
-            .join('\n\n---\n\n');
-          copyToClipboard(text);
-          sendNotification(
-            `已复制 ${messages.length} 条消息${swimlaneCode ? ` (泳道: ${swimlaneCode})` : ''}`,
-            `消息检索 @ ${datetime}`
-          );
-        } else {
-          sendNotification('查询失败，请检查 Topic 或时间格式', '消息检索');
-        }
-      } catch (err) {
-        sendNotification(`查询失败: ${(err as Error).message}`, '消息检索');
-      }
+      wf.triggerAlfred(encodeContext({
+        state: STATE_KAFKA_MESSAGES,
+        data: context.data,
+        [FIELD_MSG_CACHE_KEY]: cacheKey,
+        [FIELD_MSG_DATETIME]: datetime,
+        [FIELD_MSG_SWIMLANE]: swimlaneCode,
+        [FIELD_MSG_BASE_TOPIC_ID]: topicId,
+      }));
     },
   },
   {
@@ -491,7 +471,7 @@ const builtInFeatures: Feature[] = [
       const messageBodyInput = context.data['message_body'] as DictItem | undefined;
       const sendSwimlane = context.data['send_swimlane'] as DictItem | undefined;
 
-      const topicId = Number((topic as unknown as Record<string, string>)['_topicId'] ?? 0);
+      const baseTopicId = (topic as unknown as Record<string, string>)['_topicId'] ?? '0';
       const appkeyValue = appkey?.value ?? appkey?.name ?? '';
       const messageBody = messageBodyInput?.value ?? messageBodyInput?.name ?? '{}';
       // 泳道：优先 value（列表选择），其次 name（手动输入）
@@ -499,21 +479,23 @@ const builtInFeatures: Feature[] = [
         ? sendSwimlane.value
         : (sendSwimlane?.name && sendSwimlane.name !== '不指定泳道' ? sendSwimlane.name : '');
 
-      const content = JSON.stringify({
-        topicId,
-        messages: messageBody,
-        swimlane: swimlaneCode,
-      });
-
       try {
+        const envTopicId = Number(await resolveEnvTopicId(baseTopicId));
+        const content = JSON.stringify({
+          topicId: envTopicId,
+          messages: messageBody,
+          swimlane: swimlaneCode,
+        });
+
         const destUrl = `${MAFKA_BASE_URL}/mafka/restful/audit/apply`;
+        Logger.info('发送消息请求', { baseTopicId, envTopicId, appkeyValue, content, destUrl });
         const response = await http.proxy<MafkaSendResponse>('POST', destUrl, {
           data: {
             objectType: 'TOPIC',
             auditType: 'SEND_MESSAGE',
             content,
             taskName: `${topic.description ?? topic.name}_test`,
-            topicId,
+            topicId: envTopicId,
             appkey: appkeyValue,
           },
           headers: {
@@ -521,6 +503,7 @@ const builtInFeatures: Feature[] = [
             'Content-Type': 'application/json',
           },
         });
+        Logger.info('发送消息响应', response as object);
 
         if (response?.code === 0 && response.data?.applicantStatus === 'PASS') {
           sendNotification(
@@ -588,9 +571,7 @@ interface PoiResponse {
   poiList?: PoiInfo[];
 }
 
-// ─── mafka 相关常量和类型 ──────────────────────────────────────────────────────
-
-const MAFKA_BASE_URL = 'https://mafka.mws-test.sankuai.com';
+// ─── mafka 相关类型 ────────────────────────────────────────────────────────────
 
 interface MafkaConsumerGroup {
   id: number;

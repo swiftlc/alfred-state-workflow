@@ -21,6 +21,7 @@ export const STATE_ALIAS_SAVE = 'alias_save';
 export const STATE_ALIAS_RENAME = 'alias_rename';
 export const STATE_KAFKA_OPS = 'kafka_ops';
 export const STATE_KAFKA_CONSUMERS = 'kafka_consumers';
+export const STATE_KAFKA_MESSAGES = 'kafka_messages';
 
 // ─── rerun 刷新间隔（秒） ─────────────────────────────────────────────────────────
 
@@ -50,3 +51,11 @@ export const FIELD_PREFETCH_INPUT_INDEX = '_prefetchInputIndex';
 export const FIELD_PREFETCH_DICT_KEY = '_prefetchDictKey';
 /** spawnWorker 时生成的 job id（仅 worker 进程内部使用） */
 export const FIELD_PREFETCH_JOB_ID = '_prefetchJobId';
+/** kafka 消息查询：缓存 key */
+export const FIELD_MSG_CACHE_KEY = '_msgCacheKey';
+/** kafka 消息查询：解析后的绝对时间字符串 */
+export const FIELD_MSG_DATETIME = '_msgDatetime';
+/** kafka 消息查询：泳道过滤 code */
+export const FIELD_MSG_SWIMLANE = '_msgSwimlane';
+/** kafka 消息查询：base topicId */
+export const FIELD_MSG_BASE_TOPIC_ID = '_msgBaseTopicId';

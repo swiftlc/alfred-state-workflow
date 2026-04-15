@@ -10,6 +10,7 @@ import WorkspaceManager from '../core/WorkspaceManager';
 import AliasManager from '../core/AliasManager';
 import Logger from '../core/Logger';
 import dictService, {DictService} from '../services/dictService';
+import {resolveEnvTopicId, MAFKA_BASE_URL, type MafkaMsgItem} from '../services/mafkaService';
 import {
   PROXY_BASE_URL,
   DEFAULT_STATE,
@@ -22,6 +23,10 @@ import {
   FIELD_PREFETCH_DICT_KEY,
   FIELD_PREFETCH_FEATURE_ID,
   FIELD_PREFETCH_INPUT_INDEX,
+  FIELD_MSG_CACHE_KEY,
+  FIELD_MSG_DATETIME,
+  FIELD_MSG_SWIMLANE,
+  FIELD_MSG_BASE_TOPIC_ID,
 } from '../config/constants';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
@@ -61,6 +66,47 @@ export default function registerActions(app: Workflow): void {
     task.update(10, '正在加载数据...');
     const result = await resolveOptions(currentInput, '', context.data);
     task.update(100, `已加载 ${result.length} 条数据`);
+  });
+
+  // 后台任务：查询 kafka 消息列表并写入缓存
+  app.onTask('_prefetch_messages', async (task, context) => {
+    const baseTopicId = context[FIELD_MSG_BASE_TOPIC_ID] as string | undefined;
+    const datetime = context[FIELD_MSG_DATETIME] as string | undefined;
+    const swimlaneCode = (context[FIELD_MSG_SWIMLANE] as string | undefined) ?? '';
+    const cacheKey = context[FIELD_MSG_CACHE_KEY] as string | undefined;
+
+    if (!baseTopicId || !datetime || !cacheKey) {
+      task.update(100, '参数缺失');
+      return;
+    }
+
+    task.update(10, '正在查询消息...');
+
+    const envTopicId = await resolveEnvTopicId(baseTopicId);
+    const encodedDt = encodeURIComponent(datetime);
+    const destUrl = `${MAFKA_BASE_URL}/mafka/restful/message/timestamp/query?topicId=${envTopicId}&dateTime=${encodedDt}&limit=100`;
+
+    try {
+      const response = await http.proxy<{ code: number; msg: string; data: MafkaMsgItem[] }>(
+        'GET', destUrl, { headers: { 'm-appkey': 'fe_mafka-fe' } }
+      );
+
+      if (response?.code === 0 && Array.isArray(response.data)) {
+        let messages = response.data;
+        if (swimlaneCode) {
+          messages = messages.filter((m) => m.tag && m.tag.includes(swimlaneCode));
+        }
+        messages.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+        CacheManager.set(cacheKey, messages, 30 * 1000);
+        task.update(100, `已加载 ${messages.length} 条消息`);
+      } else {
+        CacheManager.set(cacheKey, [], 30 * 1000);
+        task.update(100, `查询失败: ${response?.msg ?? '未知错误'}`);
+      }
+    } catch (err) {
+      CacheManager.set(cacheKey, [], 30 * 1000);
+      task.update(100, `查询异常: ${(err as Error).message}`);
+    }
   });
 
   // 后台任务：预加载消费者组列表并写入缓存

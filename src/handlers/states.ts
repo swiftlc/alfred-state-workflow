@@ -19,6 +19,7 @@ import {
   STATE_ALIAS_RENAME,
   STATE_KAFKA_OPS,
   STATE_KAFKA_CONSUMERS,
+  STATE_KAFKA_MESSAGES,
   RERUN_INTERVAL_PROGRESS,
   RERUN_INTERVAL_LOADING,
   RERUN_INTERVAL_COMPLETED,
@@ -29,7 +30,12 @@ import {
   FIELD_PREFETCH_FEATURE_ID,
   FIELD_PREFETCH_INPUT_INDEX,
   FIELD_PREFETCH_DICT_KEY,
+  FIELD_MSG_CACHE_KEY,
+  FIELD_MSG_DATETIME,
+  FIELD_MSG_SWIMLANE,
+  FIELD_MSG_BASE_TOPIC_ID,
 } from '../config/constants';
+import {type MafkaMsgItem} from '../services/mafkaService';
 import DictPinManager from '../core/DictPinManager';
 import DictRecentManager from '../core/DictRecentManager';
 import TaskManager from '../core/TaskManager';
@@ -1097,7 +1103,7 @@ export default function registerStates(app: Workflow): void {
 
         const preview = currentInput.previewValue?.(query);
         const confirmTitle = preview
-          ? `✅ 确认输入: ${query}  →  ${preview}`
+          ? `✅ 确认输入: ${preview}`
           : `✅ 确认输入: ${query}`;
 
         if (isLastInput) {
@@ -1613,6 +1619,86 @@ export default function registerStates(app: Workflow): void {
     }
 
     items.push(wf.createRerunItem('🔙 返回', topicLabel, STATE_KAFKA_OPS, { data }, {}, Icons.workflow));
+    return items;
+  });
+
+  // ─── kafka_messages：消息列表（非阻塞加载，本地搜索） ────────────────────────
+
+  app.onState(STATE_KAFKA_MESSAGES, async (context, wf) => {
+    const data = context.data ?? {};
+    const query = context.query ?? '';
+    const topic = data['kafka_topic'] as DictItem | undefined;
+    const cacheKey = context[FIELD_MSG_CACHE_KEY] as string | undefined;
+    const datetime = context[FIELD_MSG_DATETIME] as string | undefined;
+    const swimlaneCode = (context[FIELD_MSG_SWIMLANE] as string | undefined) ?? '';
+    const baseTopicId = context[FIELD_MSG_BASE_TOPIC_ID] as string | undefined;
+
+    const topicLabel = topic
+      ? (topic.description ? `${topic.description}（${topic.name}）` : topic.name)
+      : '未选择 Topic';
+
+    if (!cacheKey || !baseTopicId) {
+      return [
+        { title: '⚠️ 参数缺失', subtitle: '请重新执行消息检索', valid: false } as AlfredItem,
+        wf.createRerunItem('🔙 返回', '', STATE_KAFKA_OPS, { data }, {}, Icons.workflow),
+      ];
+    }
+
+    const cached = await CacheManager.get<MafkaMsgItem[]>(cacheKey);
+
+    // 缓存未命中：用 loading 标记防止 rerun 轮询期间重复 spawn
+    if (cached === null) {
+      const loadingKey = `loading:${cacheKey}`;
+      if (!CacheManager.get(loadingKey)) {
+        CacheManager.set(loadingKey, true, 60 * 1000);
+        wf.spawnWorker('_prefetch_messages', {
+          ...context,
+          [FIELD_MSG_BASE_TOPIC_ID]: baseTopicId,
+          [FIELD_MSG_DATETIME]: datetime ?? '',
+          [FIELD_MSG_SWIMLANE]: swimlaneCode,
+          [FIELD_MSG_CACHE_KEY]: cacheKey,
+        });
+      }
+      const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
+      return {
+        rerun: RERUN_INTERVAL_LOADING,
+        items: [{
+          title: `${spinner} 正在检索消息...`,
+          subtitle: `${topicLabel}  ${datetime ?? ''}${swimlaneCode ? `  泳道: ${swimlaneCode}` : ''}`,
+          valid: false,
+        } as AlfredItem],
+      };
+    }
+
+    const subtitleHeader = `${topicLabel}  @${datetime ?? ''}${swimlaneCode ? `  泳道: ${swimlaneCode}` : ''}`;
+    const items: AlfredItem[] = [];
+
+    if (cached.length === 0) {
+      items.push({ title: '暂无消息', subtitle: subtitleHeader, valid: false });
+    } else {
+      // 拼音+fuzzy 过滤，匹配 content / tag / timestamp / msgId
+      const filtered = query
+        ? cached.filter((m) => matchQuery(query, m.content, m.tag ?? '', m.timestamp, m.msgId))
+        : cached;
+
+      for (const m of filtered) {
+        const title = m.content.length > 80 ? `${m.content.slice(0, 80)}…` : m.content;
+        const subtitle = `${m.timestamp}  tag:${m.tag ?? '-'}`;
+        const payload = { msgId: m.msgId, content: m.content, tag: m.tag, timestamp: m.timestamp };
+        items.push(
+          wf.createItem(title, subtitle, 'copy_value', {
+            copyValue: JSON.stringify(payload, null, 2),
+            copyName: `msgId:${m.msgId}`,
+          })
+        );
+      }
+
+      if (filtered.length === 0) {
+        items.push({ title: `无匹配消息 "${query}"`, subtitle: subtitleHeader, valid: false });
+      }
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', subtitleHeader, STATE_KAFKA_OPS, { data }, {}, Icons.workflow));
     return items;
   });
 }

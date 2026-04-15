@@ -34,16 +34,15 @@ export function parseQueryDatetime(input: string): string | null {
     if (!isNaN(d.getTime())) return formatDatetime(d);
   }
 
-  // ── 绝对时间：HH:mm:ss 或 HH:mm（今天） ────────────────────────────────────
+  // ── 绝对时间：HH:mm 或 HH:mm:ss（今天） ────────────────────────────────────
   if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) {
     const parts = s.split(':').map(Number);
     const now = new Date();
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parts[0], parts[1], parts[2] ?? 0);
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parts[0]!, parts[1]!, parts[2] ?? 0);
     if (!isNaN(d.getTime())) return formatDatetime(d);
   }
 
-  // ── 相对时间：英文/中文混合 ─────────────────────────────────────────────────
-  // 将中文单位统一为英文
+  // ── 相对时间：中文单位统一为英文 ───────────────────────────────────────────
   const normalized = s
     .replace(/天/g, 'd')
     .replace(/小时|时/g, 'h')
@@ -58,18 +57,23 @@ export function parseQueryDatetime(input: string): string | null {
     return formatDatetime(new Date(Date.now() - sec * 1000));
   }
 
-  // 解析 Xd Xh Xm Xs 组合（每个单位可选）
-  const relPattern = /^(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i;
-  const match = normalized.match(relPattern);
-  if (match && normalized.length > 0) {
-    const days = parseInt(match[1] ?? '0', 10);
-    const hours = parseInt(match[2] ?? '0', 10);
-    const mins = parseInt(match[3] ?? '0', 10);
-    const secs = parseInt(match[4] ?? '0', 10);
-    const totalMs = ((days * 24 + hours) * 60 + mins) * 60 * 1000 + secs * 1000;
-    if (totalMs > 0) {
-      return formatDatetime(new Date(Date.now() - totalMs));
+  // 逐段扫描 \d+[dhms]，同一单位多次出现则累加（如 2d1d = 3d，2h30m1h = 3h30m）
+  const segPattern = /(\d+)([dhms])/gi;
+  let totalMs = 0;
+  let matched = false;
+  let seg: RegExpExecArray | null;
+  while ((seg = segPattern.exec(normalized)) !== null) {
+    matched = true;
+    const val = parseInt(seg[1]!, 10);
+    switch (seg[2]!.toLowerCase()) {
+      case 'd': totalMs += val * 24 * 60 * 60 * 1000; break;
+      case 'h': totalMs += val * 60 * 60 * 1000; break;
+      case 'm': totalMs += val * 60 * 1000; break;
+      case 's': totalMs += val * 1000; break;
     }
+  }
+  if (matched && totalMs > 0) {
+    return formatDatetime(new Date(Date.now() - totalMs));
   }
 
   return null;
