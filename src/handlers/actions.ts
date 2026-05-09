@@ -150,19 +150,18 @@ export default function registerActions(app: Workflow): void {
     const swimlane = context.data['swimlane'] as DictItem;
     Logger.info('执行后台任务: login_task', context);
 
-    const proxyDest = `https://${swimlane.value}-sl-management.shangou.test.meituan.com/api/sac/account/createManagerAndRelTenant?u2dhn6k=7c5a6586a4650cdbf81a6858dd3cffad&yodaReady=h5&csecplatform=4&csecversion=4.2.0`;
-    task.update(10, '配置sso账号关联...');
+    task.update(10, '登录中...');
 
-    const data = await http.proxy<{ code: number; message?: string }>(
-      'POST',
-      proxyDest,
-      { data: { tenantId: tenant.value }, timeout: 60000 }
+    const data = await http.post<{ code: number; message?: string }>(
+      'http://www.swiftlc.com/api/qnh/login',
+      { swimlane: swimlane.value, tenantId: Number(tenant.value) },
+      { timeout: 60000 }
     );
 
-    if (data.code === 0) {
+    if (data.data.code === 0) {
       const targetUrl = `https://${swimlane.value}-sl-qnh.shangou.test.meituan.com/api/v1/sso/loginRedirect`;
-      task.update(100, `执行跳转 ${tenant.value} - ${swimlane.value}`);
-      openUrl(targetUrl);
+      task.update(100, `登录成功 ${tenant.value} - ${swimlane.value}`);
+      await openUrl(targetUrl);
       sendNotification('登录成功！');
     } else {
       throw new Error(data.message ?? '未知错误');
