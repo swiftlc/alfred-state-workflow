@@ -39,6 +39,7 @@ class HttpClient {
         Logger.info(`[HTTP Request] ${config.method?.toUpperCase()} ${config.url}`, {
           params: config.params as unknown,
           data: config.data as unknown,
+          headers: config.headers as unknown,
         });
         return config;
       },
@@ -54,7 +55,11 @@ class HttpClient {
     (this.client.interceptors.response.use as any)(
       (response: AxiosResponse) => {
         Logger.info(
-          `[HTTP Response] ${response.config.method?.toUpperCase()} ${response.config.url} - Status: ${response.status}`
+          `[HTTP Response] ${response.config.method?.toUpperCase()} ${response.config.url} - Status: ${response.status}`,
+          {
+            headers: response.headers as unknown,
+            body: response.data as unknown,
+          }
         );
         return response.data;
       },

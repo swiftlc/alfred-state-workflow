@@ -44,8 +44,18 @@ export default function registerActions(app: Workflow): void {
       return;
     }
     task.update(10, '正在加载字典数据...');
-    const items = await dictService.getDictionaryItems(dictKey, context.data as import('../types').ContextData);
-    task.update(100, `已加载 ${items.length} 条数据`);
+    const loadingKey = `loading:dict_items_${dictKey}`;
+    const errorKey = `error:dict_items_${dictKey}`;
+    try {
+      const items = await dictService.getDictionaryItems(dictKey, context.data as import('../types').ContextData);
+      CacheManager.clear(errorKey);
+      task.update(100, `已加载 ${items.length} 条数据`);
+    } catch (err) {
+      // 写入错误信息，不缓存数据，下次进来继续重试
+      CacheManager.set(errorKey, (err as Error).message, 30 * 1000);
+    } finally {
+      CacheManager.clear(loadingKey);
+    }
   });
 
   // 后台任务：预加载 fetchOptions 数据并写入缓存
@@ -155,7 +165,7 @@ export default function registerActions(app: Workflow): void {
       openUrl(targetUrl);
       sendNotification('登录成功！');
     } else {
-      task.update(100, `登录失败: ${data.message ?? '未知错误'}`);
+      throw new Error(data.message ?? '未知错误');
     }
   });
 

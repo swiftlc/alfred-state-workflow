@@ -752,9 +752,22 @@ export default function registerStates(app: Workflow): void {
     const dicts = await dictService.getDictionaries();
 
     if (cached === null) {
-      // 缓存未命中：静默启动后台预加载 worker，展示 loading item，rerun 轮询直到缓存就绪
-      wf.spawnWorker('_prefetch_dict', { ...context, [FIELD_PREFETCH_DICT_KEY]: dictKey });
+      const loadingKey = `loading:dict_items_${dictKey}`;
+      const errorKey = `error:dict_items_${dictKey}`;
       const dictName = dicts.find((d) => d.key === dictKey)?.name ?? dictKey;
+
+      // 上次请求失败：展示错误 item，点击可重试
+      const errorMsg = await CacheManager.get<string>(errorKey);
+      CacheManager.clear(errorKey);
+      if (errorMsg) {
+        return [wf.createRerunItem(`⚠️ 加载${dictName}失败`, `${errorMsg}  (回车重试)`, context.state, { data: context.data }, {}, Icons.context)];
+      }
+
+      // 缓存未命中且无错误：防重 loading 标记，避免 rerun 轮询期间重复 spawn
+      if (!(await CacheManager.get(loadingKey))) {
+        CacheManager.set(loadingKey, true, 60 * 1000);
+        wf.spawnWorker('_prefetch_dict', { ...context, [FIELD_PREFETCH_DICT_KEY]: dictKey });
+      }
       const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
       return {
         rerun: RERUN_INTERVAL_LOADING,
@@ -1554,11 +1567,15 @@ export default function registerStates(app: Workflow): void {
     const cached = await CacheManager.get<ConsumerGroup[]>(cacheKey);
 
     if (cached === null) {
-      wf.spawnWorker('_prefetch_consumers', {
-        ...context,
-        _consumerTopicId: topicId,
-        _consumerCacheKey: cacheKey,
-      });
+      const consumerLoadingKey = `loading:${cacheKey}`;
+      if (!(await CacheManager.get(consumerLoadingKey))) {
+        CacheManager.set(consumerLoadingKey, true, 60 * 1000);
+        wf.spawnWorker('_prefetch_consumers', {
+          ...context,
+          _consumerTopicId: topicId,
+          _consumerCacheKey: cacheKey,
+        });
+      }
       const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
       return {
         rerun: RERUN_INTERVAL_LOADING,
@@ -1649,7 +1666,7 @@ export default function registerStates(app: Workflow): void {
     // 缓存未命中：用 loading 标记防止 rerun 轮询期间重复 spawn
     if (cached === null) {
       const loadingKey = `loading:${cacheKey}`;
-      if (!CacheManager.get(loadingKey)) {
+      if (!(await CacheManager.get(loadingKey))) {
         CacheManager.set(loadingKey, true, 60 * 1000);
         wf.spawnWorker('_prefetch_messages', {
           ...context,
