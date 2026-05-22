@@ -189,7 +189,6 @@ export default function registerActions(app: Workflow): void {
       const targetUrl = `https://${swimlane.value}-sl-qnh.shangou.test.meituan.com/api/v1/sso/loginRedirect`;
       task.update(100, `登录成功 ${tenant.value} - ${swimlane.value}`);
       await openUrl(targetUrl);
-      sendNotification('登录成功！');
     } else {
       throw new Error(data.message ?? '未知错误');
     }
@@ -226,7 +225,6 @@ export default function registerActions(app: Workflow): void {
     if (resp.code === 0) {
       task.update(100, `登录成功（${envConfig.label}）- 租户 ${tenant.value}`);
       await openUrl(envConfig.redirectUrl);
-      sendNotification(`${envConfig.label} 登录成功！`);
     } else {
       throw new Error(resp.message ?? '未知错误');
     }
