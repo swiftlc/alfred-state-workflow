@@ -20,6 +20,7 @@ import {
   STATE_KAFKA_OPS,
   STATE_KAFKA_CONSUMERS,
   STATE_KAFKA_MESSAGES,
+  STATE_LOGIN_ENV_SELECT,
   RERUN_INTERVAL_PROGRESS,
   RERUN_INTERVAL_LOADING,
   RERUN_INTERVAL_COMPLETED,
@@ -1716,6 +1717,36 @@ export default function registerStates(app: Workflow): void {
     }
 
     items.push(wf.createRerunItem('🔙 返回', subtitleHeader, STATE_KAFKA_OPS, { data }, {}, Icons.workflow));
+    return items;
+  });
+
+  // ─── login_env_select：base 环境登录二级菜单 ─────────────────────────────────
+
+  app.onState(STATE_LOGIN_ENV_SELECT, async (context, wf) => {
+    const data = context.data ?? {};
+    const query = context.query ?? '';
+    const tenant = data['tenant'] as import('../types').DictItem | undefined;
+    const tenantLabel = tenant?.name ?? '未选择租户';
+
+    const envOptions = [
+      { key: 'test_trunk', label: '🧪 测试主干登录', description: 'Test 环境 - 主干泳道' },
+      { key: 'st',         label: '🌿 ST 登录',     description: 'ST (预发) 环境' },
+      { key: 'prod',       label: '🚀 Prod 登录',   description: '线上生产环境' },
+    ];
+
+    const items: AlfredItem[] = envOptions
+      .filter(({ label, description }) => matchQuery(query, label, description))
+      .map(({ key, label, description }) =>
+        wf.createItem(label, description, 'exec_login_env', {
+          data,
+          _loginEnvKey: key,
+          historyTitle: label,
+          historySubtitle: `租户: ${tenantLabel}`,
+          recordHistory: true,
+        }, {}, Icons.login)
+      );
+
+    items.push(wf.createRerunItem('🔙 返回', `租户: ${tenantLabel}`, DEFAULT_STATE, { data }, {}, Icons.workflow));
     return items;
   });
 }

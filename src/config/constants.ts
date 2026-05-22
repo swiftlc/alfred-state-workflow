@@ -22,6 +22,7 @@ export const STATE_ALIAS_RENAME = 'alias_rename';
 export const STATE_KAFKA_OPS = 'kafka_ops';
 export const STATE_KAFKA_CONSUMERS = 'kafka_consumers';
 export const STATE_KAFKA_MESSAGES = 'kafka_messages';
+export const STATE_LOGIN_ENV_SELECT = 'login_env_select';
 
 // ─── rerun 刷新间隔（秒） ─────────────────────────────────────────────────────────
 

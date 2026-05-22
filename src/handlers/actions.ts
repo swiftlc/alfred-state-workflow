@@ -14,6 +14,7 @@ import {resolveEnvTopicId, MAFKA_BASE_URL, type MafkaMsgItem} from '../services/
 import {
   PROXY_BASE_URL,
   DEFAULT_STATE,
+  STATE_LOGIN_ENV_SELECT,
   STATE_SELECT_DICT,
   STATE_TASK_MANAGE,
   STATE_WORKSPACE_MANAGE,
@@ -30,6 +31,32 @@ import {
 } from '../config/constants';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
+
+const MANAGEMENT_PATH = '/api/sac/account/createManagerAndRelTenant?u2dhn6k=8e8b49cbae29e8a44478a7d7c7a948e2&yodaReady=h5&csecplatform=4&csecversion=4.1.1';
+
+interface LoginEnvConfig {
+  label: string;
+  managementUrl: string;
+  redirectUrl: string;
+}
+
+const LOGIN_ENV_CONFIGS: Record<string, LoginEnvConfig> = {
+  test_trunk: {
+    label: '测试主干',
+    managementUrl: `https://management.shangou.test.meituan.com${MANAGEMENT_PATH}`,
+    redirectUrl: 'https://qnh.shangou.test.meituan.com/api/v1/sso/loginRedirect',
+  },
+  st: {
+    label: 'ST',
+    managementUrl: `https://management.shangou.st.meituan.com${MANAGEMENT_PATH}`,
+    redirectUrl: 'https://qnh.shangou.st.meituan.com/api/v1/sso/loginRedirect',
+  },
+  prod: {
+    label: 'Prod',
+    managementUrl: `https://management.vip.sankuai.com${MANAGEMENT_PATH}`,
+    redirectUrl: 'https://qnh.meituan.com/api/v1/sso/loginRedirect',
+  },
+};
 
 /**
  * 注册所有执行动作
@@ -165,6 +192,43 @@ export default function registerActions(app: Workflow): void {
       sendNotification('登录成功！');
     } else {
       throw new Error(data.message ?? '未知错误');
+    }
+  });
+
+  // 动作：进入 base 环境登录二级菜单
+  app.onAction('go_login_env_select', async (context, wf) => {
+    wf.triggerAlfred(encodeContext({ state: STATE_LOGIN_ENV_SELECT, data: context.data }));
+  });
+
+  // 动作：执行 base 环境登录（耗时，使用后台任务）
+  app.onAction('exec_login_env', async (context, wf) => {
+    wf.startTask('login_env_task', context);
+  });
+
+  app.onTask('login_env_task', async (task, context) => {
+    const tenant = context.data['tenant'] as DictItem;
+    const envKey = context['_loginEnvKey'] as string | undefined;
+    const envConfig = envKey ? LOGIN_ENV_CONFIGS[envKey] : undefined;
+
+    if (!envConfig) {
+      throw new Error(`未知登录环境: ${envKey ?? '空'}`);
+    }
+
+    Logger.info('执行后台任务: login_env_task', { envKey, tenantId: tenant?.value });
+    task.update(10, `登录中（${envConfig.label}）...`);
+
+    const resp = await http.post<{ code: number; message?: string }>(
+      PROXY_BASE_URL,
+      { tenantId: Number(tenant.value) },
+      { headers: { 'x-proxy-dest': envConfig.managementUrl }, timeout: 60000 }
+    );
+
+    if (resp.code === 0) {
+      task.update(100, `登录成功（${envConfig.label}）- 租户 ${tenant.value}`);
+      await openUrl(envConfig.redirectUrl);
+      sendNotification(`${envConfig.label} 登录成功！`);
+    } else {
+      throw new Error(resp.message ?? '未知错误');
     }
   });
 

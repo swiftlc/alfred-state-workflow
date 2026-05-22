@@ -32,6 +32,14 @@ const builtInFeatures: Feature[] = [
     icon: icon('login'),
   },
   {
+    id: 'tenant_base_login',
+    name: '🔐 租户 base 登录',
+    description: '选择环境（测试主干 / ST / Prod）登录',
+    requiredKeys: ['tenant'],
+    action: 'go_login_env_select',
+    icon: icon('login'),
+  },
+  {
     id: 'jump_qnh_management',
     name: '🌐 牵牛花M端跳转',
     description: '',
