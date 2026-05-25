@@ -1738,8 +1738,7 @@ export default function registerStates(app: Workflow): void {
       .filter(({ label, description }) => matchQuery(query, label, description))
       .map(({ key, label, description }) =>
         wf.createItem(label, description, 'exec_login_env', {
-          data,
-          _loginEnvKey: key,
+          data: { ...data, _loginEnvKey: { name: key, value: key } },
           historyTitle: label,
           historySubtitle: `租户: ${tenantLabel}`,
           recordHistory: true,

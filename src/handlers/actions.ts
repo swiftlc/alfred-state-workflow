@@ -206,7 +206,7 @@ export default function registerActions(app: Workflow): void {
 
   app.onTask('login_env_task', async (task, context) => {
     const tenant = context.data['tenant'] as DictItem;
-    const envKey = context['_loginEnvKey'] as string | undefined;
+    const envKey = (context.data['_loginEnvKey'] as import('../types').DictItem | undefined)?.value;
     const envConfig = envKey ? LOGIN_ENV_CONFIGS[envKey] : undefined;
 
     if (!envConfig) {
