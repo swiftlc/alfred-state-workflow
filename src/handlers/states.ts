@@ -865,7 +865,6 @@ export default function registerStates(app: Workflow): void {
             }, {}, featureIconPath)
           );
         } else {
-          subtitle = `执行 [${featureName}]`;
           items.push(
             wf.createItem(title, subtitle, feature.action, {
               data: newData,
