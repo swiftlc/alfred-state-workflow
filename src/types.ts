@@ -181,6 +181,11 @@ export interface Feature {
   icon?: { path: string };
   /** split_by_dict 类型的一级菜单标题（静态字符串，不含字典项信息） */
   label?: string;
+  /**
+   * 为 true 时，即使所有 requiredKeys 均未选择，该功能也会出现在列表底部（⚙️ 配置 区域），
+   * 引导用户依次补全所需字典 key。适用于仅依赖单个字典的 feature。
+   */
+  showAlways?: boolean;
 }
 
 // ─── 任务相关 ──────────────────────────────────────────────────────────────────

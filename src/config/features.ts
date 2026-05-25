@@ -36,6 +36,7 @@ const builtInFeatures: Feature[] = [
     name: '🔐 租户 base 登录',
     description: '选择环境（测试主干 / ST / Prod）登录',
     requiredKeys: ['tenant'],
+    showAlways: true,
     action: 'go_login_env_select',
     icon: icon('login'),
   },

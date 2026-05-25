@@ -357,7 +357,9 @@ export default function registerStates(app: Workflow): void {
       }
 
       const hasRelevantContext =
-        feature.requiredKeys.length === 0 || feature.requiredKeys.some((key) => data[key]);
+        feature.requiredKeys.length === 0 ||
+        feature.requiredKeys.some((key) => data[key]) ||
+        feature.showAlways === true;
       if (!hasRelevantContext) continue;
       if (typeof feature.condition === 'function' && !feature.condition(data)) continue;
 
