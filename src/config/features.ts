@@ -340,6 +340,77 @@ const builtInFeatures: Feature[] = [
       sendNotification(`已复制门店: ${poi.poiName} 的信息`, '复制成功');
     },
   },
+  // ─── Trace 查询 ───────────────────────────────────────────────────────────────
+  {
+    id: 'trace_query',
+    name: (data: ContextData) => {
+      const traceId = data['traceId'] as DictItem | undefined;
+      return `🔗 Trace 查询: ${traceId?.value ?? ''}`;
+    },
+    description: '选择环境后查看 Raptor 调用链或 AI 分析',
+    requiredKeys: ['traceId'],
+    showInSensing: true,
+    icon: icon('search'),
+    requiredInputs: [
+      {
+        key: 'trace_env',
+        label: '环境',
+        placeholder: '请选择查询环境',
+        disableManualInput: true,
+        fetchOptions: async (): Promise<DictItem[]> => [
+          { name: '测服', value: 'test', description: '测试环境' },
+          { name: '线上', value: 'prod', description: '生产环境' },
+        ],
+      },
+      {
+        key: 'trace_action',
+        label: '操作',
+        placeholder: '请选择操作',
+        disableManualInput: true,
+        fetchOptions: async (): Promise<DictItem[]> => [
+          { name: '🔗 Raptor 跳转', value: 'raptor', description: '在 Raptor 中查看调用链' },
+          { name: '🤖 AI 分析', value: 'ai', description: '调用 AI 分析链路异常' },
+        ],
+      },
+    ],
+    action: 'trace_query_action',
+    actionHandler: async (context) => {
+      const traceId = (context.data['traceId'] as DictItem)?.value ?? '';
+      const appkey = (context.data['appkey'] as DictItem | undefined)?.value ?? '';
+      const env = (context.data['trace_env'] as DictItem)?.value ?? 'test';
+      const action = (context.data['trace_action'] as DictItem)?.value ?? 'raptor';
+      Logger.info(`trace_query action=${action} env=${env} traceId=${traceId}`);
+      if (action === 'raptor') {
+        const domain = env === 'prod' ? 'raptor.mws.sankuai.com' : 'raptor.mws-test.sankuai.com';
+        const path = appkey ? `/log/topic/view/${encodeURIComponent(appkey)}` : '/log/logview';
+        openUrl(`https://${domain}${path}?searchType=expert&searchGrammar=dsl&condition=${encodeURIComponent(traceId)}`);
+      } else {
+        sendNotification(`AI 分析 traceId: ${traceId}（${env}）`, 'Trace AI 分析（功能待实现）');
+      }
+    },
+  },
+  // ─── Shepherd 接口查询 ─────────────────────────────────────────────────────────
+  {
+    id: 'shepherd_query',
+    name: (data: ContextData) => {
+      const route = data['route'] as DictItem | undefined;
+      return `🛣️ Shepherd 接口查询: ${route?.value ?? ''}`;
+    },
+    description: '查询 Shepherd 网关接口配置信息',
+    requiredKeys: ['route'],
+    showInSensing: true,
+    icon: icon('search'),
+    condition: (data: ContextData) => {
+      const route = data['route'] as DictItem | undefined;
+      return !!(route?.value?.startsWith('/qnh-gw'));
+    },
+    action: 'shepherd_query_action',
+    actionHandler: async (context, wf) => {
+      const route = (context.data['route'] as DictItem)?.value ?? '';
+      Logger.info(`shepherd_query 发起后台任务 route=${route}`);
+      wf.startTask('shepherd_query_task', context);
+    },
+  },
   // ─── Kafka 功能入口（二级菜单） ────────────────────────────────────────────────
   {
     id: 'kafka_menu',

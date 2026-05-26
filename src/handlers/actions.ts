@@ -10,11 +10,14 @@ import WorkspaceManager from '../core/WorkspaceManager';
 import AliasManager from '../core/AliasManager';
 import Logger from '../core/Logger';
 import dictService, {DictService} from '../services/dictService';
+import {dismissSnapshot} from '../services/sensingService';
 import {resolveEnvTopicId, MAFKA_BASE_URL, type MafkaMsgItem} from '../services/mafkaService';
 import {
   PROXY_BASE_URL,
   DEFAULT_STATE,
   STATE_LOGIN_ENV_SELECT,
+  STATE_SENSING_PROGRESS,
+  FIELD_SENSING_SELECTED,
   STATE_SELECT_DICT,
   STATE_TASK_MANAGE,
   STATE_WORKSPACE_MANAGE,
@@ -511,6 +514,37 @@ export default function registerActions(app: Workflow): void {
     sendNotification('快捷指令已删除', 'Workflow');
     const nextState = (context.returnState as string | undefined) ?? STATE_ALIAS_MANAGE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
+  });
+
+  // 动作：进入环境嗅探进度页
+  app.onAction('go_sensing_progress', async (context, wf) => {
+    wf.triggerAlfred(encodeContext({ state: STATE_SENSING_PROGRESS, data: context.data }));
+  });
+
+  // 动作：⌘ 切换 sensing 单项选中状态（context.data 已含更新后的 _sensingSelected）
+  app.onAction('toggle_sensing_item', async (context, wf) => {
+    wf.triggerAlfred(encodeContext({ state: STATE_SENSING_PROGRESS, data: context.data }));
+  }, { skipContextSave: true });
+
+  // 动作：将单个 sensing 检测结果注入上下文并留在当前页
+  app.onAction('inject_sensing_item', async (context, wf) => {
+    wf.triggerAlfred(encodeContext({ state: STATE_SENSING_PROGRESS, data: context.data }));
+  }, { skipContextSave: true });
+
+  // 动作：应用环境嗅探检测到的上下文
+  app.onAction('apply_sensing', async (context, wf) => {
+    await dismissSnapshot('clipboard');
+    wf.triggerAlfred(encodeContext({ state: DEFAULT_STATE, data: context.data }));
+  });
+
+  // 任务：Shepherd 接口信息查询
+  app.onTask('shepherd_query_task', async (task, context) => {
+    const route = (context.data['route'] as DictItem | undefined)?.value ?? '';
+    Logger.info(`shepherd_query_task 开始 route=${route}`);
+    task.update(50, `查询中: ${route}`);
+    // TODO: 实现实际 Shepherd 接口查询逻辑
+    sendNotification(`Shepherd 查询完成: ${route}`, 'Shepherd 接口查询（功能待实现）');
+    task.update(100, '查询完成');
   });
 }
 

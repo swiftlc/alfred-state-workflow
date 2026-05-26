@@ -23,6 +23,13 @@ export const STATE_KAFKA_OPS = 'kafka_ops';
 export const STATE_KAFKA_CONSUMERS = 'kafka_consumers';
 export const STATE_KAFKA_MESSAGES = 'kafka_messages';
 export const STATE_LOGIN_ENV_SELECT = 'login_env_select';
+export const STATE_SENSING_PROGRESS = 'sensing_progress';
+export const STATE_CONTEXT_VIEW = 'context_view';
+
+// ─── 环境嗅探 ─────────────────────────────────────────────────────────────────
+
+/** sensing 快照被认为"新鲜"的最长时间（毫秒） */
+export const SENSING_FRESH_MS = 3 * 60 * 1000;
 
 // ─── rerun 刷新间隔（秒） ─────────────────────────────────────────────────────────
 
@@ -60,3 +67,5 @@ export const FIELD_MSG_DATETIME = '_msgDatetime';
 export const FIELD_MSG_SWIMLANE = '_msgSwimlane';
 /** kafka 消息查询：base topicId */
 export const FIELD_MSG_BASE_TOPIC_ID = '_msgBaseTopicId';
+/** sensing 多选时已选中的 key 集合（JSON 字符串） */
+export const FIELD_SENSING_SELECTED = '_sensingSelected';

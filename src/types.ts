@@ -186,6 +186,12 @@ export interface Feature {
    * 引导用户依次补全所需字典 key。适用于仅依赖单个字典的 feature。
    */
   showAlways?: boolean;
+  /**
+   * 为 true 时，该 feature 可在环境嗅探结果页直接启动。
+   * 展示条件：showInSensing=true 且 requiredKeys 全部存在于嗅探结果中（condition 也需通过）。
+   * 选中后自动将嗅探结果注入上下文，然后进入该 feature 的操作流程。
+   */
+  showInSensing?: boolean;
 }
 
 // ─── 任务相关 ──────────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import dictService from '../services/dictService';
 import {http} from '../core/HttpClient';
+import {getLatestSnapshotAny, getAggregatedContexts, expandContexts} from '../services/sensingService';
 import features from '../config/features';
 import CacheManager from '../core/CacheManager';
 import {
@@ -21,6 +22,9 @@ import {
   STATE_KAFKA_CONSUMERS,
   STATE_KAFKA_MESSAGES,
   STATE_LOGIN_ENV_SELECT,
+  STATE_SENSING_PROGRESS,
+  STATE_CONTEXT_VIEW,
+  FIELD_SENSING_SELECTED,
   RERUN_INTERVAL_PROGRESS,
   RERUN_INTERVAL_LOADING,
   RERUN_INTERVAL_COMPLETED,
@@ -220,7 +224,38 @@ export default function registerStates(app: Workflow): void {
       return items;
     }
 
-    // 1. 历史记录区
+    // 1. 环境嗅探区：始终评估，不受 query 过滤
+    {
+      const [latestSnapshot, aggregatedContexts] = await Promise.all([
+        getLatestSnapshotAny('clipboard'),
+        getAggregatedContexts('clipboard'),
+      ]);
+      const isParsingNow = latestSnapshot && latestSnapshot.overallStatus !== 'done';
+      const flatContexts = expandContexts(aggregatedContexts);
+
+      if (isParsingNow) {
+        items.push(wf.createItem(
+          '🔍 环境解析中...',
+          latestSnapshot!.contentPreview ?? '正在识别剪切板内容',
+          'go_sensing_progress',
+          { data },
+          {},
+          Icons.context
+        ));
+      } else if (flatContexts.length > 0) {
+        const applyableContexts = flatContexts.filter((c) => {
+          const existing = data[c.key] as DictItem | undefined;
+          if (!existing) return true;
+          return existing.value !== c.value;
+        });
+        const title = `🔍 查看环境解析结果`;
+        const summary = (applyableContexts.length > 0 ? applyableContexts : flatContexts)
+          .map((c) => `${c.label}: ${c.name}`).join('  ');
+        items.push(wf.createItem(title, summary, 'go_sensing_progress', { data }, {}, Icons.context));
+      }
+    }
+
+    // 2. 历史记录区
     // query 为空时只展示 1 条最近记录（固定的优先），搜索 h/历史 时展开全部
     const history = HistoryManager.getHistory();
     const pinnedHistory = history.filter((h) => h.isPinned);
@@ -261,7 +296,36 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    // 2. 字典选择区
+    // 2. 上下文快速查看：输入 c 展开当前上下文条目（仅非内部字段）
+    if (query && matchQuery(query, '上下文', 'c', 'context')) {
+      const ctxEntries = Object.entries(data).filter(([k]) => !k.startsWith('_'));
+      if (ctxEntries.length > 0) {
+        ctxEntries.sort(([a], [b]) => a.localeCompare(b));
+        for (const [key, value] of ctxEntries) {
+          let title: string;
+          let subtitle: string;
+          let copyValue: string;
+          if (value && typeof value === 'object' && 'name' in value) {
+            const item = value as DictItem;
+            title = `${key}: ${item.name}`;
+            subtitle = item.value !== item.name ? `value: ${item.value}` : (item.value ?? '');
+            copyValue = item.value ?? '';
+          } else if (typeof value === 'string') {
+            title = key;
+            subtitle = value;
+            copyValue = value;
+          } else {
+            const json = JSON.stringify(value);
+            title = key;
+            subtitle = json;
+            copyValue = json;
+          }
+          items.push(wf.createItem(title, subtitle, 'copy_value', { copyValue, copyName: key }));
+        }
+      }
+    }
+
+    // 3. 字典选择区
     const dicts = await dictService.getDictionaries();
     for (const dict of dicts) {
       const selected = data[dict.key] as DictItem | undefined;
@@ -507,6 +571,18 @@ export default function registerStates(app: Workflow): void {
         : '将功能操作绑定为触发词，一步直达执行';
       items.push(
         wf.createRerunItem('⚡ 快捷指令', aliasSubtitle, STATE_ALIAS_MANAGE, { data }, {}, Icons.alias)
+      );
+    }
+
+    // 查看上下文
+    if (Object.keys(data).length > 0 && matchQuery(query, '查看上下文', '上下文', 'context')) {
+      const visibleCount = Object.keys(data).filter((k) => !k.startsWith('_')).length;
+      const hiddenCount = Object.keys(data).length - visibleCount;
+      const subtitle = hiddenCount > 0
+        ? `${visibleCount} 个参数，${hiddenCount} 个内部参数`
+        : `共 ${visibleCount} 个参数`;
+      items.push(
+        wf.createRerunItem('🔎 查看上下文', subtitle, STATE_CONTEXT_VIEW, { data }, {}, Icons.context)
       );
     }
 
@@ -1747,6 +1823,178 @@ export default function registerStates(app: Workflow): void {
       );
 
     items.push(wf.createRerunItem('🔙 返回', `租户: ${tenantLabel}`, DEFAULT_STATE, { data }, {}, Icons.workflow));
+    return items;
+  });
+
+  // ─── 查看上下文 ────────────────────────────────────────────────────────────────
+
+  app.onState(STATE_CONTEXT_VIEW, async (context, wf) => {
+    const data = context.data ?? {};
+    const query = context.query ?? '';
+    const items: AlfredItem[] = [];
+
+    const entries = Object.entries(data);
+
+    if (entries.length === 0) {
+      items.push({ title: '上下文为空', subtitle: '当前没有任何上下文数据', valid: false });
+    } else {
+      // 普通字段（非 _ 开头）排前，内部字段排后
+      const sorted = [...entries].sort(([a], [b]) => {
+        const aHidden = a.startsWith('_');
+        const bHidden = b.startsWith('_');
+        if (aHidden !== bHidden) return aHidden ? 1 : -1;
+        return a.localeCompare(b);
+      });
+
+      for (const [key, value] of sorted) {
+        let title: string;
+        let subtitle: string;
+        let copyValue: string;
+
+        if (value && typeof value === 'object' && 'name' in value) {
+          const item = value as DictItem;
+          title = `${key}: ${item.name}`;
+          subtitle = item.value !== item.name ? `value: ${item.value}` : (item.value ?? '');
+          copyValue = item.value ?? '';
+        } else if (typeof value === 'string') {
+          title = key;
+          subtitle = value;
+          copyValue = value;
+        } else {
+          const json = JSON.stringify(value);
+          title = key;
+          subtitle = json;
+          copyValue = json;
+        }
+
+        if (!query || matchQuery(query, title, subtitle)) {
+          items.push(wf.createItem(title, subtitle, 'copy_value', {
+            copyValue,
+            copyName: key,
+          }));
+        }
+      }
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回管理中心', STATE_MANAGE, { data }, {}, Icons.workflow));
+    return items;
+  });
+
+  // ─── 环境嗅探进度页 ────────────────────────────────────────────────────────────
+  app.onState(STATE_SENSING_PROGRESS, async (context, wf) => {
+    const data = (context.data ?? {}) as ContextData;
+
+    // 并行获取：最新快照（检测是否正在解析）+ 有效期内的聚合上下文
+    const [latestSnapshot, aggregatedContexts] = await Promise.all([
+      getLatestSnapshotAny('clipboard'),
+      getAggregatedContexts('clipboard'),
+    ]);
+
+    const isParsingNow = latestSnapshot && latestSnapshot.overallStatus !== 'done';
+
+    // 最新剪切板正在解析中：始终展示 loading，不展示之前层级的旧数据
+    if (isParsingNow) {
+      const spinner = SPINNERS[Math.floor(Date.now() / 300) % SPINNERS.length];
+      return {
+        rerun: RERUN_INTERVAL_PROGRESS,
+        items: [
+          {
+            title: `${spinner} 环境解析中...`,
+            subtitle: (latestSnapshot!.contentPreview ?? '正在识别剪切板内容，请稍候...') + '  回车返回主页',
+            arg: wf.createItem('', '', 'rerun', { nextState: DEFAULT_STATE, data }).arg,
+            icon: { path: Icons.context },
+            valid: true,
+          } as AlfredItem,
+        ],
+      };
+    }
+
+    const flatContexts = expandContexts(aggregatedContexts);
+
+    // 解析完成但无有效结果
+    if (flatContexts.length === 0) {
+      return [
+        wf.createRerunItem('未检测到有效上下文', '剪切板内容未识别到有效字段', DEFAULT_STATE, { data }, {}, Icons.context),
+        wf.createRerunItem('🔙 返回主页', '返回', DEFAULT_STATE, { data }, {}, Icons.workflow),
+      ];
+    }
+
+    const items: AlfredItem[] = [];
+
+    // 逐项展示聚合结果，点击即注入当前上下文并刷新列表
+    for (const ctx of flatContexts) {
+      const existingItem = data[ctx.key] as DictItem | undefined;
+      const isSameValue = existingItem ? existingItem.value === ctx.value : false;
+      const isDiffValue = !!existingItem && !isSameValue;
+
+      if (isSameValue) {
+        // 已注入且值相同：展示状态，Enter 停留在当前页
+        items.push({
+          title: `✓ ${ctx.label}: ${ctx.name}`,
+          subtitle: `已设置  置信度 ${Math.round(ctx.confidence * 100)}%`,
+          arg: wf.createItem('', '', 'rerun', { nextState: STATE_SENSING_PROGRESS, data }).arg,
+          icon: { path: Icons.context },
+          valid: true,
+        } as AlfredItem);
+      } else {
+        // 未设置 or 已有但值不同：点击注入并刷新列表
+        const injectedData = { ...data, [ctx.key]: { name: ctx.name, value: ctx.value } as DictItem };
+        const subtitle = isDiffValue
+          ? `当前已设置: ${existingItem!.name}  置信度 ${Math.round(ctx.confidence * 100)}%  回车覆盖`
+          : `置信度 ${Math.round(ctx.confidence * 100)}%  回车注入`;
+        items.push(wf.createItem(
+          isDiffValue ? `↩ ${ctx.label}: ${ctx.name}` : `+ ${ctx.label}: ${ctx.name}`,
+          subtitle,
+          'inject_sensing_item',
+          { data: injectedData },
+          {},
+          Icons.context
+        ));
+      }
+    }
+
+    // 展示 showInSensing 的 feature：requiredKeys 全部命中嗅探结果时直接入口
+    for (const feature of features) {
+      if (!feature.showInSensing) continue;
+      if (feature.requiredKeys.length === 0) continue;
+      const allKeysPresent = feature.requiredKeys.every(key => flatContexts.some(ctx => ctx.key === key));
+      if (!allKeysPresent) continue;
+
+      // 将嗅探命中的 requiredKeys 注入 data
+      const injectedData: ContextData = { ...data };
+      for (const key of feature.requiredKeys) {
+        const match = flatContexts.find(ctx => ctx.key === key);
+        if (match) injectedData[key] = { name: match.name, value: match.value } as DictItem;
+      }
+
+      // 通过 condition 检查（用注入后的 data）
+      if (typeof feature.condition === 'function' && !feature.condition(injectedData)) continue;
+
+      const featureName = typeof feature.name === 'function' ? feature.name(injectedData) : feature.name;
+      const featureDescription = typeof feature.description === 'function' ? feature.description(injectedData) : feature.description;
+
+      if (feature.requiredInputs && feature.requiredInputs.length > 0) {
+        items.push(wf.createRerunItem(
+          `⚡ ${featureName}`,
+          featureDescription,
+          STATE_INPUT,
+          { data: injectedData, pendingAction: feature.id, inputIndex: 0 },
+          {},
+          feature.icon?.path,
+        ));
+      } else {
+        items.push(wf.createItem(
+          `⚡ ${featureName}`,
+          featureDescription,
+          feature.action,
+          { data: injectedData },
+          {},
+          feature.icon?.path,
+        ));
+      }
+    }
+
+    items.push(wf.createRerunItem('🔙 返回主页', '返回', DEFAULT_STATE, { data }, {}, Icons.workflow));
     return items;
   });
 }
