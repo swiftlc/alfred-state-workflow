@@ -25,6 +25,9 @@ export const STATE_KAFKA_MESSAGES = 'kafka_messages';
 export const STATE_LOGIN_ENV_SELECT = 'login_env_select';
 export const STATE_SENSING_PROGRESS = 'sensing_progress';
 export const STATE_CONTEXT_VIEW = 'context_view';
+export const STATE_SHEPHERD_RESULT = 'shepherd_result';
+export const STATE_SHEPHERD_SEARCH = 'shepherd_search';
+export const STATE_LION_CONFIG = 'lion_config';
 
 // ─── 环境嗅探 ─────────────────────────────────────────────────────────────────
 
@@ -57,6 +60,16 @@ export const FIELD_PREFETCH_FEATURE_ID = '_prefetchFeatureId';
 export const FIELD_PREFETCH_INPUT_INDEX = '_prefetchInputIndex';
 /** 预加载字典列表时传递的 dictKey */
 export const FIELD_PREFETCH_DICT_KEY = '_prefetchDictKey';
+// ─── 持久化查询通用字段 ───────────────────────────────────────────────────────────
+/** 当前查询结果缓存 key（持久化查询通用） */
+export const FIELD_QUERY_CACHE_KEY = '_queryCacheKey';
+/** 为 true 时结果使用无 TTL 持久缓存，结果页展示刷新入口 */
+export const FIELD_QUERY_PERSIST = '_persistCache';
+/** 刷新缓存时调用的 action 名称 */
+export const FIELD_QUERY_REFRESH_ACTION = '_refreshAction';
+/** 为 true 时跳过缓存检查，强制重新查询 */
+export const FIELD_QUERY_FORCE_REFRESH = '_forceRefresh';
+
 /** spawnWorker 时生成的 job id（仅 worker 进程内部使用） */
 export const FIELD_PREFETCH_JOB_ID = '_prefetchJobId';
 /** kafka 消息查询：缓存 key */

@@ -1,12 +1,14 @@
+import {execSync} from 'child_process';
 import PluginManager from '../core/PluginManager';
 import {http} from '../core/HttpClient';
 import Logger from '../core/Logger';
 import CacheManager from '../core/CacheManager';
 import {copyToClipboard, openUrl, sendNotification, encodeContext} from '../core/utils';
 import {icon} from '../core/icons';
-import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS, STATE_KAFKA_CONSUMERS, STATE_KAFKA_MESSAGES, FIELD_MSG_CACHE_KEY, FIELD_MSG_DATETIME, FIELD_MSG_SWIMLANE, FIELD_MSG_BASE_TOPIC_ID} from './constants';
+import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS, STATE_KAFKA_CONSUMERS, STATE_KAFKA_MESSAGES, FIELD_MSG_CACHE_KEY, FIELD_MSG_DATETIME, FIELD_MSG_SWIMLANE, FIELD_MSG_BASE_TOPIC_ID, STATE_SHEPHERD_RESULT, STATE_SHEPHERD_SEARCH, STATE_LION_CONFIG} from './constants';
+import {startWithCacheCheck} from '../core/persistentQuery';
 import {resolveQueryDatetime} from '../core/timeUtils';
-import {DictService} from '../services/dictService';
+import dictService, {DictService} from '../services/dictService';
 import {resolveEnvTopicId, MAFKA_BASE_URL} from '../services/mafkaService';
 import type {ContextData, DictItem, Feature} from '../types';
 
@@ -376,16 +378,19 @@ const builtInFeatures: Feature[] = [
     action: 'trace_query_action',
     actionHandler: async (context) => {
       const traceId = (context.data['traceId'] as DictItem)?.value ?? '';
-      const appkey = (context.data['appkey'] as DictItem | undefined)?.value ?? '';
       const env = (context.data['trace_env'] as DictItem)?.value ?? 'test';
       const action = (context.data['trace_action'] as DictItem)?.value ?? 'raptor';
       Logger.info(`trace_query action=${action} env=${env} traceId=${traceId}`);
+      const fullPath = `/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:${process.env.PATH ?? ''}`;
       if (action === 'raptor') {
         const domain = env === 'prod' ? 'raptor.mws.sankuai.com' : 'raptor.mws-test.sankuai.com';
-        const path = appkey ? `/log/topic/view/${encodeURIComponent(appkey)}` : '/log/logview';
-        openUrl(`https://${domain}${path}?searchType=expert&searchGrammar=dsl&condition=${encodeURIComponent(traceId)}`);
+        // condition 值加双引号，防止负号开头的 traceId 被解析异常
+        openUrl(`https://${domain}/log/topic/view/com.sankuai.sgshopmgmt.productbiz?searchType=expert&searchGrammar=dsl&condition=${encodeURIComponent(`"${traceId}"`)}`);
       } else {
-        sendNotification(`AI 分析 traceId: ${traceId}（${env}）`, 'Trace AI 分析（功能待实现）');
+        const envLabel = env === 'prod' ? '线上环境' : '测试环境';
+        const msg = `帮我查询 logcenter trace（${envLabel}）：${traceId} 分析错误日志`;
+        execSync(`autodx send --to "花椒" --text ${JSON.stringify(msg)}`, { env: { ...process.env, PATH: fullPath } });
+        sendNotification('已发送给花椒，等待 AI 分析结果', `[${envLabel}] traceId: ${traceId}`);
       }
     },
   },
@@ -407,8 +412,66 @@ const builtInFeatures: Feature[] = [
     action: 'shepherd_query_action',
     actionHandler: async (context, wf) => {
       const route = (context.data['route'] as DictItem)?.value ?? '';
-      Logger.info(`shepherd_query 发起后台任务 route=${route}`);
-      wf.startTask('shepherd_query_task', context);
+      Logger.info(`shepherd_query route=${route}`);
+      await startWithCacheCheck(wf, context, {
+        taskName: 'shepherd_query_task',
+        cacheKey: `shepherd:route:${route}`,
+        resultState: STATE_SHEPHERD_RESULT,
+        refreshAction: 'shepherd_query_action',
+      });
+    },
+  },
+  // ─── Shepherd 接口全量搜索 ────────────────────────────────────────────────────
+  {
+    id: 'shepherd_search',
+    name: '🔍 Shepherd 接口搜索',
+    description: '全量搜索 Shepherd 网关所有接口（输入 sh 触发）',
+    requiredKeys: [],
+    showWhen: { queryContains: 'sh' },
+    icon: icon('search'),
+    action: 'shepherd_search_action',
+    actionHandler: async (context, wf) => {
+      await startWithCacheCheck(wf, context, {
+        taskName: 'shepherd_search_task',
+        cacheKey: 'shepherd:all_apis',
+        resultState: STATE_SHEPHERD_SEARCH,
+        refreshAction: 'shepherd_search_action',
+      });
+    },
+  },
+  // ─── Lion 动态配置查询 ────────────────────────────────────────────────────────
+  {
+    id: 'lion_config',
+    name: '🦁 Lion 动态配置查询',
+    description: '查询动态配置，支持搜索与环境对比',
+    requiredKeys: ['appkey'],
+    icon: icon('search'),
+    requiredInputs: [
+      {
+        key: 'lion_appkey_input',
+        label: '输入 Appkey',
+        placeholder: 'com.sankuai.xxx',
+        skipIf: (data) => !!(data['appkey'] as DictItem | undefined)?.value,
+        fetchOptions: async (query, data) => {
+          const items = await dictService.getCachedItems('appkey', data) ?? [];
+          return items;
+        },
+      },
+    ],
+    action: 'lion_config_action',
+    actionHandler: async (context, wf) => {
+      const appkey =
+        (context.data['appkey'] as DictItem | undefined)?.value ??
+        (context.data['lion_appkey_input'] as DictItem | undefined)?.value ??
+        '';
+      if (!appkey) return;
+      Logger.info(`lion_config appkey=${appkey}`);
+      await startWithCacheCheck(wf, context, {
+        taskName: 'lion_config_task',
+        cacheKey: `lion:config:${appkey}`,
+        resultState: STATE_LION_CONFIG,
+        refreshAction: 'lion_config_action',
+      });
     },
   },
   // ─── Kafka 功能入口（二级菜单） ────────────────────────────────────────────────

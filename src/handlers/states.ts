@@ -24,6 +24,13 @@ import {
   STATE_LOGIN_ENV_SELECT,
   STATE_SENSING_PROGRESS,
   STATE_CONTEXT_VIEW,
+  STATE_SHEPHERD_RESULT,
+  STATE_SHEPHERD_SEARCH,
+  STATE_LION_CONFIG,
+  FIELD_QUERY_CACHE_KEY,
+  FIELD_QUERY_PERSIST,
+  FIELD_QUERY_REFRESH_ACTION,
+  FIELD_QUERY_FORCE_REFRESH,
   FIELD_SENSING_SELECTED,
   RERUN_INTERVAL_PROGRESS,
   RERUN_INTERVAL_LOADING,
@@ -420,23 +427,31 @@ export default function registerStates(app: Workflow): void {
         continue;
       }
 
-      const hasRelevantContext =
-        feature.requiredKeys.length === 0 ||
-        feature.requiredKeys.some((key) => data[key]) ||
-        feature.showAlways === true;
-      if (!hasRelevantContext) continue;
-      if (typeof feature.condition === 'function' && !feature.condition(data)) continue;
+      if (feature.showWhen) {
+        // 查询触发展示模式：仅当 query 包含指定字符串时出现，忽略上下文检查
+        const qc = feature.showWhen.queryContains;
+        if (!query.toLowerCase().includes(qc.toLowerCase())) continue;
+      } else {
+        const hasRelevantContext =
+          feature.requiredKeys.length === 0 ||
+          feature.requiredKeys.some((key) => data[key]) ||
+          feature.showAlways === true;
+        if (!hasRelevantContext) continue;
+        if (typeof feature.condition === 'function' && !feature.condition(data)) continue;
+      }
 
       const featureName = typeof feature.name === 'function' ? feature.name(data) : feature.name;
       const featureDescription =
         typeof feature.description === 'function' ? feature.description(data) : feature.description;
 
-      if (!matchQuery(query, featureName, featureDescription)) continue;
+      if (!feature.showWhen && !matchQuery(query, featureName, featureDescription)) continue;
 
       const featureIconPath = feature.icon?.path;
       const missingKeys = getMissingKeys(feature, data);
       if (missingKeys.length === 0) {
-        if (feature.requiredInputs && feature.requiredInputs.length > 0) {
+        const allInputsSkipped = !!feature.requiredInputs?.length &&
+          feature.requiredInputs.every(inp => inp.skipIf?.(data) === true);
+        if (feature.requiredInputs && feature.requiredInputs.length > 0 && !allInputsSkipped) {
           readyItems.push(
             wf.createRerunItem(
               `${featureName}`,
@@ -1995,6 +2010,222 @@ export default function registerStates(app: Workflow): void {
     }
 
     items.push(wf.createRerunItem('🔙 返回主页', '返回', DEFAULT_STATE, { data }, {}, Icons.workflow));
+    return items;
+  });
+
+  // ─── shepherd_result：Shepherd 接口查询结果展示 ───────────────────────────────
+
+  app.onState(STATE_SHEPHERD_RESULT, async (context, wf) => {
+    const data = context.data ?? {};
+    const route = (data['route'] as DictItem | undefined)?.value ?? '';
+    const cacheKey = (context[FIELD_QUERY_CACHE_KEY] as string | undefined) ?? `shepherd:route:${route}`;
+    const isPersist = !!(context[FIELD_QUERY_PERSIST] as boolean | undefined);
+    const refreshAction = context[FIELD_QUERY_REFRESH_ACTION] as string | undefined;
+
+    interface ShepherdResult {
+      apiId: number; apiGroupId: number; apiGroupName: string; apiName: string;
+      description: string; requestPath: string; serviceName: string; methodName: string; exactMatch: boolean;
+    }
+
+    const results = await CacheManager.get<ShepherdResult[]>(cacheKey);
+
+    if (results === null) {
+      const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
+      return {
+        rerun: RERUN_INTERVAL_LOADING,
+        items: [{ title: `${spinner} 正在查询 Shepherd 接口...`, subtitle: route, valid: false } as AlfredItem],
+      };
+    }
+
+    const items: AlfredItem[] = [];
+
+    if (results.length === 0) {
+      items.push({ title: '未找到匹配接口', subtitle: `route: ${route}`, valid: false } as AlfredItem);
+    } else {
+      for (const r of results) {
+        const interfaceRef = `${r.serviceName}#${r.methodName}`;
+        const shepherdUrl = `https://shepherd.mws-test.sankuai.com/api-detail?api_group_name=${encodeURIComponent(r.apiGroupName)}&api_group_id=${r.apiGroupId}&api_name=${encodeURIComponent(r.apiName)}&api_id=${r.apiId}&group_tab=api-manage`;
+        const title = r.exactMatch ? `✅ ${r.apiName}` : r.apiName;
+        const subtitle = r.exactMatch ? (r.description || route) : `${r.requestPath}  ${r.description || ''}`.trim();
+        items.push(wf.createItem(
+          title,
+          subtitle,
+          'copy_value',
+          { copyValue: interfaceRef, copyName: r.apiName },
+          { cmd: { subtitle: `🔗 打开 Shepherd: ${r.apiName}`, action: 'open_url', payload: { url: shepherdUrl } } },
+          Icons.search,
+        ));
+      }
+    }
+
+    if (isPersist && refreshAction) {
+      items.push(wf.createItem(
+        '🔄 刷新缓存',
+        '重新从 Shepherd 查询最新数据',
+        refreshAction,
+        { data, [FIELD_QUERY_FORCE_REFRESH]: true },
+        {},
+        Icons.workflow,
+      ));
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', route, DEFAULT_STATE, { data }, {}, Icons.workflow));
+    return items;
+  });
+
+  // ─── shepherd_search：Shepherd 接口全量搜索结果展示 ───────────────────────────
+
+  const SHEPHERD_SEARCH_MAX_DISPLAY = 50;
+
+  app.onState(STATE_SHEPHERD_SEARCH, async (context, wf) => {
+    const query = context.query ?? '';
+    const data = context.data ?? {};
+    const cacheKey = (context[FIELD_QUERY_CACHE_KEY] as string | undefined) ?? 'shepherd:all_apis';
+    const isPersist = !!(context[FIELD_QUERY_PERSIST] as boolean | undefined);
+    const refreshAction = context[FIELD_QUERY_REFRESH_ACTION] as string | undefined;
+
+    interface ShepherdApiItem {
+      id: number; name: string; path: string; description: string; apiGroupId: number; apiGroupName: string;
+    }
+
+    const allApis = await CacheManager.get<ShepherdApiItem[]>(cacheKey);
+
+    if (allApis === null) {
+      const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
+      return {
+        rerun: RERUN_INTERVAL_LOADING,
+        items: [{ title: `${spinner} 正在加载 Shepherd 接口列表...`, subtitle: '首次加载需要一段时间', valid: false } as AlfredItem],
+      };
+    }
+
+    const items: AlfredItem[] = [];
+
+    // 本地模糊搜索：多关键词空格分隔，各关键词与 name/description/path/groupName 做交集匹配
+    const filtered = query
+      ? allApis.filter(api => matchQuery(query, api.name, api.description, api.path, api.apiGroupName))
+      : allApis.slice(0, SHEPHERD_SEARCH_MAX_DISPLAY);
+
+    if (filtered.length === 0) {
+      items.push({ title: '未找到匹配接口', subtitle: `共 ${allApis.length} 个接口，尝试换个关键词`, valid: false } as AlfredItem);
+    } else {
+      for (const api of filtered) {
+        const shepherdUrl = `https://shepherd.mws-test.sankuai.com/api-detail?api_group_name=${encodeURIComponent(api.apiGroupName)}&api_group_id=${api.apiGroupId}&api_name=${encodeURIComponent(api.name)}&api_id=${api.id}&group_tab=api-manage`;
+        const subtitle = [api.path, api.description, api.apiGroupName].filter(Boolean).join('  ');
+        items.push(wf.createItem(
+          api.name,
+          subtitle,
+          'shepherd_copy_ref_action',
+          { apiGroupName: api.apiGroupName, apiName: api.name },
+          { cmd: { subtitle: `🔗 打开 Shepherd: ${api.name}`, action: 'open_url', payload: { url: shepherdUrl } } },
+          Icons.search,
+        ));
+      }
+      if (!query && allApis.length > SHEPHERD_SEARCH_MAX_DISPLAY) {
+        items.push({ title: `... 共 ${allApis.length} 个接口，输入关键词搜索`, subtitle: '支持拼音、多关键词空格交集', valid: false } as AlfredItem);
+      }
+    }
+
+    // 刷新按钮：常显（不受搜索条件影响）
+    if (isPersist && refreshAction) {
+      items.push(wf.createItem(
+        '🔄 刷新接口列表',
+        `当前共缓存 ${allApis.length} 个接口，重新从 Shepherd 全量拉取`,
+        refreshAction,
+        { data, [FIELD_QUERY_FORCE_REFRESH]: true },
+        {},
+        Icons.workflow,
+      ));
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data }, {}, Icons.workflow));
+    return items;
+  });
+
+  // ─── lion_config：Lion 动态配置查询结果展示 ────────────────────────────────────
+
+  app.onState(STATE_LION_CONFIG, async (context, wf) => {
+    const query = context.query ?? '';
+    const data = context.data ?? {};
+    const cacheKey = (context[FIELD_QUERY_CACHE_KEY] as string | undefined) ?? '';
+    const isPersist = !!(context[FIELD_QUERY_PERSIST] as boolean | undefined);
+    const refreshAction = context[FIELD_QUERY_REFRESH_ACTION] as string | undefined;
+
+    const appkey =
+      (data['appkey'] as DictItem | undefined)?.value ??
+      (data['lion_appkey_input'] as DictItem | undefined)?.value ??
+      '';
+
+    // FIELD_QUERY_CACHE_KEY 可能在 saveContext 未被持久化，用 appkey 兜底重建
+    const resolvedCacheKey = cacheKey || (appkey ? `lion:config:${appkey}` : '');
+
+    interface LionConfigItem {
+      key: string; name: string; desc: string; type: string; rank: string;
+      testValue: string | null; prodValue: string | null;
+    }
+
+    const allItems = resolvedCacheKey ? await CacheManager.get<LionConfigItem[]>(resolvedCacheKey) : null;
+
+    if (allItems === null) {
+      const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
+      return {
+        rerun: RERUN_INTERVAL_LOADING,
+        items: [
+          { title: `${spinner} 正在加载 Lion 配置...`, subtitle: appkey, valid: false } as AlfredItem,
+          wf.createItem('↩️ 重新查询', appkey ? `重新拉取 ${appkey}` : '重新拉取', 'lion_config_action', { data }),
+          wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data }, {}, Icons.workflow),
+        ],
+      };
+    }
+
+    const items: AlfredItem[] = [];
+
+    const filtered = query
+      ? allItems.filter((item) => matchQuery(query, item.key, item.name, item.desc, item.testValue ?? '', item.prodValue ?? ''))
+      : allItems;
+
+    if (filtered.length === 0) {
+      items.push({
+        title: query ? `未找到匹配配置「${query}」` : '暂无配置项',
+        subtitle: `${appkey}  共 ${allItems.length} 条`,
+        valid: false,
+      } as AlfredItem);
+    } else {
+      for (const item of filtered) {
+        const hasDiff = item.testValue !== item.prodValue;
+        const prefix = hasDiff ? '⚠️' : '✅';
+        const title = `${prefix} ${item.name || item.key}`;
+        const testProd = `test: ${item.testValue ?? '(空)'}  |  prod: ${item.prodValue ?? '(空)'}`;
+        const desc = item.desc ? item.desc.replace(/[\r\n]+/g, ' ') : '';
+        const subtitle = desc || testProd;
+        const lionUrl = `https://lion.mws-test.sankuai.com/config/dync?appKey=${encodeURIComponent(appkey)}&env=test`;
+        const copyPayload = JSON.stringify({ key: item.key, valueTest: item.testValue, valueProd: item.prodValue, desc: item.desc ?? '' });
+
+        items.push(wf.createItem(
+          title,
+          subtitle,
+          'copy_value',
+          { copyValue: copyPayload, copyName: desc || item.key },
+          { cmd: { subtitle: `🔗 打开 Lion: ${item.key}`, action: 'open_url', payload: { url: lionUrl } } },
+          Icons.search,
+        ));
+      }
+      if (!query && allItems.length > filtered.length) {
+        items.push({ title: `共 ${allItems.length} 条配置，输入关键词搜索`, subtitle: '支持拼音、多关键词空格交集', valid: false } as AlfredItem);
+      }
+    }
+
+    if (isPersist && refreshAction) {
+      items.push(wf.createItem(
+        '🔄 刷新配置',
+        `当前共 ${allItems.length} 条，重新拉取 test + prod`,
+        refreshAction,
+        { data, [FIELD_QUERY_FORCE_REFRESH]: true },
+        {},
+        Icons.workflow,
+      ));
+    }
+
+    items.push(wf.createRerunItem('🔙 返回', appkey, DEFAULT_STATE, { data }, {}, Icons.workflow));
     return items;
   });
 }
