@@ -14,7 +14,6 @@ import {resolveEnvTopicId, MAFKA_BASE_URL, type MafkaMsgItem} from '../services/
 import {
   PROXY_BASE_URL,
   DEFAULT_STATE,
-  STATE_LOGIN_ENV_SELECT,
   STATE_SELECT_DICT,
   STATE_TASK_MANAGE,
   STATE_WORKSPACE_MANAGE,
@@ -28,35 +27,22 @@ import {
   FIELD_MSG_DATETIME,
   FIELD_MSG_SWIMLANE,
   FIELD_MSG_BASE_TOPIC_ID,
+  FIELD_CONSUMER_TOPIC_ID,
+  FIELD_CONSUMER_CACHE_KEY,
+  FIELD_LOGIN_ENV_KEY,
+  LOGIN_ENV_CONFIGS,
+  MAFKA_HEADERS,
+  LOGIN_TASK_API_URL,
+  TASK_PREFETCH_DICT,
+  TASK_PREFETCH_OPTIONS,
+  TASK_PREFETCH_MESSAGES,
+  TASK_PREFETCH_CONSUMERS,
+  TASK_LOGIN,
+  TASK_LOGIN_ENV,
 } from '../config/constants';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
 
-const MANAGEMENT_PATH = '/api/sac/account/createManagerAndRelTenant?u2dhn6k=8e8b49cbae29e8a44478a7d7c7a948e2&yodaReady=h5&csecplatform=4&csecversion=4.1.1';
-
-interface LoginEnvConfig {
-  label: string;
-  managementUrl: string;
-  redirectUrl: string;
-}
-
-const LOGIN_ENV_CONFIGS: Record<string, LoginEnvConfig> = {
-  test_trunk: {
-    label: '测试主干',
-    managementUrl: `https://management.shangou.test.meituan.com${MANAGEMENT_PATH}`,
-    redirectUrl: 'https://qnh.shangou.test.meituan.com/api/v1/sso/loginRedirect',
-  },
-  st: {
-    label: 'ST',
-    managementUrl: `https://management.shangou.st.meituan.com${MANAGEMENT_PATH}`,
-    redirectUrl: 'https://qnh.shangou.st.meituan.com/api/v1/sso/loginRedirect',
-  },
-  prod: {
-    label: 'Prod',
-    managementUrl: `https://management.vip.sankuai.com${MANAGEMENT_PATH}`,
-    redirectUrl: 'https://qnh.meituan.com/api/v1/sso/loginRedirect',
-  },
-};
 
 /**
  * 注册所有执行动作
@@ -64,7 +50,7 @@ const LOGIN_ENV_CONFIGS: Record<string, LoginEnvConfig> = {
  */
 export default function registerActions(app: Workflow): void {
   // 后台任务：预加载字典列表数据并写入缓存
-  app.onTask('_prefetch_dict', async (task, context) => {
+  app.onTask(TASK_PREFETCH_DICT, async (task, context) => {
     const dictKey = context[FIELD_PREFETCH_DICT_KEY] as string | undefined;
     if (!dictKey) {
       task.update(100, '参数缺失');
@@ -86,7 +72,7 @@ export default function registerActions(app: Workflow): void {
   });
 
   // 后台任务：预加载 fetchOptions 数据并写入缓存
-  app.onTask('_prefetch_options', async (task, context) => {
+  app.onTask(TASK_PREFETCH_OPTIONS, async (task, context) => {
     const featureId = context[FIELD_PREFETCH_FEATURE_ID] as string | undefined;
     const inputIndex = (context[FIELD_PREFETCH_INPUT_INDEX] as number | undefined) ?? 0;
 
@@ -106,7 +92,7 @@ export default function registerActions(app: Workflow): void {
   });
 
   // 后台任务：查询 kafka 消息列表并写入缓存
-  app.onTask('_prefetch_messages', async (task, context) => {
+  app.onTask(TASK_PREFETCH_MESSAGES, async (task, context) => {
     const baseTopicId = context[FIELD_MSG_BASE_TOPIC_ID] as string | undefined;
     const datetime = context[FIELD_MSG_DATETIME] as string | undefined;
     const swimlaneCode = (context[FIELD_MSG_SWIMLANE] as string | undefined) ?? '';
@@ -125,7 +111,7 @@ export default function registerActions(app: Workflow): void {
 
     try {
       const response = await http.proxy<{ code: number; msg: string; data: MafkaMsgItem[] }>(
-        'GET', destUrl, { headers: { 'm-appkey': 'fe_mafka-fe' } }
+        'GET', destUrl, { headers: MAFKA_HEADERS }
       );
 
       if (response?.code === 0 && Array.isArray(response.data)) {
@@ -147,17 +133,17 @@ export default function registerActions(app: Workflow): void {
   });
 
   // 后台任务：预加载消费者组列表并写入缓存
-  app.onTask('_prefetch_consumers', async (task, context) => {
-    const topicId = context['_consumerTopicId'] as string | undefined;
-    const cacheKey = context['_consumerCacheKey'] as string | undefined;
+  app.onTask(TASK_PREFETCH_CONSUMERS, async (task, context) => {
+    const topicId = context[FIELD_CONSUMER_TOPIC_ID] as string | undefined;
+    const cacheKey = context[FIELD_CONSUMER_CACHE_KEY] as string | undefined;
     if (!topicId || !cacheKey) {
       task.update(100, '参数缺失');
       return;
     }
     task.update(10, '正在加载消费者组...');
-    const destUrl = `https://mafka.mws-test.sankuai.com/mafka/restful/consumer/listByTopicId?topicId=${topicId}&pageNum=1&limit=100&type=3&content=&auth=-1`;
+    const destUrl = `${MAFKA_BASE_URL}/mafka/restful/consumer/listByTopicId?topicId=${topicId}&pageNum=1&limit=100&type=3&content=&auth=-1`;
     const response = await http.proxy<{ code: number; msg: string; data: Array<{ id: number; name: string; appkey: string; remark: string | null; status: number; environment: string; topicName: string }> }>('GET', destUrl, {
-      headers: { 'm-appkey': 'fe_mafka-fe' },
+      headers: MAFKA_HEADERS,
     });
     if (response?.code === 0 && Array.isArray(response.data)) {
       CacheManager.set(cacheKey, response.data, 2 * 60 * 1000); // 缓存 2 分钟
@@ -167,12 +153,7 @@ export default function registerActions(app: Workflow): void {
     }
   });
 
-  // 动作：租户泳道登录（耗时，使用后台任务）
-  app.onAction('login', async (context, wf) => {
-    wf.startTask('login_task', context);
-  });
-
-  app.onTask('login_task', async (task, context) => {
+  app.onTask(TASK_LOGIN, async (task, context) => {
     const tenant = context.data['tenant'] as DictItem;
     const swimlane = context.data['swimlane'] as DictItem;
     Logger.info('执行后台任务: login_task', context);
@@ -180,12 +161,12 @@ export default function registerActions(app: Workflow): void {
     task.update(10, '登录中...');
 
     const data = await http.post<{ code: number; message?: string }>(
-      'http://www.swiftlc.com/api/qnh/login',
+      LOGIN_TASK_API_URL,
       { swimlane: swimlane.value, tenantId: Number(tenant.value) },
       { timeout: 60000 }
     );
 
-    if (data.data.code === 0) {
+    if (data.code === 0) {
       const targetUrl = `https://${swimlane.value}-sl-qnh.shangou.test.meituan.com/api/v1/sso/loginRedirect`;
       task.update(100, `登录成功 ${tenant.value} - ${swimlane.value}`);
       await openUrl(targetUrl);
@@ -194,19 +175,9 @@ export default function registerActions(app: Workflow): void {
     }
   });
 
-  // 动作：进入 base 环境登录二级菜单
-  app.onAction('go_login_env_select', async (context, wf) => {
-    wf.triggerAlfred(encodeContext({ state: STATE_LOGIN_ENV_SELECT, data: context.data }));
-  });
-
-  // 动作：执行 base 环境登录（耗时，使用后台任务）
-  app.onAction('exec_login_env', async (context, wf) => {
-    wf.startTask('login_env_task', context);
-  });
-
-  app.onTask('login_env_task', async (task, context) => {
+  app.onTask(TASK_LOGIN_ENV, async (task, context) => {
     const tenant = context.data['tenant'] as DictItem;
-    const envKey = (context.data['_loginEnvKey'] as import('../types').DictItem | undefined)?.value;
+    const envKey = (context.data[FIELD_LOGIN_ENV_KEY] as import('../types').DictItem | undefined)?.value;
     const envConfig = envKey ? LOGIN_ENV_CONFIGS[envKey] : undefined;
 
     if (!envConfig) {
@@ -228,18 +199,6 @@ export default function registerActions(app: Workflow): void {
     } else {
       throw new Error(resp.message ?? '未知错误');
     }
-  });
-
-  // 动作：跳转牵牛花 M 端管理
-  app.onAction('jump_qnh_management', async (context) => {
-    const swimlane = context.data['swimlane'] as DictItem;
-    openUrl(`https://${swimlane.value}-sl-management.shangou.test.meituan.com/`);
-  });
-
-  // 动作：跳转牵牛花
-  app.onAction('jump_qnh', async (context) => {
-    const swimlane = context.data['swimlane'] as DictItem;
-    openUrl(`https://${swimlane.value}-sl-qnh.shangou.test.meituan.com/`);
   });
 
   // 动作：复制字典值到剪切板

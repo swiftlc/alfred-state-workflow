@@ -4,7 +4,8 @@ import pinyinMatch from 'pinyin-match';
 // @ts-ignore – fuzzysort 暂无 @types 包
 import fuzzysort from 'fuzzysort';
 import CacheManager from './CacheManager';
-import type {ContextData, DictItem, RequiredInput} from '../types';
+import {RERUN_INTERVAL_LOADING} from '../config/constants';
+import type {AlfredFilterOutput, AlfredItem, ContextData, DictItem, RequiredInput} from '../types';
 
 export function encodeContext(obj: object): string {
   return Buffer.from(JSON.stringify(obj)).toString('base64');
@@ -94,5 +95,29 @@ export async function resolveOptions(
   }
 
   return input.fetchOptions(query, contextData);
+}
+
+export const SPINNERS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const;
+
+/**
+ * 构造非阻塞加载状态的 AlfredFilterOutput：spinner + 加载中文字 + rerun
+ */
+export function makeLoadingOutput(title: string, subtitle: string, iconPath?: string): AlfredFilterOutput {
+  const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
+  const item: AlfredItem = { title: `${spinner} ${title}`, subtitle, valid: false };
+  if (iconPath) item.icon = { path: iconPath };
+  return { rerun: RERUN_INTERVAL_LOADING, items: [item] };
+}
+
+/**
+ * 防重 spawnWorker 守卫：以 `loading:${cacheKey}` 为标志，
+ * 确保同一缓存 key 同时只发起一次后台 worker。
+ */
+export async function spawnIfNotLoading(cacheKey: string, spawn: () => void): Promise<void> {
+  const loadingKey = `loading:${cacheKey}`;
+  if (!(await CacheManager.get(loadingKey))) {
+    CacheManager.set(loadingKey, true, 60 * 1000);
+    spawn();
+  }
 }
 

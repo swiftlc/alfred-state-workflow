@@ -20,9 +20,7 @@ import {
   STATE_KAFKA_OPS,
   STATE_KAFKA_CONSUMERS,
   STATE_KAFKA_MESSAGES,
-  STATE_LOGIN_ENV_SELECT,
   RERUN_INTERVAL_PROGRESS,
-  RERUN_INTERVAL_LOADING,
   RERUN_INTERVAL_COMPLETED,
   RERUN_INTERVAL_TASK_LIST,
   FIELD_CURRENT_DICT,
@@ -35,6 +33,13 @@ import {
   FIELD_MSG_DATETIME,
   FIELD_MSG_SWIMLANE,
   FIELD_MSG_BASE_TOPIC_ID,
+  FIELD_CONSUMER_TOPIC_ID,
+  FIELD_CONSUMER_CACHE_KEY,
+  FIELD_TOPIC_ID,
+  TASK_PREFETCH_DICT,
+  TASK_PREFETCH_OPTIONS,
+  TASK_PREFETCH_MESSAGES,
+  TASK_PREFETCH_CONSUMERS,
 } from '../config/constants';
 import {type MafkaMsgItem} from '../services/mafkaService';
 import DictPinManager from '../core/DictPinManager';
@@ -43,12 +48,10 @@ import TaskManager from '../core/TaskManager';
 import HistoryManager from '../core/HistoryManager';
 import WorkspaceManager, {WorkspaceManager as WorkspaceManagerClass} from '../core/WorkspaceManager';
 import AliasManager from '../core/AliasManager';
-import {matchQuery} from '../core/utils';
+import {matchQuery, SPINNERS, makeLoadingOutput, spawnIfNotLoading} from '../core/utils';
 import Icons, {icon} from '../core/icons';
 import type Workflow from '../core/Workflow';
 import type {AlfredItem, Context, ContextData, DictItem, Feature} from '../types';
-
-const SPINNERS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const;
 
 /** 检查某个功能还缺少哪些字典上下文 */
 function getMissingKeys(feature: Feature, data: ContextData): string[] {
@@ -62,6 +65,13 @@ function formatDictSubtitle(item: { value?: string; description?: string }): str
   return item.value === item.description
     ? (item.value ?? '')
     : [item.value, item.description].filter(Boolean).join('  ');
+}
+
+/** 构造 Kafka Topic 展示标签：有描述时显示 "描述（技术名）"，否则直接用名称 */
+function buildTopicLabel(topic: DictItem | undefined): string {
+  return topic
+    ? (topic.description ? `${topic.description}（${topic.name}）` : topic.name)
+    : '未选择 Topic';
 }
 
 /** 将历史记录的 data 格式化为可读字符串 */
@@ -755,7 +765,6 @@ export default function registerStates(app: Workflow): void {
     const dicts = await dictService.getDictionaries();
 
     if (cached === null) {
-      const loadingKey = `loading:dict_items_${dictKey}`;
       const errorKey = `error:dict_items_${dictKey}`;
       const dictName = dicts.find((d) => d.key === dictKey)?.name ?? dictKey;
 
@@ -767,22 +776,10 @@ export default function registerStates(app: Workflow): void {
       }
 
       // 缓存未命中且无错误：防重 loading 标记，避免 rerun 轮询期间重复 spawn
-      if (!(await CacheManager.get(loadingKey))) {
-        CacheManager.set(loadingKey, true, 60 * 1000);
-        wf.spawnWorker('_prefetch_dict', { ...context, [FIELD_PREFETCH_DICT_KEY]: dictKey });
-      }
-      const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
-      return {
-        rerun: RERUN_INTERVAL_LOADING,
-        items: [
-          {
-            title: `${spinner} 正在加载${dictName}列表...`,
-            subtitle: '数据加载中，请稍候',
-            valid: false,
-            icon: { path: Icons.context },
-          } as AlfredItem,
-        ],
-      };
+      await spawnIfNotLoading(`dict_items_${dictKey}`, () => {
+        wf.spawnWorker(TASK_PREFETCH_DICT, { ...context, [FIELD_PREFETCH_DICT_KEY]: dictKey });
+      });
+      return makeLoadingOutput(`正在加载${dictName}列表...`, '数据加载中，请稍候', Icons.context);
     }
 
     let dictItems = cached;
@@ -967,7 +964,7 @@ export default function registerStates(app: Workflow): void {
 
         if (cached === null) {
           // 缓存未命中，启动后台 task 发起请求，自动跳转 progress 状态展示加载进度
-          wf.startTask('_prefetch_options', {
+          wf.startTask(TASK_PREFETCH_OPTIONS, {
             ...context,
             returnState: STATE_INPUT,
             [FIELD_SILENT_ON_SUCCESS]: true,
@@ -1504,15 +1501,10 @@ export default function registerStates(app: Workflow): void {
     const items: AlfredItem[] = [];
 
     // 展示当前 topic 信息
-    const topicLabel = topic
-      ? (topic.description ? `${topic.description}（${topic.name}）` : topic.name)
-      : '未选择 Topic';
+    const topicLabel = buildTopicLabel(topic);
 
-    // 从 features 中找到三个子操作
-    const kafkaFeatureIds = ['kafka_consumer_groups', 'kafka_query_messages', 'kafka_send_message'];
-    for (const featureId of kafkaFeatureIds) {
-      const feature = features.find((f) => f.id === featureId);
-      if (!feature) continue;
+    // 从 features 中收集属于本菜单组的子操作（通过 menuGroup 声明）
+    for (const feature of features.filter((f) => f.menuGroup === STATE_KAFKA_OPS)) {
       const featureName = typeof feature.name === 'function' ? feature.name(data) : feature.name;
       const featureDescription = typeof feature.description === 'function' ? feature.description(data) : feature.description;
       const featureIconPath = feature.icon?.path;
@@ -1552,10 +1544,8 @@ export default function registerStates(app: Workflow): void {
     const appkey = data['appkey'] as DictItem | undefined;
     const items: AlfredItem[] = [];
 
-    const topicId = topic ? (topic as unknown as Record<string, string>)['_topicId'] ?? '' : '';
-    const topicLabel = topic
-      ? (topic.description ? `${topic.description}（${topic.name}）` : topic.name)
-      : '未选择 Topic';
+    const topicId = topic ? (topic as unknown as Record<string, string>)[FIELD_TOPIC_ID] ?? '' : '';
+    const topicLabel = buildTopicLabel(topic);
 
     if (!topicId) {
       items.push({ title: '⚠️ 未选择 Topic', subtitle: '请先选择 kafka_topic', valid: false });
@@ -1569,24 +1559,14 @@ export default function registerStates(app: Workflow): void {
     const cached = await CacheManager.get<ConsumerGroup[]>(cacheKey);
 
     if (cached === null) {
-      const consumerLoadingKey = `loading:${cacheKey}`;
-      if (!(await CacheManager.get(consumerLoadingKey))) {
-        CacheManager.set(consumerLoadingKey, true, 60 * 1000);
-        wf.spawnWorker('_prefetch_consumers', {
+      await spawnIfNotLoading(cacheKey, () => {
+        wf.spawnWorker(TASK_PREFETCH_CONSUMERS, {
           ...context,
-          _consumerTopicId: topicId,
-          _consumerCacheKey: cacheKey,
+          [FIELD_CONSUMER_TOPIC_ID]: topicId,
+          [FIELD_CONSUMER_CACHE_KEY]: cacheKey,
         });
-      }
-      const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
-      return {
-        rerun: RERUN_INTERVAL_LOADING,
-        items: [{
-          title: `${spinner} 正在加载消费者组...`,
-          subtitle: topicLabel,
-          valid: false,
-        } as AlfredItem],
-      };
+      });
+      return makeLoadingOutput('正在加载消费者组...', topicLabel);
     }
 
     const groups = cached;
@@ -1652,9 +1632,7 @@ export default function registerStates(app: Workflow): void {
     const swimlaneCode = (context[FIELD_MSG_SWIMLANE] as string | undefined) ?? '';
     const baseTopicId = context[FIELD_MSG_BASE_TOPIC_ID] as string | undefined;
 
-    const topicLabel = topic
-      ? (topic.description ? `${topic.description}（${topic.name}）` : topic.name)
-      : '未选择 Topic';
+    const topicLabel = buildTopicLabel(topic);
 
     if (!cacheKey || !baseTopicId) {
       return [
@@ -1667,26 +1645,16 @@ export default function registerStates(app: Workflow): void {
 
     // 缓存未命中：用 loading 标记防止 rerun 轮询期间重复 spawn
     if (cached === null) {
-      const loadingKey = `loading:${cacheKey}`;
-      if (!(await CacheManager.get(loadingKey))) {
-        CacheManager.set(loadingKey, true, 60 * 1000);
-        wf.spawnWorker('_prefetch_messages', {
+      await spawnIfNotLoading(cacheKey, () => {
+        wf.spawnWorker(TASK_PREFETCH_MESSAGES, {
           ...context,
           [FIELD_MSG_BASE_TOPIC_ID]: baseTopicId,
           [FIELD_MSG_DATETIME]: datetime ?? '',
           [FIELD_MSG_SWIMLANE]: swimlaneCode,
           [FIELD_MSG_CACHE_KEY]: cacheKey,
         });
-      }
-      const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
-      return {
-        rerun: RERUN_INTERVAL_LOADING,
-        items: [{
-          title: `${spinner} 正在检索消息...`,
-          subtitle: `${topicLabel}  ${datetime ?? ''}${swimlaneCode ? `  泳道: ${swimlaneCode}` : ''}`,
-          valid: false,
-        } as AlfredItem],
-      };
+      });
+      return makeLoadingOutput('正在检索消息...', `${topicLabel}  ${datetime ?? ''}${swimlaneCode ? `  泳道: ${swimlaneCode}` : ''}`);
     }
 
     const subtitleHeader = `${topicLabel}  @${datetime ?? ''}${swimlaneCode ? `  泳道: ${swimlaneCode}` : ''}`;
@@ -1721,33 +1689,5 @@ export default function registerStates(app: Workflow): void {
     return items;
   });
 
-  // ─── login_env_select：base 环境登录二级菜单 ─────────────────────────────────
-
-  app.onState(STATE_LOGIN_ENV_SELECT, async (context, wf) => {
-    const data = context.data ?? {};
-    const query = context.query ?? '';
-    const tenant = data['tenant'] as import('../types').DictItem | undefined;
-    const tenantLabel = tenant?.name ?? '未选择租户';
-
-    const envOptions = [
-      { key: 'test_trunk', label: '🧪 测试主干登录', description: 'Test 环境 - 主干泳道' },
-      { key: 'st',         label: '🌿 ST 登录',     description: 'ST (预发) 环境' },
-      { key: 'prod',       label: '🚀 Prod 登录',   description: '线上生产环境' },
-    ];
-
-    const items: AlfredItem[] = envOptions
-      .filter(({ label, description }) => matchQuery(query, label, description))
-      .map(({ key, label, description }) =>
-        wf.createItem(label, description, 'exec_login_env', {
-          data: { ...data, _loginEnvKey: { name: key, value: key } },
-          historyTitle: label,
-          historySubtitle: `租户: ${tenantLabel}`,
-          recordHistory: true,
-        }, {}, Icons.login)
-      );
-
-    items.push(wf.createRerunItem('🔙 返回', `租户: ${tenantLabel}`, DEFAULT_STATE, { data }, {}, Icons.workflow));
-    return items;
-  });
 }
 

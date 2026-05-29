@@ -186,6 +186,23 @@ export interface Feature {
    * 引导用户依次补全所需字典 key。适用于仅依赖单个字典的 feature。
    */
   showAlways?: boolean;
+  /**
+   * open_url 类型专用：URL 模板。
+   * 字符串或函数（接收 contextData 返回最终 URL），框架自动调用 openUrl，无需在 actions.ts 注册 action。
+   */
+  urlTemplate?: string | ((data: ContextData) => string);
+  /**
+   * 纯导航类型专用：声明此 feature 触发后跳转到的目标 state。
+   * 框架自动生成 `wf.triggerAlfred(encodeContext({ state: targetState, data: ctx.data }))` 处理器，
+   * 无需在 actionHandler 或 actions.ts 中写任何代码。
+   */
+  targetState?: string;
+  /**
+   * 所属菜单组 ID。值等于某个 state 名称时，该功能将在该状态下自动聚合展示。
+   * 主要用于子菜单功能隶属声明（如 kafka 子操作声明 menuGroup: STATE_KAFKA_OPS），
+   * 状态处理器通过 features.filter(f => f.menuGroup === stateId) 动态收集，无需硬编码 ID 列表。
+   */
+  menuGroup?: string;
 }
 
 // ─── 任务相关 ──────────────────────────────────────────────────────────────────

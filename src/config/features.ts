@@ -4,13 +4,35 @@ import Logger from '../core/Logger';
 import CacheManager from '../core/CacheManager';
 import {copyToClipboard, openUrl, sendNotification, encodeContext} from '../core/utils';
 import {icon} from '../core/icons';
-import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS, STATE_KAFKA_CONSUMERS, STATE_KAFKA_MESSAGES, FIELD_MSG_CACHE_KEY, FIELD_MSG_DATETIME, FIELD_MSG_SWIMLANE, FIELD_MSG_BASE_TOPIC_ID} from './constants';
+import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS, STATE_KAFKA_CONSUMERS, STATE_KAFKA_MESSAGES, FIELD_MSG_CACHE_KEY, FIELD_MSG_DATETIME, FIELD_MSG_SWIMLANE, FIELD_MSG_BASE_TOPIC_ID, FIELD_LOGIN_ENV_KEY, FIELD_TOPIC_ID, LOGIN_ENV_CONFIGS, OCTO_BASE_URL, MAFKA_HEADERS, JUMPER_BASE_URL, CARGO_DEV_BASE_URL, OCTO_INVOKE_URL, TENANT_EMPOWER_APPKEY, TASK_LOGIN, TASK_LOGIN_ENV} from './constants';
 import {resolveQueryDatetime} from '../core/timeUtils';
 import {DictService} from '../services/dictService';
 import {resolveEnvTopicId, MAFKA_BASE_URL} from '../services/mafkaService';
 import type {ContextData, DictItem, Feature} from '../types';
 
 export {PROXY_BASE_URL};
+
+/**
+ * 构造泳道选择 fetchOptions：空选项 + 当前上下文泳道（如有）
+ * @param emptyLabel   空选项名称，如"不过滤（全部消息）"
+ * @param emptyDesc    空选项描述
+ * @param swimlaneDesc 有泳道时的选项描述，接收 code 参数
+ */
+function buildSwimlaneOptions(
+  emptyLabel: string,
+  emptyDesc: string,
+  swimlaneDesc: (code: string) => string
+): (_query: string, contextData: ContextData) => Promise<DictItem[]> {
+  return async (_query, contextData) => {
+    const swimlane = contextData['swimlane'] as DictItem | undefined;
+    const options: DictItem[] = [{ name: emptyLabel, value: '', description: emptyDesc }];
+    if (swimlane?.value || swimlane?.name) {
+      const code = swimlane.value ?? swimlane.name;
+      options.push({ name: `当前泳道: ${swimlane.name}`, value: code, description: swimlaneDesc(code) });
+    }
+    return options;
+  };
+}
 
 /**
  * 功能矩阵配置
@@ -30,6 +52,9 @@ const builtInFeatures: Feature[] = [
     requiredKeys: ['tenant', 'swimlane'],
     action: 'login',
     icon: icon('login'),
+    actionHandler: async (context, wf) => {
+      wf.startTask(TASK_LOGIN, context);
+    },
   },
   {
     id: 'tenant_base_login',
@@ -37,8 +62,24 @@ const builtInFeatures: Feature[] = [
     description: '选择环境（测试主干 / ST / Prod）登录',
     requiredKeys: ['tenant'],
     showAlways: true,
-    action: 'go_login_env_select',
+    action: 'login_env',
     icon: icon('login'),
+    requiredInputs: [
+      {
+        key: FIELD_LOGIN_ENV_KEY,
+        label: '登录环境',
+        placeholder: '请选择登录环境',
+        disableManualInput: true,
+        fetchOptions: async (): Promise<DictItem[]> =>
+          Object.entries(LOGIN_ENV_CONFIGS).map(([key, conf]) => ({
+            name: conf.label,
+            value: key,
+          })),
+      },
+    ],
+    actionHandler: async (context, wf) => {
+      wf.startTask(TASK_LOGIN_ENV, context);
+    },
   },
   {
     id: 'jump_qnh_management',
@@ -46,6 +87,9 @@ const builtInFeatures: Feature[] = [
     description: '',
     requiredKeys: ['swimlane'],
     action: 'jump_qnh_management',
+    type: 'open_url',
+    urlTemplate: (data: ContextData) =>
+      `https://${(data['swimlane'] as DictItem).value}-sl-management.shangou.test.meituan.com/`,
     icon: icon('search'),
   },
   {
@@ -54,6 +98,9 @@ const builtInFeatures: Feature[] = [
     description: '',
     requiredKeys: ['swimlane'],
     action: 'jump_qnh',
+    type: 'open_url',
+    urlTemplate: (data: ContextData) =>
+      `https://${(data['swimlane'] as DictItem).value}-sl-qnh.shangou.test.meituan.com/`,
     icon: icon('search'),
   },
   {
@@ -138,7 +185,7 @@ const builtInFeatures: Feature[] = [
           const swimlane = contextData['swimlane'] as DictItem;
           const stackUuid = swimlane.description ?? '';
           try {
-            const proxyDest = `https://dev.sankuai.com/gateway/cargo/api/stack?type=runners_octo_status&stack_uuid=${stackUuid}`;
+            const proxyDest = `${CARGO_DEV_BASE_URL}/stack?type=runners_octo_status&stack_uuid=${stackUuid}`;
             const response = await http.proxy<{ data?: Record<string, MachineInfo> }>('GET', proxyDest);
             Logger.info('接口响应', response as object);
             if (response?.data) {
@@ -158,17 +205,15 @@ const builtInFeatures: Feature[] = [
       },
     ],
     action: 'view_swimlane_machines_action',
-    actionHandler: async (context) => {
-      const machine = (context.data['machine'] as DictItem & { value: MachineInfo }).value;
-      openUrl(`https://jumper.mws.sankuai.com/terminal?hostIp=${machine.ip}`);
+    type: 'open_url',
+    urlTemplate: (data: ContextData) => {
+      const machine = (data['machine'] as DictItem & { value: MachineInfo }).value;
+      return `${JUMPER_BASE_URL}?hostIp=${machine.ip}`;
     },
   },
   {
     id: 'view_appkey_machines',
-    name: (data: ContextData) => {
-      const appkey = data['appkey'] as DictItem | undefined;
-      return `🖥️ appkey 机器列表`;
-    },
+    name: () => `🖥️ appkey 机器列表`,
     description: (data: ContextData) => {
       const appkey = data['appkey'] as DictItem | undefined;
       return `${appkey ? ` ${appkey.name}` : ''}`;
@@ -191,7 +236,7 @@ const builtInFeatures: Feature[] = [
           const appkey = contextData['appkey'] as DictItem;
           const appkeyValue = appkey.value ?? appkey.name;
           try {
-            const proxyDest = `https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck/serverNodes?appkey=${appkeyValue}&env=test`;
+            const proxyDest = `${OCTO_BASE_URL}/api/octo/v2/thriftcheck/serverNodes?appkey=${appkeyValue}&env=test`;
             const response = await http.proxy<OctoServerNodesResponse>('GET', proxyDest);
             Logger.info('appkey 机器列表响应', response as object);
             if (response?.success && Array.isArray(response.data)) {
@@ -242,7 +287,7 @@ const builtInFeatures: Feature[] = [
           const node = (contextData['appkey_node'] as DictItem & { value: OctoServerNode }).value;
           const appkeyValue = appkey.value ?? appkey.name;
           try {
-            const proxyDest = `https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck/serviceMethods?appkey=${appkeyValue}&host=${node.ip}&port=${node.port}&isRequestPort=false`;
+            const proxyDest = `${OCTO_BASE_URL}/api/octo/v2/thriftcheck/serviceMethods?appkey=${appkeyValue}&host=${node.ip}&port=${node.port}&isRequestPort=false`;
             const response = await http.proxy<OctoServiceMethodsResponse>('GET', proxyDest);
             Logger.info('服务方法响应', response as object);
             if (response?.success && response.data) {
@@ -280,7 +325,7 @@ const builtInFeatures: Feature[] = [
         sendNotification(`已复制方法: ${method}`, '复制成功');
       } else {
         // 默认：跳转节点
-        openUrl(`https://jumper.mws.sankuai.com/terminal?hostIp=${node.ip}`);
+        openUrl(`${JUMPER_BASE_URL}?hostIp=${node.ip}`);
       }
     },
   },
@@ -306,10 +351,10 @@ const builtInFeatures: Feature[] = [
           const tenantId = tenant.value ?? '';
           try {
             const response = await http.post<{ data: { return: string } }>(
-              'http://www.swiftlc.com:8080/api/octo-invoke',
+              OCTO_INVOKE_URL,
               {
                 params: { tenantId: parseInt(tenantId, 10), poiStatus: 1 },
-                appkey: 'com.sankuai.shangou.empower.tenant',
+                appkey: TENANT_EMPOWER_APPKEY,
                 swimlane: '',
                 methodKeyword: 'PoiThriftService#queryPoiInfoListByCondition',
               },
@@ -355,9 +400,7 @@ const builtInFeatures: Feature[] = [
     requiredKeys: ['kafka_topic'],
     icon: icon('workflow'),
     action: 'kafka_menu_action',
-    actionHandler: async (context, wf) => {
-      wf.triggerAlfred(encodeContext({ state: STATE_KAFKA_OPS, data: context.data }));
-    },
+    targetState: STATE_KAFKA_OPS,
   },
   // ─── Kafka 子操作（仅在 kafka_ops 状态中展示，主菜单隐藏） ─────────────────────
   {
@@ -367,10 +410,9 @@ const builtInFeatures: Feature[] = [
     requiredKeys: ['kafka_topic'],
     icon: icon('task'),
     action: 'kafka_consumer_groups_action',
-    condition: () => false, // 不在主菜单展示，由 kafka_ops 状态直接渲染
-    actionHandler: async (context, wf) => {
-      wf.triggerAlfred(encodeContext({ state: STATE_KAFKA_CONSUMERS, data: context.data }));
-    },
+    menuGroup: STATE_KAFKA_OPS,
+    condition: () => false,
+    targetState: STATE_KAFKA_CONSUMERS,
   },
   {
     id: 'kafka_query_messages',
@@ -379,6 +421,7 @@ const builtInFeatures: Feature[] = [
     requiredKeys: ['kafka_topic'],
     icon: icon('search'),
     action: 'kafka_query_messages_action',
+    menuGroup: STATE_KAFKA_OPS,
     condition: () => false,
     requiredInputs: [
       {
@@ -391,39 +434,18 @@ const builtInFeatures: Feature[] = [
         key: 'swimlane_filter',
         label: '泳道过滤',
         placeholder: '输入泳道code，或从列表选择，留空=不过滤',
-        fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
-          const swimlane = contextData['swimlane'] as DictItem | undefined;
-          const options: DictItem[] = [
-            { name: '不过滤（全部消息）', value: '', description: '返回所有泳道的消息' },
-          ];
-          if (swimlane?.value || swimlane?.name) {
-            const code = swimlane.value ?? swimlane.name;
-            options.push({
-              name: `当前泳道: ${swimlane.name}`,
-              value: code,
-              description: `仅展示 tag 包含 ${code} 的消息`,
-            });
-          }
-          return options;
-        },
+        fetchOptions: buildSwimlaneOptions('不过滤（全部消息）', '返回所有泳道的消息', (code) => `仅展示 tag 包含 ${code} 的消息`),
       },
     ],
     actionHandler: async (context, wf) => {
       const topic = context.data['kafka_topic'] as DictItem;
-      const topicId = (topic as unknown as Record<string, string>)['_topicId'] ?? '';
+      const topicId = (topic as unknown as Record<string, string>)[FIELD_TOPIC_ID] ?? '';
       const datetimeInput = context.data['msg_datetime'] as DictItem | undefined;
       const swimlaneFilter = context.data['swimlane_filter'] as DictItem | undefined;
 
-      // 支持相对/绝对时间解析
-      const rawDatetime = datetimeInput?.name && datetimeInput.name !== datetimeInput.value
-        ? datetimeInput.name
-        : (datetimeInput?.value ?? '');
-      const datetime = resolveQueryDatetime(rawDatetime || undefined);
+      const datetime = resolveQueryDatetime(datetimeInput?.value || undefined);
 
-      // 优先用 value（列表选择），其次用 name（手动输入），空值=不过滤
-      const swimlaneCode = swimlaneFilter?.value !== undefined && swimlaneFilter.value !== ''
-        ? swimlaneFilter.value
-        : (swimlaneFilter?.name && swimlaneFilter.name !== '不过滤（全部消息）' ? swimlaneFilter.name : '');
+      const swimlaneCode = swimlaneFilter?.value ?? '';
 
       // cacheKey 含 topicId + 时间 + 泳道，不同参数各自独立
       const cacheKey = `kafka_messages:${topicId}:${datetime}:${swimlaneCode}`;
@@ -446,6 +468,7 @@ const builtInFeatures: Feature[] = [
     requiredKeys: ['kafka_topic'],
     icon: icon('login'),
     action: 'kafka_send_message_action',
+    menuGroup: STATE_KAFKA_OPS,
     condition: () => false,
     requiredInputs: [
       {
@@ -457,21 +480,7 @@ const builtInFeatures: Feature[] = [
         key: 'send_swimlane',
         label: '发送泳道',
         placeholder: '输入泳道code，或从列表选择，留空=不指定泳道',
-        fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
-          const swimlane = contextData['swimlane'] as DictItem | undefined;
-          const options: DictItem[] = [
-            { name: '不指定泳道', value: '', description: '发送到默认泳道' },
-          ];
-          if (swimlane?.value || swimlane?.name) {
-            const code = swimlane.value ?? swimlane.name;
-            options.push({
-              name: `当前泳道: ${swimlane.name}`,
-              value: code,
-              description: `发送到泳道 ${code}`,
-            });
-          }
-          return options;
-        },
+        fetchOptions: buildSwimlaneOptions('不指定泳道', '发送到默认泳道', (code) => `发送到泳道 ${code}`),
       },
     ],
     actionHandler: async (context) => {
@@ -480,13 +489,10 @@ const builtInFeatures: Feature[] = [
       const messageBodyInput = context.data['message_body'] as DictItem | undefined;
       const sendSwimlane = context.data['send_swimlane'] as DictItem | undefined;
 
-      const baseTopicId = (topic as unknown as Record<string, string>)['_topicId'] ?? '0';
+      const baseTopicId = (topic as unknown as Record<string, string>)[FIELD_TOPIC_ID] ?? '0';
       const appkeyValue = appkey?.value ?? appkey?.name ?? '';
       const messageBody = messageBodyInput?.value ?? messageBodyInput?.name ?? '{}';
-      // 泳道：优先 value（列表选择），其次 name（手动输入）
-      const swimlaneCode = sendSwimlane?.value !== undefined && sendSwimlane.value !== ''
-        ? sendSwimlane.value
-        : (sendSwimlane?.name && sendSwimlane.name !== '不指定泳道' ? sendSwimlane.name : '');
+      const swimlaneCode = sendSwimlane?.value ?? '';
 
       try {
         const envTopicId = Number(await resolveEnvTopicId(baseTopicId));
@@ -507,10 +513,7 @@ const builtInFeatures: Feature[] = [
             topicId: envTopicId,
             appkey: appkeyValue,
           },
-          headers: {
-            'm-appkey': 'fe_mafka-fe',
-            'Content-Type': 'application/json',
-          },
+          headers: { ...MAFKA_HEADERS, 'Content-Type': 'application/json' },
         });
         Logger.info('发送消息响应', response as object);
 
@@ -581,38 +584,6 @@ interface PoiResponse {
 }
 
 // ─── mafka 相关类型 ────────────────────────────────────────────────────────────
-
-interface MafkaConsumerGroup {
-  id: number;
-  name: string;
-  appkey: string;
-  topicName: string;
-  remark: string | null;
-  status: number;
-  environment: string;
-}
-
-interface MafkaConsumerListResponse {
-  code: number;
-  msg: string;
-  data: MafkaConsumerGroup[];
-}
-
-interface MafkaMessage {
-  offset: number;
-  timestamp: string;
-  content: string;
-  partitionId: number;
-  msgId: string;
-  tag: string | null;
-  clusterName: string;
-}
-
-interface MafkaMessageQueryResponse {
-  code: number;
-  msg: string;
-  data: MafkaMessage[];
-}
 
 interface MafkaSendResponse {
   code: number;
