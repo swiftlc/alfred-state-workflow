@@ -17,6 +17,7 @@ import CacheManager from '../core/CacheManager';
 import {http} from '../core/HttpClient';
 import type {DictCategory, DictItem, ContextData} from '../types';
 import {PROXY_BASE_URL} from '../config/features';
+import {MIS_USERNAME, OCTO_BASE_URL, FIELD_TOPIC_ID, MAFKA_BASE_URL, MAFKA_HEADERS} from '../config/constants';
 
 const DEFAULT_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
 
@@ -30,9 +31,7 @@ interface OctoAppsResponse {
 }
 
 const APPKEY_DEST_URL =
-  'https://octo.mws-test.sankuai.com/api/octo/v2/common/apps?mis=liucheng58';
-
-const MAFKA_BASE_URL = 'https://mafka.mws-test.sankuai.com';
+  `${OCTO_BASE_URL}/api/octo/v2/common/apps?mis=${MIS_USERNAME}`;
 
 // ─── mafka 接口类型 ────────────────────────────────────────────────────────────
 
@@ -115,7 +114,7 @@ const DICTS: DictCategory[] = [
         ? `${MAFKA_BASE_URL}/mafka/restful/topic/list?pageNum=1&limit=1000&type=2&content=${encodeURIComponent(appkeyValue)}&auth=2`
         : `${MAFKA_BASE_URL}/mafka/restful/topic/list?pageNum=1&limit=1000&type=3&content=&auth=2`;
       const response = await http.proxy<MafkaTopicListResponse>('GET', destUrl, {
-        headers: { 'm-appkey': 'fe_mafka-fe' },
+        headers: MAFKA_HEADERS,
       });
       if (response?.code === 0 && Array.isArray(response.data?.list)) {
         return response.data.list
@@ -124,7 +123,7 @@ const DICTS: DictCategory[] = [
             name: t.remark ? t.remark : t.name,
             value: t.name,
             description: t.name,
-            _topicId: String(t.id),
+            [FIELD_TOPIC_ID]: String(t.id),
           }));
       }
       return [];

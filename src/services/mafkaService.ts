@@ -1,8 +1,7 @@
 import {http} from '../core/HttpClient';
+import {MAFKA_BASE_URL, MAFKA_HEADERS, MAFKA_TARGET_ENV} from '../config/constants';
 
-export const MAFKA_BASE_URL = 'https://mafka.mws-test.sankuai.com';
-
-const MAFKA_HEADERS = { 'm-appkey': 'fe_mafka-fe' };
+export {MAFKA_BASE_URL};
 
 export interface MafkaMsgItem {
   msgId: string;
@@ -23,7 +22,7 @@ export async function resolveEnvTopicId(baseTopicId: string): Promise<string> {
       'GET', destUrl, { headers: MAFKA_HEADERS }
     );
     if (response?.code === 0 && Array.isArray(response.data)) {
-      const testTopic = response.data.find((t) => t.environment === 'test');
+      const testTopic = response.data.find((t) => t.environment === MAFKA_TARGET_ENV);
       if (testTopic) return String(testTopic.id);
     }
   } catch { /* 降级：使用 base topicId */ }

@@ -302,6 +302,19 @@ class Workflow {
       const feature = features.find((f) => f.action === action);
       if (feature && typeof feature.actionHandler === 'function') {
         handler = feature.actionHandler;
+      } else if (feature?.type === 'open_url' && feature.urlTemplate) {
+        const template = feature.urlTemplate;
+        const { openUrl } = require('./utils') as typeof import('./utils');
+        handler = async (ctx) => {
+          const url = typeof template === 'function' ? template(ctx.data) : template;
+          openUrl(url);
+        };
+      } else if (feature?.targetState) {
+        const targetState = feature.targetState;
+        const { encodeContext: encode } = require('./utils') as typeof import('./utils');
+        handler = async (ctx) => {
+          this.triggerAlfred(encode({ state: targetState, data: ctx.data }));
+        };
       }
     }
 
