@@ -203,6 +203,17 @@ export interface Feature {
    * 状态处理器通过 features.filter(f => f.menuGroup === stateId) 动态收集，无需硬编码 ID 列表。
    */
   menuGroup?: string;
+  /**
+   * 为 true 时，该 feature 可在环境嗅探结果页直接启动。
+   * 展示条件：showInSensing=true 且 requiredKeys 全部存在于嗅探结果中（condition 也需通过）。
+   * 选中后自动将嗅探结果注入上下文，然后进入该 feature 的操作流程。
+   */
+  showInSensing?: boolean;
+  /**
+   * 查询触发展示模式：当主页搜索框内容包含 queryContains（大小写不敏感）时展示该 feature，
+   * 忽略 requiredKeys / showAlways / condition 的常规上下文检查。
+   */
+  showWhen?: { queryContains: string };
 }
 
 // ─── 任务相关 ──────────────────────────────────────────────────────────────────

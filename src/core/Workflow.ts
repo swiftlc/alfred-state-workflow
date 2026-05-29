@@ -92,12 +92,10 @@ class Workflow {
 
   saveContext(context: Partial<Context>): void {
     try {
-      const contextToSave: Partial<Context> & { timestamp: number } = {
+      const contextToSave = {
+        ...context,
         state: context.state ?? DEFAULT_STATE,
         data: context.data ?? {},
-        pendingAction: context.pendingAction,
-        inputIndex: context.inputIndex,
-        jobId: context.jobId,
         timestamp: Date.now(),
       };
       fs.writeFileSync(CONTEXT_FILE, JSON.stringify(contextToSave, null, 2), 'utf8');
@@ -160,13 +158,9 @@ class Workflow {
     child.unref();
 
     const nextArg = encodeContext({
+      ...context,
       state: STATE_PROGRESS,
       jobId,
-      data: context.data,
-      returnState: context.returnState,
-      pendingAction: context.pendingAction,
-      inputIndex: context.inputIndex,
-      [FIELD_SILENT_ON_SUCCESS]: context[FIELD_SILENT_ON_SUCCESS],
     });
     this.triggerAlfred(nextArg);
   }
