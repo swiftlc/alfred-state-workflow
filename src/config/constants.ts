@@ -69,6 +69,8 @@ export const FIELD_QUERY_PERSIST = '_persistCache';
 export const FIELD_QUERY_REFRESH_ACTION = '_refreshAction';
 /** 为 true 时跳过缓存检查，强制重新查询 */
 export const FIELD_QUERY_FORCE_REFRESH = '_forceRefresh';
+/** 缓存为空时重新拉取所用的后台任务名 */
+export const FIELD_QUERY_TASK_NAME = '_queryTaskName';
 
 /** spawnWorker 时生成的 job id（仅 worker 进程内部使用） */
 export const FIELD_PREFETCH_JOB_ID = '_prefetchJobId';
@@ -101,6 +103,11 @@ export const TASK_PREFETCH_OPTIONS = '_prefetch_options';
 export const TASK_PREFETCH_MESSAGES = '_prefetch_messages';
 /** 预加载 kafka 消费者组的后台 worker 任务名 */
 export const TASK_PREFETCH_CONSUMERS = '_prefetch_consumers';
+
+/** 重新加载 item 携带的数据缓存 key（action 执行时清除） */
+export const FIELD_RELOAD_CACHE_KEY = '_reloadCacheKey';
+/** 重新加载 item 携带的 loading 防重锁 key（action 执行时清除，可选） */
+export const FIELD_RELOAD_LOADING_KEY = '_reloadLoadingKey';
 
 /** 租户泳道登录后台任务名 */
 export const TASK_LOGIN = 'login_task';

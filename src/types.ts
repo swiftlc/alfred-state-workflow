@@ -23,6 +23,8 @@ export interface DictCategory {
   fallbackItems?: DictItem[];
   /** 是否允许修改字典条目描述，默认 true；设为 false 时该字典不出现在「修改描述」功能中 */
   allowDescriptionEdit?: boolean;
+  /** 缓存命中时是否展示「重新加载」item，默认 true；只读/静态字典可设为 false */
+  allowReload?: boolean;
   /**
    * 复制字典项时的取值方式：
    * - 'value'：仅复制 item.value
@@ -146,6 +148,11 @@ export interface RequiredInput {
    * 不填默认 60 秒。
    */
   cacheTtl?: number;
+  /**
+   * 是否在缓存命中时展示「重新加载」item（默认 true，设为 false 可关闭）。
+   * 仅在 cacheKey 存在时生效。
+   */
+  allowReload?: boolean;
   /**
    * 输入预览函数：将用户输入转换为更易读的展示文本，附加在 item title 后。
    * 例如将 "2h" 转换为 "→ 2026-04-14 15:30:00"，让用户实时确认解析结果。

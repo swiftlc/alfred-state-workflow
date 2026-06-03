@@ -6,7 +6,7 @@ import CacheManager from '../core/CacheManager';
 import {copyToClipboard, openUrl, sendNotification, encodeContext} from '../core/utils';
 import {icon} from '../core/icons';
 import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS, STATE_KAFKA_CONSUMERS, STATE_KAFKA_MESSAGES, FIELD_MSG_CACHE_KEY, FIELD_MSG_DATETIME, FIELD_MSG_SWIMLANE, FIELD_MSG_BASE_TOPIC_ID, FIELD_LOGIN_ENV_KEY, FIELD_TOPIC_ID, LOGIN_ENV_CONFIGS, OCTO_BASE_URL, MAFKA_HEADERS, JUMPER_BASE_URL, CARGO_DEV_BASE_URL, OCTO_INVOKE_URL, TENANT_EMPOWER_APPKEY, TASK_LOGIN, TASK_LOGIN_ENV, STATE_SHEPHERD_RESULT, STATE_SHEPHERD_SEARCH, STATE_LION_CONFIG} from './constants';
-import {startWithCacheCheck} from '../core/persistentQuery';
+import {createPersistentQueryHandler} from '../core/persistentQuery';
 import {resolveQueryDatetime} from '../core/timeUtils';
 import dictService, {DictService} from '../services/dictService';
 import {resolveEnvTopicId, MAFKA_BASE_URL} from '../services/mafkaService';
@@ -231,26 +231,37 @@ const builtInFeatures: Feature[] = [
         cacheKey: (contextData: ContextData) => {
           const appkey = contextData['appkey'] as DictItem | undefined;
           const appkeyValue = appkey?.value ?? appkey?.name ?? '';
-          return `appkey_nodes:${appkeyValue}:test`;
+          const swimlane = contextData['swimlane'] as DictItem | undefined;
+          const swimlaneValue = swimlane?.value ?? swimlane?.name ?? '';
+          return `appkey_nodes:${appkeyValue}:test:${swimlaneValue}`;
         },
         cacheTtl: 60 * 1000,
         fetchOptions: async (_query: string, contextData: ContextData): Promise<DictItem[]> => {
           const appkey = contextData['appkey'] as DictItem;
           const appkeyValue = appkey.value ?? appkey.name;
+          const ctxSwimlane = (contextData['swimlane'] as DictItem | undefined)?.value
+            ?? (contextData['swimlane'] as DictItem | undefined)?.name
+            ?? '';
           try {
             const proxyDest = `${OCTO_BASE_URL}/api/octo/v2/thriftcheck/serverNodes?appkey=${appkeyValue}&env=test`;
             const response = await http.proxy<OctoServerNodesResponse>('GET', proxyDest);
             Logger.info('appkey 机器列表响应', response as object);
             if (response?.success && Array.isArray(response.data)) {
-              return response.data.map((node) => {
+              const toItem = (node: OctoServerNode, hit: boolean): DictItem => {
                 const statusText = node.status === 0 ? '正常' : `异常(${node.status})`;
-                const swimlaneText = node.swimlane ? `${node.swimlane}` : 'default';
+                const swimlaneText = node.swimlane || 'default';
                 return {
-                  name: `${node.ip} | ${swimlaneText}`,
-                  description: ` 状态: ${statusText}`,
+                  name: hit ? `★ ${node.ip} | ${swimlaneText}` : `${node.ip} | ${swimlaneText}`,
+                  description: hit ? `⬆ 当前泳道  状态: ${statusText}` : `状态: ${statusText}`,
                   value: node as unknown as string,
                 };
-              });
+              };
+              const matched = response.data.filter((n) => ctxSwimlane && n.swimlane === ctxSwimlane);
+              const others  = response.data.filter((n) => !ctxSwimlane || n.swimlane !== ctxSwimlane);
+              return [
+                ...matched.map((n) => toItem(n, true)),
+                ...others.map((n) => toItem(n, false)),
+              ];
             }
             return [];
           } catch {
@@ -455,16 +466,14 @@ const builtInFeatures: Feature[] = [
       return !!(route?.value?.startsWith('/qnh-gw'));
     },
     action: 'shepherd_query_action',
-    actionHandler: async (context, wf) => {
-      const route = (context.data['route'] as DictItem)?.value ?? '';
-      Logger.info(`shepherd_query route=${route}`);
-      await startWithCacheCheck(wf, context, {
-        taskName: 'shepherd_query_task',
-        cacheKey: `shepherd:route:${route}`,
-        resultState: STATE_SHEPHERD_RESULT,
-        refreshAction: 'shepherd_query_action',
-      });
-    },
+    actionHandler: createPersistentQueryHandler({
+      taskName: 'shepherd_query_task',
+      cacheKey: (data) => {
+        const route = (data['route'] as DictItem | undefined)?.value ?? '';
+        return route ? `shepherd:route:${route}` : '';
+      },
+      resultState: STATE_SHEPHERD_RESULT,
+    }),
   },
   // ─── Shepherd 接口全量搜索 ────────────────────────────────────────────────────
   {
@@ -475,14 +484,11 @@ const builtInFeatures: Feature[] = [
     showWhen: { queryContains: 'sh' },
     icon: icon('search'),
     action: 'shepherd_search_action',
-    actionHandler: async (context, wf) => {
-      await startWithCacheCheck(wf, context, {
-        taskName: 'shepherd_search_task',
-        cacheKey: 'shepherd:all_apis',
-        resultState: STATE_SHEPHERD_SEARCH,
-        refreshAction: 'shepherd_search_action',
-      });
-    },
+    actionHandler: createPersistentQueryHandler({
+      taskName: 'shepherd_search_task',
+      cacheKey: () => 'shepherd:all_apis',
+      resultState: STATE_SHEPHERD_SEARCH,
+    }),
   },
   // ─── Lion 动态配置查询 ────────────────────────────────────────────────────────
   {
@@ -504,20 +510,17 @@ const builtInFeatures: Feature[] = [
       },
     ],
     action: 'lion_config_action',
-    actionHandler: async (context, wf) => {
-      const appkey =
-        (context.data['appkey'] as DictItem | undefined)?.value ??
-        (context.data['lion_appkey_input'] as DictItem | undefined)?.value ??
-        '';
-      if (!appkey) return;
-      Logger.info(`lion_config appkey=${appkey}`);
-      await startWithCacheCheck(wf, context, {
-        taskName: 'lion_config_task',
-        cacheKey: `lion:config:${appkey}`,
-        resultState: STATE_LION_CONFIG,
-        refreshAction: 'lion_config_action',
-      });
-    },
+    actionHandler: createPersistentQueryHandler({
+      taskName: 'lion_config_task',
+      cacheKey: (data) => {
+        const appkey =
+          (data['appkey'] as DictItem | undefined)?.value ??
+          (data['lion_appkey_input'] as DictItem | undefined)?.value ??
+          '';
+        return appkey ? `lion:config:${appkey}` : '';
+      },
+      resultState: STATE_LION_CONFIG,
+    }),
   },
   // ─── Kafka 功能入口（二级菜单） ────────────────────────────────────────────────
   {

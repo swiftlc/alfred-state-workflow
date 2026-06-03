@@ -28,9 +28,8 @@ import {
   STATE_SHEPHERD_SEARCH,
   STATE_LION_CONFIG,
   FIELD_QUERY_CACHE_KEY,
-  FIELD_QUERY_PERSIST,
   FIELD_QUERY_REFRESH_ACTION,
-  FIELD_QUERY_FORCE_REFRESH,
+  FIELD_QUERY_TASK_NAME,
   FIELD_SENSING_SELECTED,
   RERUN_INTERVAL_PROGRESS,
   RERUN_INTERVAL_LOADING,
@@ -54,6 +53,8 @@ import {
   TASK_PREFETCH_OPTIONS,
   TASK_PREFETCH_MESSAGES,
   TASK_PREFETCH_CONSUMERS,
+  FIELD_RELOAD_CACHE_KEY,
+  FIELD_RELOAD_LOADING_KEY,
 } from '../config/constants';
 import {type MafkaMsgItem} from '../services/mafkaService';
 import DictPinManager from '../core/DictPinManager';
@@ -62,7 +63,8 @@ import TaskManager from '../core/TaskManager';
 import HistoryManager from '../core/HistoryManager';
 import WorkspaceManager, {WorkspaceManager as WorkspaceManagerClass} from '../core/WorkspaceManager';
 import AliasManager from '../core/AliasManager';
-import {matchQuery, SPINNERS, makeLoadingOutput, spawnIfNotLoading} from '../core/utils';
+import {matchQuery, matchQueryOpts, SPINNERS, makeLoadingOutput, spawnIfNotLoading} from '../core/utils';
+import {startWithCacheCheck} from '../core/persistentQuery';
 import Icons, {icon} from '../core/icons';
 import type Workflow from '../core/Workflow';
 import type {AlfredItem, Context, ContextData, DictItem, Feature} from '../types';
@@ -998,6 +1000,21 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
+    // 缓存命中时追加「重新加载」item（仅当字典 allowReload !== false）
+    if (cached !== null && dictConfig?.allowReload !== false && (!query || matchQuery(query, '重新加载'))) {
+      const dictCacheKey = dictService.resolveItemsCacheKey(dictKey, data);
+      items.push(
+        wf.createItem('🔄 重新加载', `清除缓存并重新获取 ${dictName} 列表`, 'reload_cache', {
+          state: STATE_SELECT_DICT,
+          dictKey,
+          data,
+          pendingAction,
+          [FIELD_RELOAD_CACHE_KEY]: dictCacheKey,
+          [FIELD_RELOAD_LOADING_KEY]: `loading:dict_items_${dictKey}`,
+        }, {}, Icons.context)
+      );
+    }
+
     if (matchQuery(query, '返回')) {
       items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data }, {}, Icons.workflow));
     }
@@ -1127,6 +1144,19 @@ export default function registerStates(app: Workflow): void {
                 )
               );
             }
+          }
+
+          // 缓存命中时追加「重新加载」item，仅当 allowReload !== false 且 query 无输入或匹配时展示
+          if (currentInput.allowReload !== false && (!query || matchQuery(query, '重新加载'))) {
+            items.push(
+              wf.createItem('🔄 重新加载', `清除缓存并重新获取 ${currentInput.label}`, 'reload_cache', {
+                state: STATE_INPUT,
+                data,
+                pendingAction,
+                inputIndex,
+                [FIELD_RELOAD_CACHE_KEY]: resolvedCacheKey,
+              }, {}, featureIconPath)
+            );
           }
         }
       } else {
@@ -1990,8 +2020,8 @@ export default function registerStates(app: Workflow): void {
     const data = context.data ?? {};
     const route = (data['route'] as DictItem | undefined)?.value ?? '';
     const cacheKey = (context[FIELD_QUERY_CACHE_KEY] as string | undefined) ?? `shepherd:route:${route}`;
-    const isPersist = !!(context[FIELD_QUERY_PERSIST] as boolean | undefined);
-    const refreshAction = context[FIELD_QUERY_REFRESH_ACTION] as string | undefined;
+    const refreshAction = (context[FIELD_QUERY_REFRESH_ACTION] as string | undefined) ?? '';
+    const taskName = context[FIELD_QUERY_TASK_NAME] as string | undefined;
 
     interface ShepherdResult {
       apiId: number; apiGroupId: number; apiGroupName: string; apiName: string;
@@ -2001,6 +2031,11 @@ export default function registerStates(app: Workflow): void {
     const results = await CacheManager.get<ShepherdResult[]>(cacheKey);
 
     if (results === null) {
+      if (cacheKey && taskName) {
+        await startWithCacheCheck(wf, context, {
+          taskName, cacheKey, resultState: STATE_SHEPHERD_RESULT, refreshAction,
+        });
+      }
       return makeLoadingOutput('正在查询 Shepherd 接口...', route);
     }
 
@@ -2025,16 +2060,21 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    if (isPersist && refreshAction) {
-      items.push(wf.createItem(
-        '🔄 刷新缓存',
-        '重新从 Shepherd 查询最新数据',
-        refreshAction,
-        { data, [FIELD_QUERY_FORCE_REFRESH]: true },
-        {},
-        Icons.workflow,
-      ));
-    }
+    items.push(wf.createItem(
+      '🔄 重新加载',
+      '清除缓存并重新从 Shepherd 查询',
+      'reload_cache',
+      {
+        state: context.state,
+        data,
+        [FIELD_RELOAD_CACHE_KEY]: cacheKey,
+        [FIELD_QUERY_CACHE_KEY]: cacheKey,
+        [FIELD_QUERY_REFRESH_ACTION]: refreshAction,
+        [FIELD_QUERY_TASK_NAME]: taskName,
+      },
+      {},
+      Icons.workflow,
+    ));
 
     items.push(wf.createRerunItem('🔙 返回', route, DEFAULT_STATE, { data }, {}, Icons.workflow));
     return items;
@@ -2048,8 +2088,8 @@ export default function registerStates(app: Workflow): void {
     const query = context.query ?? '';
     const data = context.data ?? {};
     const cacheKey = (context[FIELD_QUERY_CACHE_KEY] as string | undefined) ?? 'shepherd:all_apis';
-    const isPersist = !!(context[FIELD_QUERY_PERSIST] as boolean | undefined);
-    const refreshAction = context[FIELD_QUERY_REFRESH_ACTION] as string | undefined;
+    const refreshAction = (context[FIELD_QUERY_REFRESH_ACTION] as string | undefined) ?? '';
+    const taskName = context[FIELD_QUERY_TASK_NAME] as string | undefined;
 
     interface ShepherdApiItem {
       id: number; name: string; path: string; description: string; apiGroupId: number; apiGroupName: string;
@@ -2058,12 +2098,16 @@ export default function registerStates(app: Workflow): void {
     const allApis = await CacheManager.get<ShepherdApiItem[]>(cacheKey);
 
     if (allApis === null) {
+      if (cacheKey && taskName) {
+        await startWithCacheCheck(wf, context, {
+          taskName, cacheKey, resultState: STATE_SHEPHERD_SEARCH, refreshAction,
+        });
+      }
       return makeLoadingOutput('正在加载 Shepherd 接口列表...', '首次加载需要一段时间');
     }
 
     const items: AlfredItem[] = [];
 
-    // 本地模糊搜索：多关键词空格分隔，各关键词与 name/description/path/groupName 做交集匹配
     const filtered = query
       ? allApis.filter(api => matchQuery(query, api.name, api.description, api.path, api.apiGroupName))
       : allApis.slice(0, SHEPHERD_SEARCH_MAX_DISPLAY);
@@ -2088,17 +2132,21 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    // 刷新按钮：常显（不受搜索条件影响）
-    if (isPersist && refreshAction) {
-      items.push(wf.createItem(
-        '🔄 刷新接口列表',
-        `当前共缓存 ${allApis.length} 个接口，重新从 Shepherd 全量拉取`,
-        refreshAction,
-        { data, [FIELD_QUERY_FORCE_REFRESH]: true },
-        {},
-        Icons.workflow,
-      ));
-    }
+    items.push(wf.createItem(
+      '🔄 重新加载',
+      `当前共缓存 ${allApis.length} 个接口，重新从 Shepherd 全量拉取`,
+      'reload_cache',
+      {
+        state: context.state,
+        data,
+        [FIELD_RELOAD_CACHE_KEY]: cacheKey,
+        [FIELD_QUERY_CACHE_KEY]: cacheKey,
+        [FIELD_QUERY_REFRESH_ACTION]: refreshAction,
+        [FIELD_QUERY_TASK_NAME]: taskName,
+      },
+      {},
+      Icons.workflow,
+    ));
 
     items.push(wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data }, {}, Icons.workflow));
     return items;
@@ -2110,8 +2158,8 @@ export default function registerStates(app: Workflow): void {
     const query = context.query ?? '';
     const data = context.data ?? {};
     const cacheKey = (context[FIELD_QUERY_CACHE_KEY] as string | undefined) ?? '';
-    const isPersist = !!(context[FIELD_QUERY_PERSIST] as boolean | undefined);
-    const refreshAction = context[FIELD_QUERY_REFRESH_ACTION] as string | undefined;
+    const refreshAction = (context[FIELD_QUERY_REFRESH_ACTION] as string | undefined) ?? 'lion_config_action';
+    const taskName = (context[FIELD_QUERY_TASK_NAME] as string | undefined) ?? 'lion_config_task';
 
     const appkey =
       (data['appkey'] as DictItem | undefined)?.value ??
@@ -2129,21 +2177,27 @@ export default function registerStates(app: Workflow): void {
     const allItems = resolvedCacheKey ? await CacheManager.get<LionConfigItem[]>(resolvedCacheKey) : null;
 
     if (allItems === null) {
-      const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
-      return {
-        rerun: RERUN_INTERVAL_LOADING,
-        items: [
-          { title: `${spinner} 正在加载 Lion 配置...`, subtitle: appkey, valid: false } as AlfredItem,
-          wf.createItem('↩️ 重新查询', appkey ? `重新拉取 ${appkey}` : '重新拉取', 'lion_config_action', { data }),
-          wf.createRerunItem('🔙 返回', '返回主菜单', DEFAULT_STATE, { data }, {}, Icons.workflow),
-        ],
-      };
+      if (resolvedCacheKey && appkey) {
+        // 缓存已过期，自动重新拉取，startWithCacheCheck 会触发 STATE_PROGRESS
+        await startWithCacheCheck(wf, context, {
+          taskName,
+          cacheKey: resolvedCacheKey,
+          resultState: STATE_LION_CONFIG,
+          refreshAction,
+        });
+        const spinner = SPINNERS[Math.floor(Date.now() / 200) % SPINNERS.length]!;
+        return {
+          rerun: RERUN_INTERVAL_LOADING,
+          items: [{ title: `${spinner} 正在加载 Lion 配置...`, subtitle: appkey, valid: false } as AlfredItem],
+        };
+      }
+      return [wf.createRerunItem('🔙 返回主菜单', '无法加载配置，请重新选择', DEFAULT_STATE, { data }, {}, Icons.workflow)];
     }
 
     const items: AlfredItem[] = [];
 
     const filtered = query
-      ? allItems.filter((item) => matchQuery(query, item.key, item.name, item.desc, item.testValue ?? '', item.prodValue ?? ''))
+      ? allItems.filter((item) => matchQueryOpts(query, [item.key, item.name, item.desc, item.testValue ?? '', item.prodValue ?? ''], { fuzzy: false }))
       : allItems;
 
     if (filtered.length === 0) {
@@ -2177,16 +2231,21 @@ export default function registerStates(app: Workflow): void {
       }
     }
 
-    if (isPersist && refreshAction) {
-      items.push(wf.createItem(
-        '🔄 刷新配置',
-        `当前共 ${allItems.length} 条，重新拉取 test + prod`,
-        refreshAction,
-        { data, [FIELD_QUERY_FORCE_REFRESH]: true },
-        {},
-        Icons.workflow,
-      ));
-    }
+    items.push(wf.createItem(
+      '🔄 重新加载',
+      `当前共 ${allItems.length} 条，重新拉取 test + prod`,
+      'reload_cache',
+      {
+        state: context.state,
+        data,
+        [FIELD_RELOAD_CACHE_KEY]: resolvedCacheKey,
+        [FIELD_QUERY_CACHE_KEY]: resolvedCacheKey,
+        [FIELD_QUERY_REFRESH_ACTION]: refreshAction,
+        [FIELD_QUERY_TASK_NAME]: taskName,
+      },
+      {},
+      Icons.workflow,
+    ));
 
     items.push(wf.createRerunItem('🔙 返回', appkey, DEFAULT_STATE, { data }, {}, Icons.workflow));
     return items;

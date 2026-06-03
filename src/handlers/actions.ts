@@ -42,6 +42,8 @@ import {
   TASK_LOGIN,
   TASK_LOGIN_ENV,
   FIELD_QUERY_CACHE_KEY,
+  FIELD_RELOAD_CACHE_KEY,
+  FIELD_RELOAD_LOADING_KEY,
 } from '../config/constants';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
@@ -92,6 +94,20 @@ export default function registerActions(app: Workflow): void {
     task.update(10, '正在加载数据...');
     const result = await resolveOptions(currentInput, '', context.data);
     task.update(100, `已加载 ${result.length} 条数据`);
+  });
+
+  // 动作：清除指定缓存并触发 Alfred 跳回原状态（「重新加载」item 专用）
+  app.onAction('reload_cache', async (context, wf) => {
+    const cacheKey = context[FIELD_RELOAD_CACHE_KEY] as string | undefined;
+    const loadingKey = context[FIELD_RELOAD_LOADING_KEY] as string | undefined;
+    if (cacheKey) CacheManager.clear(cacheKey);
+    if (loadingKey) CacheManager.clear(loadingKey);
+
+    const cleanContext = { ...context };
+    delete cleanContext[FIELD_RELOAD_CACHE_KEY];
+    delete cleanContext[FIELD_RELOAD_LOADING_KEY];
+    delete cleanContext.action;
+    wf.triggerAlfred(encodeContext(cleanContext));
   });
 
   // 后台任务：查询 kafka 消息列表并写入缓存
@@ -163,11 +179,12 @@ export default function registerActions(app: Workflow): void {
 
     task.update(10, '登录中...');
 
-    const data = await http.post<{ code: number; message?: string }>(
+    const resp = await http.post<{ success: boolean; data: { code: number; message?: string } }>(
       LOGIN_TASK_API_URL,
       { swimlane: swimlane.value, tenantId: Number(tenant.value) },
       { timeout: 60000 }
     );
+    const data = resp.data;
 
     if (data.code === 0) {
       const targetUrl = `https://${swimlane.value}-sl-qnh.shangou.test.meituan.com/api/v1/sso/loginRedirect`;

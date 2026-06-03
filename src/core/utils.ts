@@ -20,13 +20,32 @@ export function decodeContext(str: string): Record<string, unknown> | null {
   }
 }
 
+export interface MatchQueryOptions {
+  /** 是否启用模糊搜索，默认 true */
+  fuzzy?: boolean;
+}
+
 /**
  * 检查查询字符串是否匹配目标字符串
  * 支持拼音、模糊匹配、空格多条件（AND 逻辑）
  */
 export function matchQuery(query: string, ...targets: (string | undefined | null)[]): boolean {
+  return matchQueryOpts(query, targets);
+}
+
+/**
+ * 可配置搜索模式的 matchQuery 变体
+ * - fuzzy: false → 仅拼音 + 字符串包含
+ * - fuzzy: true（默认）→ 拼音 + 模糊匹配
+ */
+export function matchQueryOpts(
+  query: string,
+  targets: (string | undefined | null)[],
+  options: MatchQueryOptions = {}
+): boolean {
   if (!query) return true;
 
+  const { fuzzy = true } = options;
   const terms = query.split(/\s+/).filter((t) => t.trim() !== '');
   if (terms.length === 0) return true;
 
@@ -35,9 +54,8 @@ export function matchQuery(query: string, ...targets: (string | undefined | null
 
   return terms.every((term) =>
     validTargets.some((target) => {
-      // 1. 拼音匹配
       if (pinyinMatch.match(target, term)) return true;
-      // 2. 模糊匹配 (fuzzysort)
+      if (!fuzzy) return target.toLowerCase().includes(term.toLowerCase());
       const result = fuzzysort.single(term, target) as { score: number } | null;
       return result !== null && result.score > -10000;
     })

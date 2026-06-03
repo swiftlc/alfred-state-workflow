@@ -140,6 +140,14 @@ class DictService {
     return suffix ? `dict_items_${dictKey}:${suffix}` : `dict_items_${dictKey}`;
   }
 
+  /** 计算指定字典的实际缓存 key（供需要精确清缓存的调用方使用） */
+  resolveItemsCacheKey(dictKey: string, contextData?: ContextData): string {
+    const dictConfig = DICTS.find((d) => d.key === dictKey);
+    return dictConfig?.getCacheKey
+      ? dictConfig.getCacheKey(contextData)
+      : DictService.getCacheKey(dictKey);
+  }
+
   /** 获取所有字典类型 */
   async getDictionaries(): Promise<DictCategory[]> {
     return DICTS;
