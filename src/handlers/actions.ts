@@ -58,16 +58,16 @@ export default function registerActions(app: Workflow): void {
   app.onTask(TASK_PREFETCH_DICT, async (task, context) => {
     const dictKey = context[FIELD_PREFETCH_DICT_KEY] as string | undefined;
     if (!dictKey) {
-      task.update(100, '参数缺失');
+      await task.update(100, '参数缺失');
       return;
     }
-    task.update(10, '正在加载字典数据...');
+    await task.update(10, '正在加载字典数据...');
     const loadingKey = `loading:dict_items_${dictKey}`;
     const errorKey = `error:dict_items_${dictKey}`;
     try {
       const items = await dictService.getDictionaryItems(dictKey, context.data as import('../types').ContextData);
       await CacheManager.clear(errorKey);
-      task.update(100, `已加载 ${items.length} 条数据`);
+      await task.update(100, `已加载 ${items.length} 条数据`);
     } catch (err) {
       // 写入错误信息，不缓存数据，下次进来继续重试
       await CacheManager.set(errorKey, (err as Error).message, 30 * 1000);
@@ -87,13 +87,13 @@ export default function registerActions(app: Workflow): void {
     const currentInput = feature?.requiredInputs?.[inputIndex];
 
     if (!currentInput?.fetchOptions || !currentInput.cacheKey) {
-      task.update(100, '无需预加载');
+      await task.update(100, '无需预加载');
       return;
     }
 
-    task.update(10, '正在加载数据...');
+    await task.update(10, '正在加载数据...');
     const result = await resolveOptions(currentInput, '', context.data);
-    task.update(100, `已加载 ${result.length} 条数据`);
+    await task.update(100, `已加载 ${result.length} 条数据`);
   });
 
   // 动作：清除指定缓存并触发 Alfred 跳回原状态（「重新加载」item 专用）
@@ -118,11 +118,11 @@ export default function registerActions(app: Workflow): void {
     const cacheKey = context[FIELD_MSG_CACHE_KEY] as string | undefined;
 
     if (!baseTopicId || !datetime || !cacheKey) {
-      task.update(100, '参数缺失');
+      await task.update(100, '参数缺失');
       return;
     }
 
-    task.update(10, '正在查询消息...');
+    await task.update(10, '正在查询消息...');
 
     const envTopicId = await resolveEnvTopicId(baseTopicId);
     const encodedDt = encodeURIComponent(datetime);
@@ -140,14 +140,14 @@ export default function registerActions(app: Workflow): void {
         }
         messages.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
         await CacheManager.set(cacheKey, messages, 30 * 1000);
-        task.update(100, `已加载 ${messages.length} 条消息`);
+        await task.update(100, `已加载 ${messages.length} 条消息`);
       } else {
         await CacheManager.set(cacheKey, [], 30 * 1000);
-        task.update(100, `查询失败: ${response?.msg ?? '未知错误'}`);
+        await task.update(100, `查询失败: ${response?.msg ?? '未知错误'}`);
       }
     } catch (err) {
       await CacheManager.set(cacheKey, [], 30 * 1000);
-      task.update(100, `查询异常: ${(err as Error).message}`);
+      await task.update(100, `查询异常: ${(err as Error).message}`);
     }
   });
 
@@ -156,19 +156,19 @@ export default function registerActions(app: Workflow): void {
     const topicId = context[FIELD_CONSUMER_TOPIC_ID] as string | undefined;
     const cacheKey = context[FIELD_CONSUMER_CACHE_KEY] as string | undefined;
     if (!topicId || !cacheKey) {
-      task.update(100, '参数缺失');
+      await task.update(100, '参数缺失');
       return;
     }
-    task.update(10, '正在加载消费者组...');
+    await task.update(10, '正在加载消费者组...');
     const destUrl = `${MAFKA_BASE_URL}/mafka/restful/consumer/listByTopicId?topicId=${topicId}&pageNum=1&limit=100&type=3&content=&auth=-1`;
     const response = await http.proxy<{ code: number; msg: string; data: Array<{ id: number; name: string; appkey: string; remark: string | null; status: number; environment: string; topicName: string }> }>('GET', destUrl, {
       headers: MAFKA_HEADERS,
     });
     if (response?.code === 0 && Array.isArray(response.data)) {
       await CacheManager.set(cacheKey, response.data, 2 * 60 * 1000); // 缓存 2 分钟
-      task.update(100, `已加载 ${response.data.length} 个消费者组`);
+      await task.update(100, `已加载 ${response.data.length} 个消费者组`);
     } else {
-      task.update(100, '加载失败');
+      await task.update(100, '加载失败');
     }
   });
 
@@ -177,7 +177,7 @@ export default function registerActions(app: Workflow): void {
     const swimlane = context.data['swimlane'] as DictItem;
     Logger.info('执行后台任务: login_task', context);
 
-    task.update(10, '登录中...');
+    await task.update(10, '登录中...');
 
     const resp = await http.post<{ success: boolean; data: { code: number; message?: string } }>(
       LOGIN_TASK_API_URL,
@@ -188,7 +188,7 @@ export default function registerActions(app: Workflow): void {
 
     if (data.code === 0) {
       const targetUrl = `https://${swimlane.value}-sl-qnh.shangou.test.meituan.com/api/v1/sso/loginRedirect`;
-      task.update(100, `登录成功 ${tenant.value} - ${swimlane.value}`);
+      await task.update(100, `登录成功 ${tenant.value} - ${swimlane.value}`);
       await openUrl(targetUrl);
     } else {
       throw new Error(data.message ?? '未知错误');
@@ -205,7 +205,7 @@ export default function registerActions(app: Workflow): void {
     }
 
     Logger.info('执行后台任务: login_env_task', { envKey, tenantId: tenant?.value });
-    task.update(10, `登录中（${envConfig.label}）...`);
+    await task.update(10, `登录中（${envConfig.label}）...`);
 
     const resp = await http.post<{ code: number; message?: string }>(
       PROXY_BASE_URL,
@@ -214,7 +214,7 @@ export default function registerActions(app: Workflow): void {
     );
 
     if (resp.code === 0) {
-      task.update(100, `登录成功（${envConfig.label}）- 租户 ${tenant.value}`);
+      await task.update(100, `登录成功（${envConfig.label}）- 租户 ${tenant.value}`);
       await openUrl(envConfig.redirectUrl);
     } else {
       throw new Error(resp.message ?? '未知错误');
@@ -377,7 +377,7 @@ export default function registerActions(app: Workflow): void {
   app.onAction('cancel_task', async (context, wf) => {
     const jobId = context.jobId;
     if (jobId) {
-      TaskManager.updateTask(jobId, { status: 'cancelled', message: '任务已取消' });
+      await TaskManager.updateTask(jobId, { status: 'cancelled', message: '任务已取消' });
       sendNotification('后台任务已取消');
     }
     const nextState = context.returnState ?? DEFAULT_STATE;
@@ -388,9 +388,7 @@ export default function registerActions(app: Workflow): void {
   app.onAction('clear_task', async (context, wf) => {
     const jobId = context.jobId;
     if (jobId) {
-      const { existsSync, unlinkSync } = await import('fs');
-      const file = TaskManager.getJobFile(jobId);
-      if (existsSync(file)) unlinkSync(file);
+      await TaskManager.deleteTask(jobId);
     }
     const nextState = context.returnState ?? STATE_TASK_MANAGE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
@@ -398,7 +396,7 @@ export default function registerActions(app: Workflow): void {
 
   // 动作：清除所有已结束的任务记录
   app.onAction('clear_all_tasks', async (context, wf) => {
-    TaskManager.clearTasks(['done', 'error', 'cancelled']);
+    await TaskManager.clearTasks(['done', 'error', 'cancelled']);
     sendNotification('已清除所有结束的任务记录');
     const nextState = context.returnState ?? STATE_TASK_MANAGE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
@@ -610,12 +608,12 @@ export default function registerActions(app: Workflow): void {
 
     if (!appkey) {
       await CacheManager.set(cacheKey, [], LION_CONFIG_TTL);
-      task.update(100, 'appkey 为空');
+      await task.update(100, 'appkey 为空');
       return;
     }
 
     Logger.info(`lion_config_task appkey=${appkey}`);
-    task.update(10, `并发拉取 test + prod 配置...`);
+    await task.update(10, `并发拉取 test + prod 配置...`);
 
     let testItems: LionRawItem[] = [];
     let prodItems: LionRawItem[] = [];
@@ -626,11 +624,11 @@ export default function registerActions(app: Workflow): void {
       ]);
     } catch (err) {
       await CacheManager.set(cacheKey, [], LION_CONFIG_TTL);
-      task.update(100, `拉取失败: ${(err as Error).message}`);
+      await task.update(100, `拉取失败: ${(err as Error).message}`);
       return;
     }
 
-    task.update(80, '合并配置项...');
+    await task.update(80, '合并配置项...');
 
     const merged = new Map<string, LionConfigItem>();
     for (const item of testItems) {
@@ -647,7 +645,7 @@ export default function registerActions(app: Workflow): void {
 
     const result = Array.from(merged.values());
     await CacheManager.set(cacheKey, result, LION_CONFIG_TTL);
-    task.update(100, `共 ${result.length} 个配置项（test: ${testItems.length}, prod: ${prodItems.length}）`);
+    await task.update(100, `共 ${result.length} 个配置项（test: ${testItems.length}, prod: ${prodItems.length}）`);
   });
 
   // 任务：Shepherd 全量接口搜索（拉取所有分组 → 并发批量拉取各分组接口）
@@ -672,7 +670,7 @@ export default function registerActions(app: Workflow): void {
     const cacheKey = (context[FIELD_QUERY_CACHE_KEY] as string | undefined) ?? 'shepherd:all_apis';
     Logger.info('shepherd_search_task 开始');
 
-    task.update(10, '获取所有分组...');
+    await task.update(10, '获取所有分组...');
 
     let groups: ShepherdGroup[] = [];
     try {
@@ -696,12 +694,12 @@ export default function registerActions(app: Workflow): void {
       }
     } catch (err) {
       await CacheManager.set(cacheKey, [], 5 * 60 * 1000);
-      task.update(100, `获取分组失败: ${(err as Error).message}`);
+      await task.update(100, `获取分组失败: ${(err as Error).message}`);
       return;
     }
 
     Logger.info(`shepherd_search_task 共 ${groups.length} 个分组`);
-    task.update(20, `共 ${groups.length} 个分组，开始拉取接口...`);
+    await task.update(20, `共 ${groups.length} 个分组，开始拉取接口...`);
 
     const allApis: ShepherdApiItem[] = [];
     let finished = 0;
@@ -750,11 +748,11 @@ export default function registerActions(app: Workflow): void {
         finished++;
       }));
       const pct = 20 + Math.round((finished / groups.length) * 75);
-      task.update(pct, `已处理 ${finished}/${groups.length} 个分组...`);
+      await task.update(pct, `已处理 ${finished}/${groups.length} 个分组...`);
     }
 
     await CacheManager.set(cacheKey, allApis);  // 无 TTL，持久缓存
-    task.update(100, `共缓存 ${allApis.length} 个接口`);
+    await task.update(100, `共缓存 ${allApis.length} 个接口`);
   });
 
   // 任务：Shepherd 接口信息查询
@@ -772,7 +770,7 @@ export default function registerActions(app: Workflow): void {
       description: string; requestPath: string; serviceName: string; methodName: string; exactMatch: boolean;
     }
 
-    task.update(30, `搜索: ${route}`);
+    await task.update(30, `搜索: ${route}`);
 
     let rawItems: ShepherdSearchItem[] = [];
     try {
@@ -786,7 +784,7 @@ export default function registerActions(app: Workflow): void {
       }
     } catch (err) {
       await CacheManager.set(cacheKey, [], 5 * 60 * 1000);
-      task.update(100, `搜索失败: ${(err as Error).message}`);
+      await task.update(100, `搜索失败: ${(err as Error).message}`);
       return;
     }
 
@@ -808,7 +806,7 @@ export default function registerActions(app: Workflow): void {
     }));
 
     await CacheManager.set(cacheKey, results);  // 无 TTL，持久缓存
-    task.update(100, results.length > 0 ? `找到 ${results.length} 个接口` : `未找到匹配接口`);
+    await task.update(100, results.length > 0 ? `找到 ${results.length} 个接口` : `未找到匹配接口`);
   });
 }
 

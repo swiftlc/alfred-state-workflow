@@ -1,7 +1,7 @@
 import app from './app';
 import TaskManager from './core/TaskManager';
-import {decodeContext} from './core/utils';
-import type {Context, TaskUpdater} from './types';
+import { decodeContext } from './core/utils';
+import type { Context, TaskData, TaskUpdater } from './types';
 
 async function main(): Promise<void> {
   const [, , taskName, jobId, contextStr] = process.argv as string[];
@@ -13,51 +13,48 @@ async function main(): Promise<void> {
 
   const context = decodeContext(contextStr) as Context | null;
   if (!context) {
-    TaskManager.updateTask(jobId, { status: 'error', message: 'Invalid context' });
+    await TaskManager.updateTask(jobId, { status: 'error', message: 'Invalid context' });
     return;
   }
 
-  // spawnWorker 不会预先 initTask，这里按需初始化
-  if (!TaskManager.getTask(jobId)) {
-    TaskManager.initTask(jobId, taskName);
+  const existing = await TaskManager.getTask(jobId);
+  if (!existing) {
+    await TaskManager.initTask(jobId, taskName);
   }
 
   const handler = app.tasks[taskName];
   if (!handler) {
-    TaskManager.updateTask(jobId, { status: 'error', message: `Task ${taskName} not found` });
+    await TaskManager.updateTask(jobId, { status: 'error', message: `Task ${taskName} not found` });
     return;
   }
 
   const taskUpdater: TaskUpdater = {
-    update: (progress: number, message: string) => {
-      // 每次更新前检查任务是否已被取消
-      const currentTask = TaskManager.getTask(jobId);
-      if (currentTask?.status === 'cancelled') {
+    update: async (progress: number, message: string): Promise<void> => {
+      const result = await TaskManager.updateTask(jobId, { progress, message }) as TaskData & { cancelled?: boolean };
+      if (result.cancelled) {
         throw new Error('Task was cancelled by user');
       }
-      TaskManager.updateTask(jobId, { progress, message });
     },
-    isCancelled: () => {
-      const currentTask = TaskManager.getTask(jobId);
-      return currentTask?.status === 'cancelled' || false;
+    isCancelled: async (): Promise<boolean> => {
+      const task = await TaskManager.getTask(jobId);
+      return task?.status === 'cancelled' || false;
     },
   };
 
   try {
     await handler(taskUpdater, context, app);
 
-    if (!taskUpdater.isCancelled()) {
-      TaskManager.updateTask(jobId, { status: 'done', progress: 100 });
+    if (!(await taskUpdater.isCancelled())) {
+      await TaskManager.updateTask(jobId, { status: 'done', progress: 100 });
     }
   } catch (err) {
     const error = err as Error;
     if (error.message === 'Task was cancelled by user') {
       console.log('Task cancelled');
     } else {
-      TaskManager.updateTask(jobId, { status: 'error', message: error.message });
+      await TaskManager.updateTask(jobId, { status: 'error', message: error.message });
     }
   }
 }
 
 main().catch(console.error);
-

@@ -112,7 +112,7 @@ export default function registerStates(app: Workflow): void {
    */
   app.onState(STATE_PROGRESS, async (context, wf) => {
     const jobId = context.jobId ?? '';
-    const task = TaskManager.getTask(jobId);
+    const task = await TaskManager.getTask(jobId);
 
     if (!task) {
       return [wf.createRerunItem('❌ 错误', '找不到任务信息', DEFAULT_STATE, { data: context.data }, {}, Icons.task)];
@@ -120,7 +120,7 @@ export default function registerStates(app: Workflow): void {
 
     if (task.status === 'running') {
       const spinner = SPINNERS[task.spinnerIdx % SPINNERS.length];
-      TaskManager.updateTask(jobId, { spinnerIdx: (task.spinnerIdx ?? 0) + 1 });
+      await TaskManager.updateTask(jobId, { spinnerIdx: (task.spinnerIdx ?? 0) + 1 });
 
       return {
         rerun: RERUN_INTERVAL_PROGRESS,
@@ -530,7 +530,7 @@ export default function registerStates(app: Workflow): void {
     }
 
     // 4. 管理中心入口（汇聚所有管理类操作，避免干扰主流程）
-    const tasks = TaskManager.getAllTasks();
+    const tasks = await TaskManager.getAllTasks();
     const runningCount = tasks.filter((t) => t.status === 'running').length;
     const manageBadges: string[] = [];
     if (runningCount > 0) manageBadges.push(`${runningCount}个任务运行中`);
@@ -570,7 +570,7 @@ export default function registerStates(app: Workflow): void {
     }
 
     // 任务中心
-    const tasks = TaskManager.getAllTasks();
+    const tasks = await TaskManager.getAllTasks();
     if (matchQuery(query, '任务中心', 'task')) {
       const runningCount = tasks.filter((t) => t.status === 'running').length;
       const taskTitle = runningCount > 0
@@ -774,7 +774,7 @@ export default function registerStates(app: Workflow): void {
   app.onState(STATE_TASK_MANAGE, async (context, wf) => {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
-    const tasks = TaskManager.getAllTasks();
+    const tasks = await TaskManager.getAllTasks();
 
     if (tasks.length === 0) {
       return [wf.createRerunItem('暂无后台任务', '按回车返回主菜单', DEFAULT_STATE, { data: context.data })];
