@@ -279,7 +279,7 @@ export default function registerStates(app: Workflow): void {
 
     // 2. 历史记录区
     // query 为空时只展示 1 条最近记录（固定的优先），搜索 h/历史 时展开全部
-    const history = HistoryManager.getHistory();
+    const history = await HistoryManager.getHistory();
     const pinnedHistory = history.filter((h) => h.isPinned);
     const unpinnedHistory = history.filter((h) => !h.isPinned);
     const isHistoryExpanded = query ? matchQuery(query, '历史', 'h', 'history') : false;
@@ -555,7 +555,7 @@ export default function registerStates(app: Workflow): void {
     const items: AlfredItem[] = [];
 
     // 历史记录
-    const history = HistoryManager.getHistory();
+    const history = await HistoryManager.getHistory();
     if (matchQuery(query, '历史记录', 'history')) {
       items.push(
         wf.createRerunItem(
@@ -719,7 +719,7 @@ export default function registerStates(app: Workflow): void {
   app.onState(STATE_HISTORY_MANAGE, async (context, wf) => {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
-    const history = HistoryManager.getHistory();
+    const history = await HistoryManager.getHistory();
 
     for (const record of history) {
       const histIcon = record.isPinned ? '📌' : '🕒';

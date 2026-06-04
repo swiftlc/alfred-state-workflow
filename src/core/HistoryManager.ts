@@ -1,96 +1,48 @@
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
-import type {HistoryRecord} from '../types';
+import { iGet, iPost, iDelete } from './internalHttp';
+import type { HistoryRecord } from '../types';
 
-const HISTORY_FILE = path.join(__dirname, '../../data/history.json');
 const MAX_UNPINNED_HISTORY = 10;
 
 class HistoryManager {
-  private cache: HistoryRecord[] | null = null;
-
-  constructor() {
-    this.ensureFileExists();
+  async getHistory(): Promise<HistoryRecord[]> {
+    return iGet<HistoryRecord[]>('/internal/history');
   }
 
-  private ensureFileExists(): void {
-    const dir = path.dirname(HISTORY_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(HISTORY_FILE)) {
-      fs.writeFileSync(HISTORY_FILE, JSON.stringify([]), 'utf8');
-    }
-  }
-
-  getHistory(): HistoryRecord[] {
-    if (this.cache !== null) return this.cache;
-    try {
-      this.cache = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')) as HistoryRecord[];
-      return this.cache;
-    } catch {
-      return [];
-    }
-  }
-
-  private saveHistory(history: HistoryRecord[]): void {
-    this.cache = history;
-    fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2), 'utf8');
-  }
-
-  private sortHistory(history: HistoryRecord[]): HistoryRecord[] {
-    return history.sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      return b.timestamp - a.timestamp;
-    });
-  }
-
-  addHistory(record: Omit<HistoryRecord, 'id' | 'timestamp' | 'isPinned'>): void {
-    let history = this.getHistory();
-
-    // 移除重复记录（基于 action + data 判断）
-    history = history.filter(
-      (item) =>
-        !(
-          item.action === record.action &&
-          JSON.stringify(item.data) === JSON.stringify(record.data)
-        )
+  async addHistory(record: Omit<HistoryRecord, 'id' | 'timestamp' | 'isPinned'>): Promise<void> {
+    const history = await this.getHistory();
+    const duplicate = history.find(
+      (h) => h.action === record.action && JSON.stringify(h.data) === JSON.stringify(record.data)
     );
+    if (duplicate) {
+      await iDelete<null>(`/internal/history/${duplicate.id}`);
+    }
 
-    history.unshift({
+    const unpinned = history.filter((h) => !h.isPinned && h.id !== duplicate?.id);
+    if (unpinned.length >= MAX_UNPINNED_HISTORY) {
+      const oldest = unpinned.sort((a, b) => a.timestamp - b.timestamp)[0];
+      if (oldest) await iDelete<null>(`/internal/history/${oldest.id}`);
+    }
+
+    await iPost<null>('/internal/history', {
       id: crypto.randomUUID(),
       ...record,
       timestamp: Date.now(),
       isPinned: false,
     });
-
-    const pinned = history.filter((h) => h.isPinned);
-    const unpinned = history.filter((h) => !h.isPinned).slice(0, MAX_UNPINNED_HISTORY);
-
-    this.saveHistory(this.sortHistory([...pinned, ...unpinned]));
   }
 
-  togglePin(id: string): void {
-    const history = this.getHistory();
-    const item = history.find((h) => h.id === id);
-    if (item) {
-      item.isPinned = !item.isPinned;
-      this.saveHistory(this.sortHistory(history));
-    }
+  async togglePin(id: string): Promise<void> {
+    await iPost<null>(`/internal/history/${id}/pin`, {});
   }
 
-  deleteHistory(id: string): void {
-    const history = this.getHistory().filter((h) => h.id !== id);
-    this.saveHistory(history);
+  async deleteHistory(id: string): Promise<void> {
+    await iDelete<null>(`/internal/history/${id}`);
   }
 
-  clearAll(): void {
-    // 只清空未固定的历史，保留固定记录
-    const history = this.getHistory().filter((h) => h.isPinned);
-    this.saveHistory(history);
+  async clearAll(): Promise<void> {
+    await iDelete<null>('/internal/history');
   }
 }
 
 export default new HistoryManager();
-

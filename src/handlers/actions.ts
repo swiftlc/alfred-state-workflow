@@ -302,21 +302,21 @@ export default function registerActions(app: Workflow): void {
 
   // 动作：固定/取消固定历史记录
   app.onAction('toggle_pin', async (context, wf) => {
-    if (context.id) HistoryManager.togglePin(context.id);
+    if (context.id) await HistoryManager.togglePin(context.id);
     const nextState = context.returnState ?? DEFAULT_STATE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   }, { skipContextSave: true });
 
   // 动作：删除单条历史记录
   app.onAction('delete_history', async (context, wf) => {
-    if (context.id) HistoryManager.deleteHistory(context.id);
+    if (context.id) await HistoryManager.deleteHistory(context.id);
     const nextState = context.returnState ?? DEFAULT_STATE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
   }, { skipContextSave: true });
 
   // 动作：清空所有未固定的历史记录
   app.onAction('clear_history', async (context, wf) => {
-    HistoryManager.clearAll();
+    await HistoryManager.clearAll();
     sendNotification('未固定的历史记录已清空');
     wf.triggerAlfred(encodeContext({ state: DEFAULT_STATE, data: context.data }));
   });
