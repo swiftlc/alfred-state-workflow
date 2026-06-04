@@ -1,110 +1,38 @@
-import fs from 'fs';
-import path from 'path';
-
-const CACHE_FILE = path.join(__dirname, '../../data/cache.json');
-
-interface CacheItem<T = unknown> {
-  value: T;
-  expireAt: number | null;
-}
+import { iGet, iPost, iDelete } from './internalHttp';
 
 class CacheManager {
-  constructor() {
-    this.ensureFileExists();
-  }
-
-  private ensureFileExists(): void {
-    const dir = path.dirname(CACHE_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(CACHE_FILE)) {
-      fs.writeFileSync(CACHE_FILE, JSON.stringify({}), 'utf8');
-    }
-  }
-
-  private readAll(): Record<string, CacheItem> {
-    try {
-      return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8')) as Record<string, CacheItem>;
-    } catch {
-      return {};
-    }
-  }
-
-  /** 清理所有已过期的 key，防止 cache.json 无限膨胀 */
-  private gc(data: Record<string, CacheItem>): Record<string, CacheItem> {
-    const now = Date.now();
-    let changed = false;
-    for (const key of Object.keys(data)) {
-      const item = data[key];
-      if (item?.expireAt && now > item.expireAt) {
-        delete data[key];
-        changed = true;
-      }
-    }
-    return changed ? data : data;
-  }
-
-  private writeAll(data: Record<string, CacheItem>): void {
-    try {
-      fs.writeFileSync(CACHE_FILE, JSON.stringify(this.gc(data), null, 2), 'utf8');
-    } catch (e) {
-      console.error('Cache write error:', e);
-    }
-  }
-
   async get<T = unknown>(
     key: string,
     getter: (() => Promise<T>) | null = null,
     ttlMs = 0
   ): Promise<T | null> {
-    const data = this.readAll();
-    const item = data[key] as CacheItem<T> | undefined;
+    const value = await iGet<T | null>(`/internal/cache/${encodeURIComponent(key)}`);
 
-    // 缓存命中且未过期
-    if (item && (!item.expireAt || Date.now() <= item.expireAt)) {
-      return item.value;
-    }
+    if (value !== null) return value;
 
-    // 缓存过期或不存在，调用 getter 重新获取
     if (getter) {
       try {
-        const value = await getter();
-        this.set(key, value, ttlMs);
-        return value;
+        const fetched = await getter();
+        await this.set(key, fetched, ttlMs);
+        return fetched;
       } catch {
         return null;
       }
     }
-
-    // 无 getter，清理过期 key
-    if (item) {
-      this.clear(key);
-    }
     return null;
   }
 
-  set<T = unknown>(key: string, value: T, ttlMs = 0): void {
-    const data = this.readAll();
-    data[key] = {
-      value,
-      expireAt: ttlMs ? Date.now() + ttlMs : null,
-    };
-    this.writeAll(data);
+  async set<T = unknown>(key: string, value: T, ttlMs = 0): Promise<void> {
+    await iPost(`/internal/cache/${encodeURIComponent(key)}`, { value, ttlMs });
   }
 
-  clear(key: string): void {
-    const data = this.readAll();
-    delete data[key];
-    this.writeAll(data);
+  async clear(key: string): Promise<void> {
+    await iDelete(`/internal/cache/${encodeURIComponent(key)}`);
   }
 
-  clearAll(): void {
-    try {
-      fs.writeFileSync(CACHE_FILE, JSON.stringify({}), 'utf8');
-    } catch { /* ignore */ }
+  async clearAll(): Promise<void> {
+    await iDelete('/internal/cache/');
   }
 }
 
 export default new CacheManager();
-

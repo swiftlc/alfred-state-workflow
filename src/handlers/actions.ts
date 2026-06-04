@@ -66,13 +66,13 @@ export default function registerActions(app: Workflow): void {
     const errorKey = `error:dict_items_${dictKey}`;
     try {
       const items = await dictService.getDictionaryItems(dictKey, context.data as import('../types').ContextData);
-      CacheManager.clear(errorKey);
+      await CacheManager.clear(errorKey);
       task.update(100, `已加载 ${items.length} 条数据`);
     } catch (err) {
       // 写入错误信息，不缓存数据，下次进来继续重试
-      CacheManager.set(errorKey, (err as Error).message, 30 * 1000);
+      await CacheManager.set(errorKey, (err as Error).message, 30 * 1000);
     } finally {
-      CacheManager.clear(loadingKey);
+      await CacheManager.clear(loadingKey);
     }
   });
 
@@ -100,8 +100,8 @@ export default function registerActions(app: Workflow): void {
   app.onAction('reload_cache', async (context, wf) => {
     const cacheKey = context[FIELD_RELOAD_CACHE_KEY] as string | undefined;
     const loadingKey = context[FIELD_RELOAD_LOADING_KEY] as string | undefined;
-    if (cacheKey) CacheManager.clear(cacheKey);
-    if (loadingKey) CacheManager.clear(loadingKey);
+    if (cacheKey) await CacheManager.clear(cacheKey);
+    if (loadingKey) await CacheManager.clear(loadingKey);
 
     const cleanContext = { ...context };
     delete cleanContext[FIELD_RELOAD_CACHE_KEY];
@@ -139,14 +139,14 @@ export default function registerActions(app: Workflow): void {
           messages = messages.filter((m) => m.tag && m.tag.includes(swimlaneCode));
         }
         messages.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-        CacheManager.set(cacheKey, messages, 30 * 1000);
+        await CacheManager.set(cacheKey, messages, 30 * 1000);
         task.update(100, `已加载 ${messages.length} 条消息`);
       } else {
-        CacheManager.set(cacheKey, [], 30 * 1000);
+        await CacheManager.set(cacheKey, [], 30 * 1000);
         task.update(100, `查询失败: ${response?.msg ?? '未知错误'}`);
       }
     } catch (err) {
-      CacheManager.set(cacheKey, [], 30 * 1000);
+      await CacheManager.set(cacheKey, [], 30 * 1000);
       task.update(100, `查询异常: ${(err as Error).message}`);
     }
   });
@@ -165,7 +165,7 @@ export default function registerActions(app: Workflow): void {
       headers: MAFKA_HEADERS,
     });
     if (response?.code === 0 && Array.isArray(response.data)) {
-      CacheManager.set(cacheKey, response.data, 2 * 60 * 1000); // 缓存 2 分钟
+      await CacheManager.set(cacheKey, response.data, 2 * 60 * 1000); // 缓存 2 分钟
       task.update(100, `已加载 ${response.data.length} 个消费者组`);
     } else {
       task.update(100, '加载失败');
@@ -257,7 +257,7 @@ export default function registerActions(app: Workflow): void {
 
   // 动作：强制刷新缓存
   app.onAction('refresh_cache', async (context, wf) => {
-    CacheManager.clearAll();
+    await CacheManager.clearAll();
     sendNotification('缓存已清空，下次查询将重新获取数据', '刷新成功');
     wf.triggerAlfred(encodeContext({ state: DEFAULT_STATE, data: context.data }));
   }, { skipContextSave: true });
@@ -295,7 +295,7 @@ export default function registerActions(app: Workflow): void {
     }
 
     await http.delete(`${PROXY_BASE_URL}/dictionaries/${dictItemId}`);
-    CacheManager.clear(DictService.getCacheKey(dictKey));
+    await CacheManager.clear(DictService.getCacheKey(dictKey));
     sendNotification(`已删除: ${dictItemName ?? dictItemId}`, '删除成功');
     wf.triggerAlfred(encodeContext({ state: STATE_SELECT_DICT, dictKey, data: context.data }));
   });
@@ -356,7 +356,7 @@ export default function registerActions(app: Workflow): void {
           ? `${invoker.serviceName}#${invoker.methodName}`
           : null;
         if (interfaceRef) {
-          CacheManager.set(cacheKey, interfaceRef, SHEPHERD_API_DETAIL_TTL);
+          await CacheManager.set(cacheKey, interfaceRef, SHEPHERD_API_DETAIL_TTL);
         }
       } catch (err) {
         Logger.info(`shepherd_copy_ref_action 失败: ${(err as Error).message}`);
@@ -609,7 +609,7 @@ export default function registerActions(app: Workflow): void {
     const cacheKey = (context[FIELD_QUERY_CACHE_KEY] as string | undefined) ?? `lion:config:${appkey}`;
 
     if (!appkey) {
-      CacheManager.set(cacheKey, [], LION_CONFIG_TTL);
+      await CacheManager.set(cacheKey, [], LION_CONFIG_TTL);
       task.update(100, 'appkey 为空');
       return;
     }
@@ -625,7 +625,7 @@ export default function registerActions(app: Workflow): void {
         lionFetchAll('prod', appkey).catch(() => []),
       ]);
     } catch (err) {
-      CacheManager.set(cacheKey, [], LION_CONFIG_TTL);
+      await CacheManager.set(cacheKey, [], LION_CONFIG_TTL);
       task.update(100, `拉取失败: ${(err as Error).message}`);
       return;
     }
@@ -646,7 +646,7 @@ export default function registerActions(app: Workflow): void {
     }
 
     const result = Array.from(merged.values());
-    CacheManager.set(cacheKey, result, LION_CONFIG_TTL);
+    await CacheManager.set(cacheKey, result, LION_CONFIG_TTL);
     task.update(100, `共 ${result.length} 个配置项（test: ${testItems.length}, prod: ${prodItems.length}）`);
   });
 
@@ -695,7 +695,7 @@ export default function registerActions(app: Workflow): void {
         }
       }
     } catch (err) {
-      CacheManager.set(cacheKey, [], 5 * 60 * 1000);
+      await CacheManager.set(cacheKey, [], 5 * 60 * 1000);
       task.update(100, `获取分组失败: ${(err as Error).message}`);
       return;
     }
@@ -753,7 +753,7 @@ export default function registerActions(app: Workflow): void {
       task.update(pct, `已处理 ${finished}/${groups.length} 个分组...`);
     }
 
-    CacheManager.set(cacheKey, allApis);  // 无 TTL，持久缓存
+    await CacheManager.set(cacheKey, allApis);  // 无 TTL，持久缓存
     task.update(100, `共缓存 ${allApis.length} 个接口`);
   });
 
@@ -785,7 +785,7 @@ export default function registerActions(app: Workflow): void {
         rawItems = res.data.items;
       }
     } catch (err) {
-      CacheManager.set(cacheKey, [], 5 * 60 * 1000);
+      await CacheManager.set(cacheKey, [], 5 * 60 * 1000);
       task.update(100, `搜索失败: ${(err as Error).message}`);
       return;
     }
@@ -807,7 +807,7 @@ export default function registerActions(app: Workflow): void {
       exactMatch: i.requestPath === route,
     }));
 
-    CacheManager.set(cacheKey, results);  // 无 TTL，持久缓存
+    await CacheManager.set(cacheKey, results);  // 无 TTL，持久缓存
     task.update(100, results.length > 0 ? `找到 ${results.length} 个接口` : `未找到匹配接口`);
   });
 }
