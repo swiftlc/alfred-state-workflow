@@ -216,7 +216,7 @@ export default function registerStates(app: Workflow): void {
     const aliasPrefix = wf.aliasPrefix;
     if (query.startsWith(aliasPrefix)) {
       const aliasQuery = query.slice(aliasPrefix.length).trim();
-      const aliases = AliasManager.getAll();
+      const aliases = await AliasManager.getAll();
       const matchedAliases = aliasQuery
         ? aliases.filter(alias => matchQuery(aliasQuery, alias.alias, alias.title))
         : aliases;
@@ -595,7 +595,7 @@ export default function registerStates(app: Workflow): void {
 
     // 快捷指令管理
     if (matchQuery(query, '快捷指令', '指令', 'alias')) {
-      const aliases = AliasManager.getAll();
+      const aliases = await AliasManager.getAll();
       const aliasSubtitle = aliases.length > 0
         ? `已保存 ${aliases.length} 条快捷指令`
         : '将功能操作绑定为触发词，一步直达执行';
@@ -1428,7 +1428,7 @@ export default function registerStates(app: Workflow): void {
   app.onState(STATE_ALIAS_MANAGE, async (context, wf) => {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
-    const allAliases = AliasManager.getAll();
+    const allAliases = await AliasManager.getAll();
     const currentData = context.data ?? {};
 
     if (allAliases.length === 0) {
@@ -1531,7 +1531,7 @@ export default function registerStates(app: Workflow): void {
         );
 
         // 检查是否有同名别名，给出覆盖提示
-        const existing = AliasManager.getAll().find((a) => a.alias === trimmedQuery);
+        const existing = (await AliasManager.getAll()).find((a) => a.alias === trimmedQuery);
         if (existing) {
           items.push({
             title: `⚠️ 已存在同名别名「${trimmedQuery}」`,
@@ -1600,7 +1600,7 @@ export default function registerStates(app: Workflow): void {
           )
         );
 
-        const conflict = AliasManager.getAll().find((a) => a.alias === trimmed && a.id !== aliasId);
+        const conflict = (await AliasManager.getAll()).find((a) => a.alias === trimmed && a.id !== aliasId);
         if (conflict) {
           items.push({
             title: `⚠️ 触发词「${trimmed}」已被「${conflict.title}」占用`,

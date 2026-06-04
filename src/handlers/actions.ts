@@ -460,7 +460,7 @@ export default function registerActions(app: Workflow): void {
     }
 
     // 标记别名使用（更新统计）
-    const alias = AliasManager.markUsed(aliasId);
+    const alias = await AliasManager.markUsed(aliasId);
 
     Logger.info(`执行别名: ${alias?.alias} → ${aliasAction}`, { data: aliasData });
 
@@ -491,7 +491,7 @@ export default function registerActions(app: Workflow): void {
       return;
     }
 
-    const alias = AliasManager.add(
+    const alias = await AliasManager.add(
       aliasName.trim(),
       pendingAction,
       data,
@@ -515,10 +515,10 @@ export default function registerActions(app: Workflow): void {
     }
 
     // 若新名与已有其他别名冲突，先删除冲突项
-    const conflict = AliasManager.getAll().find((a) => a.alias === aliasNewName.trim() && a.id !== aliasId);
-    if (conflict) AliasManager.delete(conflict.id);
+    const conflict = (await AliasManager.getAll()).find((a) => a.alias === aliasNewName.trim() && a.id !== aliasId);
+    if (conflict) await AliasManager.delete(conflict.id);
 
-    const updated = AliasManager.rename(aliasId, aliasNewName.trim());
+    const updated = await AliasManager.rename(aliasId, aliasNewName.trim());
     if (updated) {
       sendNotification(`已重命名为「${updated.alias}」`, 'Workflow');
     }
@@ -530,7 +530,7 @@ export default function registerActions(app: Workflow): void {
     const aliasId = context['aliasId'] as string | undefined;
     if (!aliasId) return;
 
-    AliasManager.delete(aliasId);
+    await AliasManager.delete(aliasId);
     sendNotification('快捷指令已删除', 'Workflow');
     const nextState = (context.returnState as string | undefined) ?? STATE_ALIAS_MANAGE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
