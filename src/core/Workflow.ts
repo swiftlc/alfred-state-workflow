@@ -1,14 +1,12 @@
 import {execSync, spawn} from 'child_process';
 import path from 'path';
-import fs from 'fs';
 import {decodeContext, encodeContext} from './utils';
 import TaskManager from './TaskManager';
 import HistoryManager from './HistoryManager';
 import {DEFAULT_STATE, FIELD_PREFETCH_JOB_ID, FIELD_SILENT_ON_SUCCESS, STATE_PROGRESS} from '../config/constants';
 import Logger from './Logger';
 import type {ActionHandler, AlfredFilterOutput, AlfredItem, Context, StateHandler, TaskHandler,} from '../types';
-
-const CONTEXT_FILE = path.join(__dirname, '../../data/context.json');
+import { iGet, iPost } from './internalHttp';
 
 interface WorkflowOptions {
   bundleId?: string;
@@ -60,7 +58,6 @@ class Workflow {
     this.actionOptions = {};
     this.tasks = {};
     this._stateChanged = false;
-    this.ensureContextFileExists();
   }
 
   // ─── Alfred 触发 ─────────────────────────────────────────────────────────────
@@ -76,21 +73,7 @@ class Workflow {
 
   // ─── 上下文持久化 ─────────────────────────────────────────────────────────────
 
-  private ensureContextFileExists(): void {
-    const dir = path.dirname(CONTEXT_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(CONTEXT_FILE)) {
-      fs.writeFileSync(
-        CONTEXT_FILE,
-        JSON.stringify({ state: DEFAULT_STATE, data: {} }),
-        'utf8'
-      );
-    }
-  }
-
-  saveContext(context: Partial<Context>): void {
+  async saveContext(context: Partial<Context>): Promise<void> {
     try {
       const contextToSave = {
         ...context,
@@ -98,25 +81,16 @@ class Workflow {
         data: context.data ?? {},
         timestamp: Date.now(),
       };
-      fs.writeFileSync(CONTEXT_FILE, JSON.stringify(contextToSave, null, 2), 'utf8');
+      await iPost('/internal/context', contextToSave);
     } catch (e) {
       Logger.error('Failed to save context', e as Error);
     }
   }
 
-  /** 上下文最长保留时间：10 分钟 */
-  private static readonly CONTEXT_TTL_MS = 10 * 60 * 1000;
-
-  loadContext(): Context {
+  async loadContext(): Promise<Context> {
     try {
-      const raw = fs.readFileSync(CONTEXT_FILE, 'utf8');
-      const context = JSON.parse(raw) as Context & { timestamp?: number };
-
-      // 上下文保存时间超过 TTL 则重置
-      if (context.timestamp && Date.now() - context.timestamp > Workflow.CONTEXT_TTL_MS) {
-        return { state: DEFAULT_STATE, data: {} };
-      }
-      return context;
+      const ctx = await iGet<Context | null>('/internal/context');
+      return ctx ?? { state: DEFAULT_STATE, data: {} };
     } catch {
       return { state: DEFAULT_STATE, data: {} };
     }
@@ -141,10 +115,10 @@ class Workflow {
 
   // ─── 后台任务 ─────────────────────────────────────────────────────────────────
 
-  startTask(taskName: string, context: Context): void {
+  async startTask(taskName: string, context: Context): Promise<void> {
     this._stateChanged = true;
     const jobId = `job_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    TaskManager.initTask(jobId, taskName);
+    await TaskManager.initTask(jobId, taskName);
 
     const workerPath = path.join(__dirname, '../worker.ts');
     const contextStr = encodeContext(context);
@@ -230,12 +204,12 @@ class Workflow {
   async runFilter(arg: string, query = ''): Promise<void> {
     let context: Context;
     if (!arg) {
-      context = this.loadContext();
+      context = await this.loadContext();
       // 每次打开 Alfred（无参数入口）都刷新 timestamp，重新计时
-      this.saveContext(context);
+      await this.saveContext(context);
     } else {
       context = (decodeContext(arg) as Context | null) ?? { state: DEFAULT_STATE, data: {} };
-      this.saveContext(context);
+      await this.saveContext(context);
     }
 
     context.query = query.trim();
@@ -287,7 +261,7 @@ class Workflow {
     if (action === 'rerun') {
       const nextState = context.nextState ?? DEFAULT_STATE;
       const nextContext: Context = { ...context, state: nextState };
-      this.saveContext(nextContext);
+      await this.saveContext(nextContext);
       this.triggerAlfred(encodeContext(nextContext));
       return;
     }
@@ -321,7 +295,7 @@ class Workflow {
     if (handler) {
       try {
         if (context.historyTitle && context.recordHistory !== false) {
-          HistoryManager.addHistory({
+          await HistoryManager.addHistory({
             title: context.historyTitle,
             subtitle: context.historySubtitle,
             action,
@@ -339,9 +313,9 @@ class Workflow {
           !this.actionOptions[action]?.skipContextSave
         ) {
           // 将 action 携带的 data 与持久化上下文的 data 合并，action data 优先覆盖
-          const persisted = this.loadContext();
+          const persisted = await this.loadContext();
           const mergedData = { ...persisted.data, ...(context.data ?? {}) };
-          this.saveContext({ state: DEFAULT_STATE, data: mergedData });
+          await this.saveContext({ state: DEFAULT_STATE, data: mergedData });
         }
       } catch (err) {
         Logger.error(`Action execution failed: ${action}`, err as Error, { context });

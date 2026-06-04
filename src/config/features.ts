@@ -55,7 +55,7 @@ const builtInFeatures: Feature[] = [
     action: 'login',
     icon: icon('login'),
     actionHandler: async (context, wf) => {
-      wf.startTask(TASK_LOGIN, context);
+      await wf.startTask(TASK_LOGIN, context);
     },
   },
   {
@@ -80,7 +80,7 @@ const builtInFeatures: Feature[] = [
       },
     ],
     actionHandler: async (context, wf) => {
-      wf.startTask(TASK_LOGIN_ENV, context);
+      await wf.startTask(TASK_LOGIN_ENV, context);
     },
   },
   {
@@ -156,7 +156,7 @@ const builtInFeatures: Feature[] = [
       // 同步更新 context 里已选中条目的 description，避免 feature item 展示旧值
       if (context.data[dictKey]) {
         (context.data[dictKey] as DictItem).description = input1.value;
-        wf.saveContext({ state: DEFAULT_STATE, data: context.data });
+        await wf.saveContext({ state: DEFAULT_STATE, data: context.data });
       }
       sendNotification('修改成功！', '修改成功');
     },
