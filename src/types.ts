@@ -240,8 +240,8 @@ export interface TaskData {
 
 /** worker.js 中传入 task handler 的 updater 对象 */
 export interface TaskUpdater {
-  update: (progress: number, message: string) => void;
-  isCancelled: () => boolean;
+  update: (progress: number, message: string) => Promise<void>;
+  isCancelled: () => Promise<boolean>;
 }
 
 // ─── 历史记录 ──────────────────────────────────────────────────────────────────
