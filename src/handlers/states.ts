@@ -584,7 +584,7 @@ export default function registerStates(app: Workflow): void {
 
     // 工作区管理
     if (matchQuery(query, '工作区', 'workspace')) {
-      const workspaces = WorkspaceManager.getAll();
+      const workspaces = await WorkspaceManager.getAll();
       const wsSubtitle = workspaces.length > 0
         ? `已保存 ${workspaces.length} 个工作区`
         : '保存当前上下文为工作区，下次一键恢复';
@@ -1304,7 +1304,7 @@ export default function registerStates(app: Workflow): void {
   app.onState(STATE_WORKSPACE_MANAGE, async (context, wf) => {
     const query = context.query ?? '';
     const items: AlfredItem[] = [];
-    const workspaces = WorkspaceManager.getAll();
+    const workspaces = await WorkspaceManager.getAll();
 
     // 保存当前上下文为新工作区入口（有上下文数据时才展示）
     const currentData = context.data ?? {};
@@ -1386,7 +1386,7 @@ export default function registerStates(app: Workflow): void {
       );
 
       // 检查是否有同名工作区，给出覆盖提示
-      const existing = WorkspaceManager.getAll().find((w) => w.name === query);
+      const existing = (await WorkspaceManager.getAll()).find((w) => w.name === query);
       if (existing) {
         items.push({
           title: `⚠️ 已存在同名工作区「${query}」`,

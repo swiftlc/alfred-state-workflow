@@ -409,7 +409,7 @@ export default function registerActions(app: Workflow): void {
     const workspaceId = context['workspaceId'] as string | undefined;
     if (!workspaceId) return;
 
-    const workspace = WorkspaceManager.markUsed(workspaceId);
+    const workspace = await WorkspaceManager.markUsed(workspaceId);
     if (!workspace) {
       sendNotification('工作区不存在或已被删除', 'Workflow');
       return;
@@ -429,7 +429,7 @@ export default function registerActions(app: Workflow): void {
       return;
     }
 
-    const workspace = WorkspaceManager.add(workspaceName.trim(), data);
+    const workspace = await WorkspaceManager.add(workspaceName.trim(), data);
     Logger.info(`保存工作区: ${workspace.name}`, workspace as unknown as object);
     sendNotification(`工作区「${workspace.name}」已保存`, 'Workflow');
     wf.triggerAlfred(encodeContext({ state: STATE_WORKSPACE_MANAGE, data }));
@@ -440,7 +440,7 @@ export default function registerActions(app: Workflow): void {
     const workspaceId = context['workspaceId'] as string | undefined;
     if (!workspaceId) return;
 
-    WorkspaceManager.delete(workspaceId);
+    await WorkspaceManager.delete(workspaceId);
     sendNotification('工作区已删除', 'Workflow');
     const nextState = (context.returnState as string | undefined) ?? STATE_WORKSPACE_MANAGE;
     wf.triggerAlfred(encodeContext({ state: nextState, data: context.data }));
