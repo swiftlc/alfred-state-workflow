@@ -148,6 +148,8 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({ name: 'ShepherdView' })
+
 import { ref, computed, watch, onMounted, h, reactive } from 'vue'
 import {
   NInput, NDataTable, NDrawer, NDrawerContent, NSpin, NButton, NTag, NDropdown,

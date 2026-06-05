@@ -91,6 +91,8 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({ name: 'LionConfigView' })
+
 import { ref, computed, watch, onMounted, h, reactive } from 'vue'
 import { Pin } from '@lucide/vue'
 import {

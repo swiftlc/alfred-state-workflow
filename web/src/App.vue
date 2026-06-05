@@ -60,7 +60,11 @@
       <main class="flex-1 overflow-hidden p-5">
         <div class="bg-white rounded-2xl p-7 h-full overflow-hidden"
              style="box-shadow: 0 2px 8px rgba(30,41,80,0.07), 0 12px 40px rgba(30,41,80,0.05); border: 1px solid rgba(210,218,238,0.8)">
-          <RouterView />
+          <RouterView v-slot="{ Component }">
+            <KeepAlive :include="keepAliveComponents">
+              <component :is="Component" />
+            </KeepAlive>
+          </RouterView>
         </div>
       </main>
 
@@ -85,6 +89,12 @@ import type { GlobalThemeOverrides } from 'naive-ui'
 const router    = useRouter()
 const route     = useRoute()
 const collapsed = ref(false)
+
+const keepAliveComponents = computed(() =>
+  router.getRoutes()
+    .filter(r => r.meta?.keepAlive && r.meta?.componentName)
+    .map(r => r.meta.componentName as string)
+)
 
 const themeOverrides: GlobalThemeOverrides = {
   common: {
