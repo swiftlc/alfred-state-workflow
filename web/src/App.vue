@@ -57,9 +57,9 @@
       </aside>
 
       <!-- ── 主内容 ── -->
-      <main class="flex-1 overflow-y-auto p-5">
-        <div class="bg-white rounded-2xl p-7"
-             style="min-height: calc(100vh - 2.5rem); box-shadow: 0 2px 8px rgba(30,41,80,0.07), 0 12px 40px rgba(30,41,80,0.05); border: 1px solid rgba(210,218,238,0.8)">
+      <main class="flex-1 overflow-hidden p-5">
+        <div class="bg-white rounded-2xl p-7 h-full overflow-hidden"
+             style="box-shadow: 0 2px 8px rgba(30,41,80,0.07), 0 12px 40px rgba(30,41,80,0.05); border: 1px solid rgba(210,218,238,0.8)">
           <RouterView />
         </div>
       </main>

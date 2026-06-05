@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col overflow-hidden" style="height: calc(100vh - 80px)">
+  <div class="flex flex-col overflow-hidden" style="height: 100%">
     <div class="flex items-center justify-between mb-5 shrink-0">
       <h1 class="text-lg font-semibold text-slate-800 tracking-tight">环境嗅探</h1>
       <div class="flex items-center gap-3">
@@ -56,19 +56,23 @@
     </div>
 
     <!-- 历史记录 -->
-    <n-tabs type="line" size="small" class="flex-1 min-h-0 hist-tabs">
-      <n-tab-pane v-for="src in SOURCES" :key="src.key" :name="src.key" :tab="src.histLabel">
+    <TabTable
+      v-model="activeHistTab"
+      :tabs="SOURCES.map(s => ({ key: s.key, label: s.histLabel }))"
+      class="flex-1 min-h-0"
+    >
+      <template #default="{ height }">
         <n-data-table
           :columns="histColumns"
-          :data="histories[src.key] ?? []"
+          :data="histories[activeHistTab] ?? []"
           :loading="histLoading"
           :bordered="false"
           :single-line="false"
           size="small"
-          flex-height
+          :max-height="height || undefined"
         />
-      </n-tab-pane>
-    </n-tabs>
+      </template>
+    </TabTable>
 
     <!-- 详情抽屉 -->
     <n-drawer v-model:show="detail.show" :width="520">
@@ -144,11 +148,12 @@
 import { ref, computed, onMounted, onUnmounted, h, reactive } from 'vue'
 import { Clipboard, FolderOpen } from '@lucide/vue'
 import {
-  NDataTable, NButton, NTabs, NTabPane,
+  NDataTable, NButton,
   NDrawer, NDrawerContent, NSpin, NImage, NImageGroup,
   useMessage,
 } from 'naive-ui'
 import ContextTags from '@/components/ContextTags.vue'
+import TabTable from '@/components/TabTable.vue'
 import type { DataTableColumns } from 'naive-ui'
 import type { SnapshotSummary, SnapshotDetail, SensingContext, ContextDataItem } from '@/types'
 import {
@@ -173,10 +178,11 @@ const STAGE_LABELS: Record<string, string> = {
 
 // ─── 状态 ──────────────────────────────────────────────────────────────────────
 
-const loading      = ref(false)
-const histLoading  = ref(false)
-const statuses     = ref<Record<string, SnapshotSummary | null>>({})
-const histories    = ref<Record<string, SnapshotSummary[]>>({})
+const loading       = ref(false)
+const histLoading   = ref(false)
+const statuses      = ref<Record<string, SnapshotSummary | null>>({})
+const histories     = ref<Record<string, SnapshotSummary[]>>({})
+const activeHistTab = ref(SOURCES[0].key)
 
 const detail = reactive<{ show: boolean; loading: boolean; snap: SnapshotDetail | null }>({
   show: false, loading: false, snap: null,
@@ -411,19 +417,5 @@ onUnmounted(() => {
 <style scoped>
 :deep(.n-drawer-content .n-drawer-content__main) {
   padding: 16px;
-}
-
-/* 让历史记录 tabs 填满剩余高度，表格内部自滚动 */
-.hist-tabs {
-  display: flex;
-  flex-direction: column;
-}
-.hist-tabs :deep(.n-tabs-pane-wrapper) {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-.hist-tabs :deep(.n-tab-pane) {
-  height: 100%;
 }
 </style>

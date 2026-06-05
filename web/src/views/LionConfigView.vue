@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col" style="height: calc(100vh - 80px)">
+  <div class="flex flex-col overflow-hidden" style="height: 100%">
     <div class="flex items-center justify-between mb-5 shrink-0">
       <h1 class="text-lg font-semibold text-slate-800 tracking-tight">Lion 动态配置</h1>
     </div>

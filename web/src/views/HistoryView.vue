@@ -1,6 +1,6 @@
 <template>
-  <div>
-    <div class="flex items-center justify-between mb-5">
+  <div class="flex flex-col overflow-hidden" style="height: 100%">
+    <div class="flex items-center justify-between mb-5 shrink-0">
       <h1 class="text-lg font-semibold text-slate-800 tracking-tight">历史记录</h1>
       <n-button size="small" :disabled="!hasUnpinned" @click="doClear">清空未置顶</n-button>
     </div>
@@ -9,6 +9,7 @@
       v-model:value="searchText"
       placeholder="搜索标题 / 描述 / 复制值..."
       clearable
+      class="shrink-0"
       style="margin-bottom: 16px"
     />
 
@@ -19,6 +20,8 @@
       :bordered="false"
       :single-line="false"
       size="small"
+      flex-height
+      class="flex-1"
       :row-class-name="(row: HistoryItem) => row.isPinned ? 'pinned-row' : ''"
     />
 
