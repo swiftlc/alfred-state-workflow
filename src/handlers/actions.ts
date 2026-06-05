@@ -267,7 +267,7 @@ export default function registerActions(app: Workflow): void {
     const dictKey = context['dictKey'] as string | undefined;
     const dictItemKey = context['dictItemKey'] as string | undefined;
     if (dictKey && dictItemKey) {
-      DictRecentManager.markUsed(dictKey, dictItemKey);
+      await DictRecentManager.markUsed(dictKey, dictItemKey);
     }
     wf.triggerAlfred(encodeContext({ state: DEFAULT_STATE, data: context.data }));
   });
@@ -279,7 +279,7 @@ export default function registerActions(app: Workflow): void {
 
     if (!dictPinKey || !dictKey) return;
 
-    DictPinManager.toggle(dictPinKey);
+    await DictPinManager.toggle(dictPinKey);
     wf.triggerAlfred(encodeContext({ state: STATE_SELECT_DICT, dictKey, data: context.data }));
   });
 

@@ -882,8 +882,8 @@ export default function registerStates(app: Workflow): void {
     const dictName = dicts.find((d) => d.key === dictKey)?.name ?? dictKey;
 
     const dictConfig = dicts.find((d) => d.key === dictKey);
-    const pinnedMap = DictPinManager.getAll();
-    const recentMap = DictRecentManager.getRecentMap(dictKey);
+    const pinnedMap = await DictPinManager.getAll();
+    const recentMap = await DictRecentManager.getRecentMap(dictKey);
     const pinKey = (item: { id?: string; name: string }) => `${dictKey}:${item.id ?? item.name}`;
     const itemKey = (item: { id?: string; name: string }) => item.id ?? item.name;
 
