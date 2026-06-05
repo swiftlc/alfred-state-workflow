@@ -21,15 +21,41 @@
       size="small"
       :row-class-name="(row: HistoryItem) => row.isPinned ? 'pinned-row' : ''"
     />
+
+    <!-- 改名 Modal -->
+    <n-modal v-model:show="renameModal.show" preset="dialog" title="修改名称"
+             positive-text="保存" negative-text="取消" @positive-click="submitRename">
+      <n-form style="margin-top:12px">
+        <n-form-item label="标题">
+          <n-input v-model:value="renameModal.title" placeholder="条目标题" />
+        </n-form-item>
+        <n-form-item label="副标题">
+          <n-input v-model:value="renameModal.subtitle" placeholder="可选" />
+        </n-form-item>
+      </n-form>
+    </n-modal>
+
+    <!-- 创建别名 Modal -->
+    <n-modal v-model:show="aliasModal.show" preset="dialog" title="创建别名"
+             positive-text="创建" negative-text="取消" @positive-click="submitAlias">
+      <n-form style="margin-top:12px">
+        <n-form-item label="别名">
+          <n-input v-model:value="aliasModal.alias" placeholder="输入快捷别名，如 dep-prod" />
+        </n-form-item>
+        <div v-if="aliasModal.item" class="text-xs text-slate-400">
+          关联动作：{{ aliasModal.item.title }}
+        </div>
+      </n-form>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, onMounted, h, reactive } from 'vue'
 import { Pin, Trash2 } from '@lucide/vue'
-import { NDataTable, NInput, NButton, useMessage, useDialog } from 'naive-ui'
+import { NDataTable, NInput, NButton, NModal, NForm, NFormItem, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { getHistory, deleteHistory, clearHistory, toggleHistoryPin } from '@/api/alfred'
+import { getHistory, deleteHistory, clearHistory, toggleHistoryPin, createAlias, renameHistory } from '@/api/alfred'
 import { matchQuery, formatTime } from '@/utils/search'
 import type { HistoryItem } from '@/types'
 
@@ -70,6 +96,47 @@ function doDelete(item: HistoryItem) {
       message.success('已删除')
     },
   })
+}
+
+const renameModal = reactive({ show: false, title: '', subtitle: '', item: null as HistoryItem | null })
+
+function openRenameModal(item: HistoryItem) {
+  renameModal.title    = item.title
+  renameModal.subtitle = item.subtitle ?? ''
+  renameModal.item     = item
+  renameModal.show     = true
+}
+
+async function submitRename() {
+  if (!renameModal.title.trim()) { message.error('标题不能为空'); return false }
+  const item = renameModal.item!
+  await renameHistory(item.id, renameModal.title.trim(), renameModal.subtitle.trim() || undefined)
+  item.title    = renameModal.title.trim()
+  item.subtitle = renameModal.subtitle.trim() || undefined
+  message.success('已修改')
+  return true
+}
+
+const aliasModal = reactive({ show: false, alias: '', item: null as HistoryItem | null })
+
+function openAliasModal(item: HistoryItem) {
+  aliasModal.alias = ''
+  aliasModal.item  = item
+  aliasModal.show  = true
+}
+
+async function submitAlias() {
+  if (!aliasModal.alias.trim()) { message.error('别名不能为空'); return false }
+  const item = aliasModal.item!
+  await createAlias({
+    alias:    aliasModal.alias.trim(),
+    action:   item.action,
+    data:     item.data as Record<string, unknown>,
+    title:    item.title,
+    subtitle: item.subtitle,
+  })
+  message.success('别名已创建')
+  return true
 }
 
 function doClear() {
@@ -123,13 +190,23 @@ const columns: DataTableColumns<HistoryItem> = [
     }, formatTime(row.timestamp)),
   },
   {
-    title: '', key: 'del', width: 44,
-    render: (row) => h('span', {
-      class: 'del-btn',
-      style: 'cursor:pointer; display:inline-flex; align-items:center; color:#d1d5db',
-      title: '删除',
-      onClick: () => doDelete(row),
-    }, [h(Trash2, { size: 14 })]),
+    title: '操作', key: 'actions', width: 160,
+    render: (row) => h('div', { style: 'display:flex; align-items:center; gap:6px' }, [
+      h(NButton, {
+        size: 'tiny', ghost: true,
+        onClick: () => openRenameModal(row),
+      }, { default: () => '改名' }),
+      h(NButton, {
+        size: 'tiny', ghost: true,
+        onClick: () => openAliasModal(row),
+      }, { default: () => '创建别名' }),
+      h('span', {
+        class: 'del-btn',
+        style: 'cursor:pointer; display:inline-flex; align-items:center; color:#d1d5db',
+        title: '删除',
+        onClick: () => doDelete(row),
+      }, [h(Trash2, { size: 14 })]),
+    ]),
   },
 ]
 

@@ -25,6 +25,10 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: () => '/',  // 前端 /proxy 映射到后端 /，由 catch-all proxyRouter 处理
       },
+      '/internal': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
   build: {

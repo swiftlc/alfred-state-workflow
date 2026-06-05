@@ -46,6 +46,18 @@ export interface Alias {
   usageCount: number
 }
 
+export interface ContextDataItem {
+  id: string
+  name: string
+  value: string
+  description?: string
+}
+
+export interface Context {
+  state: string
+  data: Record<string, ContextDataItem>
+}
+
 export interface Task {
   id: string
   name: string

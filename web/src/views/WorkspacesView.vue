@@ -18,7 +18,7 @@ import { ref, onMounted, h } from 'vue'
 import { Trash2 } from '@lucide/vue'
 import { NDataTable, NTag, NSpace, NButton, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { getWorkspaces, deleteWorkspace } from '@/api/alfred'
+import { getWorkspaces, deleteWorkspace, setContext } from '@/api/alfred'
 import { formatTime } from '@/utils/search'
 import type { Workspace } from '@/types'
 
@@ -33,6 +33,11 @@ function summarizeData(data: Record<string, unknown>): Array<{ key: string; labe
     const label = v && typeof v === 'object' ? ((v as Record<string, unknown>).name as string ?? JSON.stringify(v)) : String(v ?? '')
     return { key: k, label }
   })
+}
+
+async function doApplyContext(item: Workspace) {
+  await setContext({ state: 'home', data: item.data as never })
+  message.success(`已将工作区「${item.name}」应用到上下文`)
 }
 
 function doDelete(item: Workspace) {
@@ -80,13 +85,19 @@ const columns: DataTableColumns<Workspace> = [
     }, formatTime(row.lastUsedAt) || '从未'),
   },
   {
-    title: '', key: 'del', width: 44,
-    render: (row) => h('span', {
-      class: 'del-btn',
-      style: 'cursor:pointer; display:inline-flex; align-items:center; color:#d1d5db',
-      title: '删除',
-      onClick: () => doDelete(row),
-    }, [h(Trash2, { size: 14 })]),
+    title: '操作', key: 'actions', width: 130,
+    render: (row) => h(NSpace, { size: 'small' }, {
+      default: () => [
+        h(NButton, {
+          size: 'tiny', ghost: true,
+          onClick: () => doApplyContext(row),
+        }, { default: () => '应用上下文' }),
+        h(NButton, {
+          size: 'tiny', ghost: true, type: 'error',
+          onClick: () => doDelete(row),
+        }, { default: () => h(Trash2, { size: 13 }) }),
+      ],
+    }),
   },
 ]
 
@@ -97,6 +108,3 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
-:deep(.del-btn:hover) { color: #ef4444 !important; }
-</style>

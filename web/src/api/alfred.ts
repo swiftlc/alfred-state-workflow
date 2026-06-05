@@ -1,6 +1,17 @@
-import type { DictMeta, DictItem, HistoryItem, Workspace, Alias, Task } from '@/types'
+import type { DictMeta, DictItem, HistoryItem, Workspace, Alias, Task, Context } from '@/types'
 
 const BASE = '/api/alfred'
+
+async function internalRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`/internal${path}`, {
+    method,
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  const json = await res.json() as { code: number; data: T; msg?: string }
+  if (json.code !== 0) throw new Error(json.msg ?? `API error ${json.code}`)
+  return json.data
+}
 
 interface ApiResponse<T> { code: number; data: T; msg?: string }
 
@@ -38,14 +49,19 @@ export const getHistory       = ()           => get<HistoryItem[]>('/history')
 export const deleteHistory    = (id: string) => del<null>(`/history/${id}`)
 export const clearHistory     = ()           => del<null>('/history')
 export const toggleHistoryPin = (id: string) => post<null>(`/history/${id}/pin`, {})
+export const renameHistory    = (id: string, title: string, subtitle?: string) =>
+  request<null>('PATCH', `/history/${id}`, { title, subtitle })
 
 // ─── Workspaces ───────────────────────────────────────────────────────────────
-export const getWorkspaces   = ()           => get<Workspace[]>('/workspaces')
-export const deleteWorkspace = (id: string) => del<null>(`/workspaces/${id}`)
+export const getWorkspaces    = ()                                         => get<Workspace[]>('/workspaces')
+export const deleteWorkspace  = (id: string)                               => del<null>(`/workspaces/${id}`)
+export const createWorkspace  = (name: string, data: Record<string, unknown>) => post<{ id: string }>('/workspaces', { name, data })
 
 // ─── Aliases ──────────────────────────────────────────────────────────────────
-export const getAliases  = ()           => get<Alias[]>('/aliases')
-export const deleteAlias = (id: string) => del<null>(`/aliases/${id}`)
+export const getAliases   = ()           => get<Alias[]>('/aliases')
+export const deleteAlias  = (id: string) => del<null>(`/aliases/${id}`)
+export const createAlias  = (body: { alias: string; action: string; data: Record<string, unknown>; title: string; subtitle?: string }) =>
+  post<{ id: string }>('/aliases', body)
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 export const getTasks = () => get<Task[]>('/tasks')
@@ -53,3 +69,7 @@ export const getTasks = () => get<Task[]>('/tasks')
 // ─── Applogs ──────────────────────────────────────────────────────────────────
 export const getApplogs  = (lines = 200) => get<string[]>(`/applogs?lines=${lines}`)
 export const clearApplogs = ()           => del<null>('/applogs')
+
+// ─── Context (/internal/context) ─────────────────────────────────────────────
+export const getContext = () => internalRequest<Context | null>('GET', '/context')
+export const setContext = (ctx: Context) => internalRequest<null>('POST', '/context', ctx)

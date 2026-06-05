@@ -10,5 +10,6 @@ export default createRouter({
     { path: '/workspaces',   component: () => import('@/views/WorkspacesView.vue') },
     { path: '/aliases',      component: () => import('@/views/AliasesView.vue') },
     { path: '/monitor',      component: () => import('@/views/MonitorView.vue') },
+    { path: '/context',      component: () => import('@/views/ContextView.vue') },
   ],
 })
