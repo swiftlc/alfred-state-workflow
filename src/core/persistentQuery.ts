@@ -58,7 +58,7 @@ export async function startWithCacheCheck(
       return;
     }
   } else {
-    CacheManager.clear(opts.cacheKey);
+    await CacheManager.clear(opts.cacheKey);
   }
 
   wf.startTask(opts.taskName, {

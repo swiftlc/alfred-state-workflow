@@ -152,7 +152,7 @@ const builtInFeatures: Feature[] = [
         headers: { 'Content-Type': 'application/json' },
       });
       const dictKey = String(currentDict.key);
-      CacheManager.clear(DictService.getCacheKey(dictKey));
+      await CacheManager.clear(DictService.getCacheKey(dictKey));
       // 同步更新 context 里已选中条目的 description，避免 feature item 展示旧值
       if (context.data[dictKey]) {
         (context.data[dictKey] as DictItem).description = input1.value;
@@ -586,7 +586,7 @@ const builtInFeatures: Feature[] = [
 
       // cacheKey 含 topicId + 时间 + 泳道，不同参数各自独立
       const cacheKey = `kafka_messages:${topicId}:${datetime}:${swimlaneCode}`;
-      CacheManager.clear(cacheKey);
+      await CacheManager.clear(cacheKey);
 
       wf.triggerAlfred(encodeContext({
         state: STATE_KAFKA_MESSAGES,

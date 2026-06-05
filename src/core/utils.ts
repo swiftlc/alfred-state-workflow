@@ -134,7 +134,7 @@ export function makeLoadingOutput(title: string, subtitle: string, iconPath?: st
 export async function spawnIfNotLoading(cacheKey: string, spawn: () => void): Promise<void> {
   const loadingKey = `loading:${cacheKey}`;
   if (!(await CacheManager.get(loadingKey))) {
-    CacheManager.set(loadingKey, true, 60 * 1000);
+    await CacheManager.set(loadingKey, true, 60 * 1000);
     spawn();
   }
 }

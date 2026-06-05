@@ -866,7 +866,7 @@ export default function registerStates(app: Workflow): void {
 
       // 上次请求失败：展示错误 item，点击可重试
       const errorMsg = await CacheManager.get<string>(errorKey);
-      CacheManager.clear(errorKey);
+      await CacheManager.clear(errorKey);
       if (errorMsg) {
         return [wf.createRerunItem(`⚠️ 加载${dictName}失败`, `${errorMsg}  (回车重试)`, context.state, { data: context.data }, {}, Icons.context)];
       }
@@ -1099,7 +1099,7 @@ export default function registerStates(app: Workflow): void {
             items.push({ title: `未找到匹配的 ${currentInput.label}`, subtitle: '请尝试其他搜索词', valid: false });
           } else {
             // 无搜索词但结果为空，说明接口返回空数据，提供重试入口并清除缓存
-            if (resolvedCacheKey) CacheManager.clear(resolvedCacheKey);
+            if (resolvedCacheKey) await CacheManager.clear(resolvedCacheKey);
             items.push(
               wf.createRerunItem(
                 '⚠️ 加载失败，点击重试',
