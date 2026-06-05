@@ -16,9 +16,13 @@ export interface HistoryItem {
   id: string
   title: string
   subtitle?: string
-  query?: string
-  createdAt: number
-  pinned?: boolean
+  action: string
+  data: Record<string, unknown>
+  copyValue?: string
+  copyName?: string
+  copyKey?: string
+  timestamp: number
+  isPinned: boolean
 }
 
 export interface Workspace {
@@ -26,15 +30,20 @@ export interface Workspace {
   name: string
   data: Record<string, unknown>
   createdAt: number
-  usedAt?: number
+  lastUsedAt: number
+  usageCount: number
 }
 
 export interface Alias {
   id: string
-  name: string
+  alias: string
   action: string
+  data: Record<string, unknown>
+  title: string
+  subtitle?: string
   createdAt: number
-  usedAt?: number
+  lastUsedAt: number
+  usageCount: number
 }
 
 export interface Task {

@@ -63,10 +63,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, h, reactive } from 'vue'
 import { Pin } from '@lucide/vue'
-// @ts-ignore
-import pinyinMatch from 'pinyin-match'
-// @ts-ignore
-import fuzzysort from 'fuzzysort'
+import { matchQuery } from '@/utils/search'
 import { useRoute, useRouter } from 'vue-router'
 import {
   NPageHeader, NDataTable, NInput, NButton, NModal, NForm,
@@ -94,20 +91,6 @@ const searchText = ref('')
 const dictName   = computed(() => dictMeta.value?.name ?? key.value)
 const isReadonly = computed(() => READONLY_DICTS.some(d => d.key === key.value))
 
-function matchQuery(query: string, ...targets: (string | undefined | null)[]): boolean {
-  if (!query) return true
-  const terms = query.split(/\s+/).filter(t => t.trim() !== '')
-  if (terms.length === 0) return true
-  const validTargets = targets.filter((t): t is string => t != null && t !== '')
-  if (validTargets.length === 0) return false
-  return terms.every(term =>
-    validTargets.some(target => {
-      if (pinyinMatch.match(target, term)) return true
-      const result = fuzzysort.single(term, target) as { score: number } | null
-      return result !== null && result.score > -10000
-    })
-  )
-}
 
 const filteredItems = computed(() => {
   const query = searchText.value.trim()
