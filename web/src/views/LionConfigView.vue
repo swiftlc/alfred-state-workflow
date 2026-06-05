@@ -6,15 +6,14 @@
 
     <!-- 搜索栏 -->
     <div class="flex items-center gap-2 mb-4 shrink-0">
-      <n-select
-        v-model:value="appkeyInput"
-        :options="appkeyOptionsFull"
-        filterable
-        clearable
-        tag
-        class="flex-1"
+      <DictSelect
+        v-model="appkeyInput"
+        dict-key="appkey"
+        dict-name="Appkey"
+        :fetch-items="fetchAppkeyItems"
         placeholder="com.sankuai.xxx"
-        @keydown.enter.native="doSearch"
+        clearable
+        class="flex-1"
       />
       <n-button type="primary" :loading="loading" :disabled="!appkeyInput" @click="doSearch">
         查询
@@ -104,6 +103,7 @@ import { makeFetchItems } from '@/utils/dict'
 import { matchQuery } from '@/utils/search'
 import { proxyPost } from '@/utils/proxy'
 import MonacoDiffModal from '@/components/MonacoDiffModal.vue'
+import DictSelect from '@/components/DictSelect.vue'
 
 const message = useMessage()
 
@@ -130,8 +130,7 @@ function lsSet(key: string, val: unknown) {
 
 // ─── 状态 ──────────────────────────────────────────────────────────────────────
 
-const appkeyInput       = ref<string | null>(null)
-const appkeyOptionsFull = ref<{ label: string; value: string }[]>([])
+const appkeyInput = ref<string | null>(null)
 const loading           = ref(false)
 const filterLoading     = ref(false)
 const allItems          = ref<LionConfigItem[]>([])
@@ -339,7 +338,7 @@ function valueCell(val: string | null, isDiff: boolean, onClick: () => void) {
   if (val === null) return h('span', { style: 'color:#d1d5db; font-size:12px' }, '—')
   const display = val.length > 80 ? val.slice(0, 80) + '…' : val
   const style = isDiff
-    ? 'color:#b45309; background:#fef3c7; padding:1px 4px; border-radius:3px; font-size:11px; font-family:monospace; word-break:break-all; display:block; cursor:pointer'
+    ? 'color:#92400e; font-size:11px; font-family:monospace; word-break:break-all; display:block; cursor:pointer'
     : 'font-size:11px; font-family:monospace; color:#374151; word-break:break-all; display:block; cursor:pointer'
   return h('span', { style, title: `${val}\n\n点击查看 Diff`, onClick }, display)
 }
@@ -388,7 +387,7 @@ const columns: DataTableColumns<LionConfigItem> = [
         const display = ov.length > 40 ? ov.slice(0, 40) + '…' : ov
         return h('div', { style: 'display:flex; align-items:flex-start; gap:4px' }, [
           h('span', {
-            style: 'font-size:11px; font-family:monospace; color:#059669; background:#d1fae5; padding:1px 4px; border-radius:3px; word-break:break-all; flex:1; cursor:pointer',
+            style: 'font-size:11px; font-family:monospace; color:#166534; background:#f0fdf4; padding:1px 4px; border-radius:3px; word-break:break-all; flex:1; cursor:pointer',
             title: `${ov}\n点击修改`,
             onClick: (e: Event) => { e.stopPropagation(); openSpecify(row) },
           }, display),
@@ -413,12 +412,12 @@ const columns: DataTableColumns<LionConfigItem> = [
       const isTestOnly = row.testValue !== null && row.prodValue === null
       const isProdOnly = row.testValue === null && row.prodValue !== null
       const [label, bg, color] = isDiff
-        ? ['差异',   '#fef3c7', '#d97706']
+        ? ['差异',   '#fef5e4', '#92400e']
         : isTestOnly
-          ? ['仅test', '#dbeafe', '#2563eb']
+          ? ['仅test', '#eef2ff', '#3730a3']
           : isProdOnly
-            ? ['仅prod', '#f3e8ff', '#9333ea']
-            : ['一致',   '#d1fae5', '#059669']
+            ? ['仅prod', '#f5f3ff', '#5b21b6']
+            : ['一致',   '#f1f5f9', '#64748b']
       return h('span', {
         style: `background:${bg}; color:${color}; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:500; white-space:nowrap`,
       }, label)
@@ -428,12 +427,9 @@ const columns: DataTableColumns<LionConfigItem> = [
 
 // ─── 初始化 ────────────────────────────────────────────────────────────────────
 
-onMounted(async () => {
-  try {
-    const items = await makeFetchItems('appkey')()
-    appkeyOptionsFull.value = items.map(i => ({ label: i.name, value: i.value }))
-  } catch { /* 加载失败不影响手动输入 */ }
+function fetchAppkeyItems() { return makeFetchItems('appkey')() }
 
+onMounted(() => {
   // 恢复上一次 appkey 和查询结果
   const lastAppkey = lsGet<string>(LS_APPKEY)
   if (lastAppkey) {

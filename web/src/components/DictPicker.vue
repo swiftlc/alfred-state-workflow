@@ -35,7 +35,7 @@
         <template v-else>
           <!-- 自定义输入项 -->
           <div
-            v-if="search.trim()"
+            v-if="search.trim() && allowInput !== false"
             class="alfred-item"
             :class="{ 'is-active': cursor === -1 }"
             @click="confirmManual"
@@ -91,6 +91,7 @@ const props = defineProps<{
   dictName: string
   fetchItems: () => Promise<DictItem[]>
   currentValue?: ContextDataItem | null
+  allowInput?: boolean  // 是否允许手动输入（默认 true）
 }>()
 
 const emit = defineEmits<{
@@ -150,9 +151,19 @@ function resetState() {
 }
 
 function moveCursor(dir: number) {
-  const min  = search.value.trim() ? -1 : 0
-  const max  = filteredItems.value.length - 1
-  const next = Math.max(min, Math.min(max, cursor.value + dir))
+  const hasManual = !!(search.value.trim() && props.allowInput !== false)
+  const min = hasManual ? -1 : 0
+  const max = filteredItems.value.length - 1
+  if (max < 0 && !hasManual) return
+
+  let next: number
+  if (cursor.value < min) {
+    next = dir > 0 ? min : max
+  } else {
+    next = cursor.value + dir
+    if (next > max) next = min
+    else if (next < min) next = max
+  }
   cursor.value = next
   nextTick(() => {
     const el = next >= 0 ? itemRefs.value[next] : null
@@ -173,10 +184,10 @@ function confirmManual() {
 }
 
 function onEnter() {
-  if (cursor.value === -1) { confirmManual(); return }
+  if (cursor.value === -1 && props.allowInput !== false) { confirmManual(); return }
   const item = filteredItems.value[cursor.value >= 0 ? cursor.value : 0]
   if (item) confirmItem(item)
-  else if (search.value.trim()) confirmManual()
+  else if (search.value.trim() && props.allowInput !== false) confirmManual()
 }
 </script>
 
@@ -189,6 +200,8 @@ function onEnter() {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0,0,0,0.06);
   overflow: hidden;
   outline: none;
+  align-self: flex-start;
+  margin-top: 12vh;
 }
 
 /* ── 搜索框 ── */

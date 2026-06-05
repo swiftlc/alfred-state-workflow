@@ -78,7 +78,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { BookOpen, History, Layers, Zap, BarChart2, Activity, Sliders, Network, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { BookOpen, History, Layers, Zap, BarChart2, Activity, Sliders, Network, Terminal, ChevronLeft, ChevronRight } from '@lucide/vue'
 import type { Component } from 'vue'
 import {
   NConfigProvider, NMessageProvider, NDialogProvider,
@@ -157,6 +157,7 @@ const navItems: NavItem[] = [
   { key: 'monitor',    label: '环境嗅探',     icon: BarChart2 },
   { key: 'lion',       label: 'Lion 配置',    icon: Sliders   },
   { key: 'shepherd',   label: 'Shepherd',     icon: Network   },
+  { key: 'octo',       label: 'Octo RPC',     icon: Terminal  },
 ]
 
 const activeMenu = computed(() => {
@@ -169,6 +170,7 @@ const activeMenu = computed(() => {
   if (p.startsWith('/monitor'))    return 'monitor'
   if (p.startsWith('/lion'))       return 'lion'
   if (p.startsWith('/shepherd'))   return 'shepherd'
+  if (p.startsWith('/octo'))       return 'octo'
   return 'dicts'
 })
 
