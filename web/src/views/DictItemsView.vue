@@ -62,6 +62,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, h, reactive } from 'vue'
+import { Pin } from '@lucide/vue'
 // @ts-ignore
 import pinyinMatch from 'pinyin-match'
 // @ts-ignore
@@ -198,10 +199,10 @@ const columns = computed<DataTableColumns<DictItem>>(() => [
     key: 'pin',
     width: 40,
     render: (row) => h('span', {
-      style: `cursor:pointer; font-size:16px; opacity:${row.pinned ? 1 : 0.25}`,
+      style: `cursor:pointer; display:inline-flex; align-items:center; color:${row.pinned ? '#5b6af0' : '#9ca3af'}`,
       title: row.pinned ? '取消置顶' : '置顶',
       onClick: () => doTogglePin(row),
-    }, '⭐'),
+    }, [h(Pin, { size: 14 })]),
   },
   { title: 'Name',  key: 'name',  ellipsis: { tooltip: true } },
   { title: 'Value', key: 'value', ellipsis: { tooltip: true } },
@@ -272,5 +273,5 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-:deep(.pinned-row td) { background: rgba(100, 200, 100, 0.05); }
+:deep(.pinned-row td) { background: rgba(91, 106, 240, 0.04); }
 </style>
