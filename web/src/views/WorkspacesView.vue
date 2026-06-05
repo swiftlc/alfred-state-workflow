@@ -15,10 +15,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted, h } from 'vue'
-import { Trash2 } from '@lucide/vue'
+import { Trash2, Bookmark } from '@lucide/vue'
 import { NDataTable, NSpace, NButton, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { getWorkspaces, deleteWorkspace, setContext, patchWorkspaceData, renameWorkspace } from '@/api/alfred'
+import { getWorkspaces, deleteWorkspace, setContext, patchWorkspaceData, renameWorkspace, setDefaultWorkspace } from '@/api/alfred'
 import { formatTime } from '@/utils/search'
 import ContextTags from '@/components/ContextTags.vue'
 import InlineEdit from '@/components/InlineEdit.vue'
@@ -29,6 +29,12 @@ const dialog  = useDialog()
 
 const loading = ref(false)
 const items   = ref<Workspace[]>([])
+
+async function doToggleDefault(item: Workspace) {
+  const { isDefault } = await setDefaultWorkspace(item.id)
+  items.value.forEach(i => { i.isDefault = i.id === item.id ? isDefault : false })
+  message.success(isDefault ? `「${item.name}」已设为默认工作区` : '已取消默认工作区')
+}
 
 async function doApplyContext(item: Workspace) {
   await setContext({ state: 'home', data: item.data as never })
@@ -95,9 +101,14 @@ const columns: DataTableColumns<Workspace> = [
     }, formatTime(row.lastUsedAt) || '从未'),
   },
   {
-    title: '操作', key: 'actions', width: 130,
-    render: (row) => h(NSpace, { size: 'small' }, {
+    title: '操作', key: 'actions', width: 160,
+    render: (row) => h(NSpace, { size: 'small', align: 'center' }, {
       default: () => [
+        h('span', {
+          title: row.isDefault ? '取消默认' : '设为默认',
+          style: `cursor:pointer; display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:4px; color:${row.isDefault ? '#6366f1' : '#d1d5db'}; ${row.isDefault ? 'background:rgba(99,102,241,0.08)' : ''}`,
+          onClick: () => doToggleDefault(row),
+        }, [h(Bookmark, { size: 14, fill: row.isDefault ? '#6366f1' : 'none' })]),
         h(NButton, {
           size: 'tiny', ghost: true,
           onClick: () => doApplyContext(row),

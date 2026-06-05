@@ -1,17 +1,19 @@
 <template>
   <div v-if="tagItems.length" class="ctx-tags">
-    <span
+    <n-dropdown
       v-for="tag in tagItems"
       :key="tag.key"
-      class="ctx-tag"
-      :class="{ 'is-editable': editable }"
-      :title="editable ? `点击修改 ${tag.dictName}` : `${tag.key}: ${tag.name}`"
-      @click="editable && openPicker(tag.key)"
+      trigger="click"
+      placement="bottom-start"
+      :options="menuFor(tag)"
+      @select="(k: string) => handleMenu(k, tag)"
     >
-      <span class="ctx-tag__key">{{ tag.dictName }}</span>
-      <span class="ctx-tag__sep">·</span>
-      <span class="ctx-tag__name">{{ tag.name }}</span>
-    </span>
+      <span class="ctx-tag" :title="`${tag.key}: ${tag.name}`">
+        <span class="ctx-tag__key">{{ tag.dictName }}</span>
+        <span class="ctx-tag__sep">·</span>
+        <span class="ctx-tag__name">{{ tag.name }}</span>
+      </span>
+    </n-dropdown>
 
     <DictPicker
       v-model:show="picker.show"
@@ -19,13 +21,16 @@
       :dict-name="picker.dictName"
       :fetch-items="picker.fetchItems"
       :current-value="picker.currentValue"
-      @select="onSelect"
+      @select="onPickerSelect"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed, reactive, h } from 'vue'
+import { NDropdown, useMessage } from 'naive-ui'
+import type { DropdownOption } from 'naive-ui'
+import { CheckCheck, Check, Pencil, Copy, Files } from '@lucide/vue'
 import DictPicker from '@/components/DictPicker.vue'
 import { READONLY_DICTS } from '@/config/dicts'
 import { makeFetchItems } from '@/utils/dict'
@@ -40,18 +45,22 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   select: [key: string, item: ContextDataItem]
+  applyAll: [data: Record<string, unknown>]
 }>()
 
-// ─── 字典名称（只读+可编辑均支持） ───────────────────────────────────────────
+const message = useMessage()
+
+// ─── 字典名称 ─────────────────────────────────────────────────────────────────
+
 const roNameMap: Record<string, string> = Object.fromEntries(
   READONLY_DICTS.map(d => [d.key, d.name])
 )
-
 function dictNameOf(key: string) {
   return roNameMap[key] ?? key
 }
 
 // ─── tag 列表 ─────────────────────────────────────────────────────────────────
+
 interface TagItem { key: string; dictName: string; name: string; raw: unknown }
 
 const tagItems = computed<TagItem[]>(() =>
@@ -63,7 +72,55 @@ const tagItems = computed<TagItem[]>(() =>
   }).filter(t => t.name)
 )
 
-// ─── DictPicker 状态 ──────────────────────────────────────────────────────────
+// ─── 复制辅助 ─────────────────────────────────────────────────────────────────
+
+function rawValue(tag: TagItem): string {
+  if (tag.raw && typeof tag.raw === 'object') {
+    const r = tag.raw as Record<string, unknown>
+    return String(r.value ?? r.id ?? r.name ?? tag.name)
+  }
+  return tag.name
+}
+
+// ─── 下拉菜单 ─────────────────────────────────────────────────────────────────
+
+const icon = (comp: unknown) => () => h(comp as Parameters<typeof h>[0], { size: 14 })
+
+function menuFor(tag: TagItem): DropdownOption[] {
+  const opts: DropdownOption[] = []
+  if (props.editable) {
+    opts.push({ key: 'apply-all',        label: '应用全部',  icon: icon(CheckCheck) })
+    opts.push({ key: `apply:${tag.key}`, label: '仅应用此项', icon: icon(Check) })
+    opts.push({ key: `edit:${tag.key}`,  label: '修改',      icon: icon(Pencil) })
+    opts.push({ key: 'div1', type: 'divider' } as DropdownOption)
+  }
+  opts.push({ key: `copy:${tag.key}`,  label: '复制此项', icon: icon(Copy) })
+  if (tagItems.value.length > 1) {
+    opts.push({ key: 'copy-all', label: '复制全部', icon: icon(Files) })
+  }
+  return opts
+}
+
+function handleMenu(key: string, tag: TagItem) {
+  if (key === 'apply-all') {
+    emit('applyAll', props.data)
+  } else if (key.startsWith('apply:')) {
+    emit('select', tag.key, tag.raw as ContextDataItem)
+  } else if (key.startsWith('edit:')) {
+    openPicker(tag.key)
+  } else if (key.startsWith('copy:')) {
+    const json = JSON.stringify({ [tag.key]: rawValue(tag) }, null, 2)
+    navigator.clipboard.writeText(json)
+    message.success(`已复制`)
+  } else if (key === 'copy-all') {
+    const obj = Object.fromEntries(tagItems.value.map(t => [t.key, rawValue(t)]))
+    navigator.clipboard.writeText(JSON.stringify(obj, null, 2))
+    message.success(`已复制 ${tagItems.value.length} 项`)
+  }
+}
+
+// ─── DictPicker ───────────────────────────────────────────────────────────────
+
 const picker = reactive<{
   show: boolean
   key: string
@@ -89,7 +146,7 @@ function openPicker(key: string) {
   picker.show = true
 }
 
-function onSelect(item: ContextDataItem) {
+function onPickerSelect(item: ContextDataItem) {
   emit('select', picker.key, item)
 }
 </script>
@@ -112,17 +169,16 @@ function onSelect(item: ContextDataItem) {
   color: #64748b;
   white-space: nowrap;
   user-select: none;
-}
-
-.ctx-tag.is-editable {
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
-.ctx-tag.is-editable:hover {
+
+.ctx-tag:hover {
   background: #e0e7ff;
   color: #4f46e5;
 }
-.ctx-tag.is-editable:hover .ctx-tag__key { color: #818cf8; }
+
+.ctx-tag:hover .ctx-tag__key { color: #818cf8; }
 
 .ctx-tag__key  { font-family: monospace; color: #94a3b8; }
 .ctx-tag__sep  { color: #cbd5e1; margin: 0 1px; }

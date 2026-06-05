@@ -1,4 +1,4 @@
-import type { DictMeta, DictItem, HistoryItem, Workspace, Alias, Task, Context } from '@/types'
+import type { DictMeta, DictItem, HistoryItem, Workspace, Alias, Task, Context, SnapshotSummary, SnapshotDetail } from '@/types'
 
 const BASE = '/api/alfred'
 
@@ -61,7 +61,8 @@ export const patchWorkspaceData  = (id: string, data: Record<string, unknown>) =
   request<null>('PATCH', `/workspaces/${id}`, { data })
 export const renameWorkspace     = (id: string, name: string) =>
   request<null>('PATCH', `/workspaces/${id}`, { name })
-export const createWorkspace     = (name: string, data: Record<string, unknown>) => post<{ id: string }>('/workspaces', { name, data })
+export const createWorkspace      = (name: string, data: Record<string, unknown>) => post<{ id: string }>('/workspaces', { name, data })
+export const setDefaultWorkspace  = (id: string) => post<{ isDefault: boolean }>(`/workspaces/${id}/default`, {})
 
 // ─── Aliases ──────────────────────────────────────────────────────────────────
 export const getAliases   = ()           => get<Alias[]>('/aliases')
@@ -83,3 +84,21 @@ export const clearApplogs = ()           => del<null>('/applogs')
 // ─── Context (/internal/context) ─────────────────────────────────────────────
 export const getContext = () => internalRequest<Context | null>('GET', '/context')
 export const setContext = (ctx: Context) => internalRequest<null>('POST', '/context', ctx)
+
+// ─── Sensing (/api/sensing) ───────────────────────────────────────────────────
+async function sensingFetch<T>(path: string, method = 'GET'): Promise<T> {
+  const res = await fetch(`/api/sensing${path}`, { method })
+  const json = await res.json()
+  if (Array.isArray(json)) return json as T           // history 端点返回裸数组
+  if (json.code !== 0) throw new Error(json.msg ?? `sensing API error`)
+  return json.data
+}
+
+export const getSensingStatus   = () => sensingFetch<Record<string, SnapshotSummary | null>>('/status')
+export const getSensingHistory  = (source: string, limit = 20) =>
+  sensingFetch<SnapshotSummary[]>(`/history/${source}?limit=${limit}`)
+export const getSensingSnapshot = (id: string) => sensingFetch<SnapshotDetail>(`/snapshot/${id}`)
+export const dismissSensing     = (source: string) =>
+  sensingFetch<{ dismissed: boolean }>(`/dismiss/${source}`, 'POST')
+export const triggerSensingAI   = (id: string) =>
+  sensingFetch<{ message: string }>(`/trigger-ai/${id}`, 'POST')

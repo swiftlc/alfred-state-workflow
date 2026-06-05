@@ -11,5 +11,7 @@ export default createRouter({
     { path: '/aliases',      component: () => import('@/views/AliasesView.vue') },
     { path: '/monitor',      component: () => import('@/views/MonitorView.vue') },
     { path: '/context',      component: () => import('@/views/ContextView.vue') },
+    { path: '/lion',         component: () => import('@/views/LionConfigView.vue') },
+    { path: '/shepherd',     component: () => import('@/views/ShepherdView.vue') },
   ],
 })
