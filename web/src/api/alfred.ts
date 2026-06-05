@@ -51,15 +51,25 @@ export const clearHistory     = ()           => del<null>('/history')
 export const toggleHistoryPin = (id: string) => post<null>(`/history/${id}/pin`, {})
 export const renameHistory    = (id: string, title: string, subtitle?: string) =>
   request<null>('PATCH', `/history/${id}`, { title, subtitle })
+export const patchHistoryData = (id: string, data: Record<string, unknown>) =>
+  request<null>('PATCH', `/history/${id}`, { data })
 
 // ─── Workspaces ───────────────────────────────────────────────────────────────
-export const getWorkspaces    = ()                                         => get<Workspace[]>('/workspaces')
-export const deleteWorkspace  = (id: string)                               => del<null>(`/workspaces/${id}`)
-export const createWorkspace  = (name: string, data: Record<string, unknown>) => post<{ id: string }>('/workspaces', { name, data })
+export const getWorkspaces       = ()                                         => get<Workspace[]>('/workspaces')
+export const deleteWorkspace     = (id: string)                               => del<null>(`/workspaces/${id}`)
+export const patchWorkspaceData  = (id: string, data: Record<string, unknown>) =>
+  request<null>('PATCH', `/workspaces/${id}`, { data })
+export const renameWorkspace     = (id: string, name: string) =>
+  request<null>('PATCH', `/workspaces/${id}`, { name })
+export const createWorkspace     = (name: string, data: Record<string, unknown>) => post<{ id: string }>('/workspaces', { name, data })
 
 // ─── Aliases ──────────────────────────────────────────────────────────────────
 export const getAliases   = ()           => get<Alias[]>('/aliases')
 export const deleteAlias  = (id: string) => del<null>(`/aliases/${id}`)
+export const patchAliasData = (id: string, data: Record<string, unknown>) =>
+  request<null>('PATCH', `/aliases/${id}`, { data })
+export const renameAlias  = (id: string, fields: { alias?: string; title?: string; subtitle?: string }) =>
+  request<null>('PATCH', `/aliases/${id}`, fields)
 export const createAlias  = (body: { alias: string; action: string; data: Record<string, unknown>; title: string; subtitle?: string }) =>
   post<{ id: string }>('/aliases', body)
 

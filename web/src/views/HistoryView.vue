@@ -22,19 +22,6 @@
       :row-class-name="(row: HistoryItem) => row.isPinned ? 'pinned-row' : ''"
     />
 
-    <!-- 改名 Modal -->
-    <n-modal v-model:show="renameModal.show" preset="dialog" title="修改名称"
-             positive-text="保存" negative-text="取消" @positive-click="submitRename">
-      <n-form style="margin-top:12px">
-        <n-form-item label="标题">
-          <n-input v-model:value="renameModal.title" placeholder="条目标题" />
-        </n-form-item>
-        <n-form-item label="副标题">
-          <n-input v-model:value="renameModal.subtitle" placeholder="可选" />
-        </n-form-item>
-      </n-form>
-    </n-modal>
-
     <!-- 创建别名 Modal -->
     <n-modal v-model:show="aliasModal.show" preset="dialog" title="创建别名"
              positive-text="创建" negative-text="取消" @positive-click="submitAlias">
@@ -54,10 +41,12 @@
 import { ref, computed, onMounted, h, reactive } from 'vue'
 import { Pin, Trash2 } from '@lucide/vue'
 import { NDataTable, NInput, NButton, NModal, NForm, NFormItem, useMessage, useDialog } from 'naive-ui'
+import ContextTags from '@/components/ContextTags.vue'
+import InlineEdit from '@/components/InlineEdit.vue'
 import type { DataTableColumns } from 'naive-ui'
-import { getHistory, deleteHistory, clearHistory, toggleHistoryPin, createAlias, renameHistory } from '@/api/alfred'
+import { getHistory, deleteHistory, clearHistory, toggleHistoryPin, createAlias, renameHistory, patchHistoryData } from '@/api/alfred'
 import { matchQuery, formatTime } from '@/utils/search'
-import type { HistoryItem } from '@/types'
+import type { HistoryItem, ContextDataItem } from '@/types'
 
 const message = useMessage()
 const dialog  = useDialog()
@@ -98,23 +87,23 @@ function doDelete(item: HistoryItem) {
   })
 }
 
-const renameModal = reactive({ show: false, title: '', subtitle: '', item: null as HistoryItem | null })
-
-function openRenameModal(item: HistoryItem) {
-  renameModal.title    = item.title
-  renameModal.subtitle = item.subtitle ?? ''
-  renameModal.item     = item
-  renameModal.show     = true
+async function doRenameHistoryTitle(item: HistoryItem, title: string) {
+  if (!title) return
+  await renameHistory(item.id, title, item.subtitle)
+  item.title = title
+  message.success('已修改')
 }
 
-async function submitRename() {
-  if (!renameModal.title.trim()) { message.error('标题不能为空'); return false }
-  const item = renameModal.item!
-  await renameHistory(item.id, renameModal.title.trim(), renameModal.subtitle.trim() || undefined)
-  item.title    = renameModal.title.trim()
-  item.subtitle = renameModal.subtitle.trim() || undefined
+async function doRenameHistorySubtitle(item: HistoryItem, subtitle: string) {
+  await renameHistory(item.id, item.title, subtitle || undefined)
+  item.subtitle = subtitle || undefined
   message.success('已修改')
-  return true
+}
+
+async function updateHistoryContext(item: HistoryItem, key: string, val: ContextDataItem) {
+  item.data = { ...item.data, [key]: val }
+  await patchHistoryData(item.id, item.data as Record<string, unknown>)
+  message.success(`已更新上下文「${key}」`)
 }
 
 const aliasModal = reactive({ show: false, alias: '', item: null as HistoryItem | null })
@@ -165,9 +154,28 @@ const columns: DataTableColumns<HistoryItem> = [
   {
     title: '标题', key: 'title',
     render: (row) => h('div', {}, [
-      h('div', { style: 'font-weight:500' }, row.title),
-      row.subtitle
-        ? h('div', { style: 'font-size:12px; color:#9ca3af; margin-top:1px' }, row.subtitle)
+      h(InlineEdit, {
+        value: row.title,
+        displayStyle: 'font-weight:500',
+        onConfirm: (val: string) => doRenameHistoryTitle(row, val),
+      }),
+      h('div', { style: 'margin-top:2px' }, [
+        h(InlineEdit, {
+          value: row.subtitle ?? '',
+          placeholder: '添加副标题',
+          displayStyle: 'font-size:12px; color:#9ca3af',
+          inputStyle: 'font-size:12px; color:#9ca3af',
+          onConfirm: (val: string) => doRenameHistorySubtitle(row, val),
+        }),
+      ]),
+      Object.keys(row.data ?? {}).length
+        ? h('div', { style: 'margin-top:5px' }, [
+            h(ContextTags, {
+              data: row.data as Record<string, unknown>,
+              editable: true,
+              onSelect: (key: string, val: ContextDataItem) => updateHistoryContext(row, key, val),
+            }),
+          ])
         : null,
     ]),
   },
@@ -190,12 +198,8 @@ const columns: DataTableColumns<HistoryItem> = [
     }, formatTime(row.timestamp)),
   },
   {
-    title: '操作', key: 'actions', width: 160,
+    title: '操作', key: 'actions', width: 110,
     render: (row) => h('div', { style: 'display:flex; align-items:center; gap:6px' }, [
-      h(NButton, {
-        size: 'tiny', ghost: true,
-        onClick: () => openRenameModal(row),
-      }, { default: () => '改名' }),
       h(NButton, {
         size: 'tiny', ghost: true,
         onClick: () => openAliasModal(row),

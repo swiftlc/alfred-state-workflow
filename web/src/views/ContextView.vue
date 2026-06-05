@@ -143,8 +143,9 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { RefreshCw, Copy, Layers, Pencil, Inbox, X, Plus, LayoutGrid, Database } from '@lucide/vue'
 import { NButton, NTag, NModal, NForm, NFormItem, NInput, NSpin, useMessage, useDialog } from 'naive-ui'
-import { getContext, setContext, getDicts, getDictItems, createWorkspace } from '@/api/alfred'
+import { getContext, setContext, getDicts, createWorkspace } from '@/api/alfred'
 import { READONLY_DICTS } from '@/config/dicts'
+import { makeFetchItems } from '@/utils/dict'
 import DictPicker from '@/components/DictPicker.vue'
 import type { Context, ContextDataItem, DictItem } from '@/types'
 
@@ -191,13 +192,6 @@ async function ensureDicts() {
     ...READONLY_DICTS.map(d => ({ key: d.key, name: d.name })),
     ...editableDicts.map(d => ({ key: d.key, name: d.name })),
   ]
-}
-
-// ─── item 加载函数工厂 ────────────────────────────────────────────────────────
-function makeFetchItems(key: string): () => Promise<DictItem[]> {
-  const ro = READONLY_DICTS.find(d => d.key === key)
-  if (ro) return ro.fetchItems
-  return () => getDictItems(key)
 }
 
 // ─── 分类选择器 ───────────────────────────────────────────────────────────────

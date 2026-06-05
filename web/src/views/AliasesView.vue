@@ -23,11 +23,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
 import { Trash2 } from '@lucide/vue'
-import { NDataTable, NInput, NTag, useMessage, useDialog } from 'naive-ui'
+import { NDataTable, NInput, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { getAliases, deleteAlias } from '@/api/alfred'
+import { getAliases, deleteAlias, patchAliasData, renameAlias } from '@/api/alfred'
 import { matchQuery, formatTime } from '@/utils/search'
-import type { Alias } from '@/types'
+import ContextTags from '@/components/ContextTags.vue'
+import InlineEdit from '@/components/InlineEdit.vue'
+import type { Alias, ContextDataItem } from '@/types'
 
 const message = useMessage()
 const dialog  = useDialog()
@@ -56,20 +58,58 @@ function doDelete(item: Alias) {
   })
 }
 
+async function updateAliasContext(item: Alias, key: string, val: ContextDataItem) {
+  item.data = { ...item.data, [key]: val }
+  await patchAliasData(item.id, item.data as Record<string, unknown>)
+  message.success(`已更新上下文「${key}」`)
+}
+
+async function doRenameAlias(item: Alias, fields: { alias?: string; title?: string; subtitle?: string }) {
+  await renameAlias(item.id, fields)
+  if (fields.alias    !== undefined) item.alias    = fields.alias
+  if (fields.title    !== undefined) item.title    = fields.title
+  if (fields.subtitle !== undefined) item.subtitle = fields.subtitle || undefined
+  message.success('已修改')
+}
+
+const ALIAS_TAG_STYLE = 'font-family:monospace; background:#eef2ff; color:#4f46e5; font-size:12px; font-weight:600; padding:1px 7px; border-radius:4px'
+const ALIAS_INPUT_STYLE = 'font-family:monospace; font-size:12px; font-weight:600; color:#4f46e5'
+
 const columns: DataTableColumns<Alias> = [
   {
     title: '别名', key: 'alias', width: 140,
-    render: (row) => h(NTag, {
-      size: 'small', bordered: false,
-      style: 'font-family:monospace; background:#eef2ff; color:#4f46e5; font-size:12px; font-weight:600',
-    }, { default: () => row.alias }),
+    render: (row) => h(InlineEdit, {
+      value: row.alias,
+      displayStyle: ALIAS_TAG_STYLE,
+      inputStyle: ALIAS_INPUT_STYLE,
+      onConfirm: (val: string) => doRenameAlias(row, { alias: val }),
+    }),
   },
   {
     title: '对应条目', key: 'title',
     render: (row) => h('div', {}, [
-      h('div', { style: 'font-weight:500' }, row.title),
-      row.subtitle
-        ? h('div', { style: 'font-size:12px; color:#9ca3af; margin-top:1px' }, row.subtitle)
+      h(InlineEdit, {
+        value: row.title,
+        displayStyle: 'font-weight:500',
+        onConfirm: (val: string) => doRenameAlias(row, { title: val }),
+      }),
+      h('div', { style: 'margin-top:2px' }, [
+        h(InlineEdit, {
+          value: row.subtitle ?? '',
+          placeholder: '添加副标题',
+          displayStyle: 'font-size:12px; color:#9ca3af',
+          inputStyle: 'font-size:12px; color:#9ca3af',
+          onConfirm: (val: string) => doRenameAlias(row, { subtitle: val }),
+        }),
+      ]),
+      Object.keys(row.data ?? {}).length
+        ? h('div', { style: 'margin-top:5px' }, [
+            h(ContextTags, {
+              data: row.data as Record<string, unknown>,
+              editable: true,
+              onSelect: (key: string, val: ContextDataItem) => updateAliasContext(row, key, val),
+            }),
+          ])
         : null,
     ]),
   },

@@ -16,11 +16,13 @@
 <script setup lang="ts">
 import { ref, onMounted, h } from 'vue'
 import { Trash2 } from '@lucide/vue'
-import { NDataTable, NTag, NSpace, NButton, useMessage, useDialog } from 'naive-ui'
+import { NDataTable, NSpace, NButton, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { getWorkspaces, deleteWorkspace, setContext } from '@/api/alfred'
+import { getWorkspaces, deleteWorkspace, setContext, patchWorkspaceData, renameWorkspace } from '@/api/alfred'
 import { formatTime } from '@/utils/search'
-import type { Workspace } from '@/types'
+import ContextTags from '@/components/ContextTags.vue'
+import InlineEdit from '@/components/InlineEdit.vue'
+import type { Workspace, ContextDataItem } from '@/types'
 
 const message = useMessage()
 const dialog  = useDialog()
@@ -28,16 +30,21 @@ const dialog  = useDialog()
 const loading = ref(false)
 const items   = ref<Workspace[]>([])
 
-function summarizeData(data: Record<string, unknown>): Array<{ key: string; label: string }> {
-  return Object.entries(data).map(([k, v]) => {
-    const label = v && typeof v === 'object' ? ((v as Record<string, unknown>).name as string ?? JSON.stringify(v)) : String(v ?? '')
-    return { key: k, label }
-  })
-}
-
 async function doApplyContext(item: Workspace) {
   await setContext({ state: 'home', data: item.data as never })
   message.success(`已将工作区「${item.name}」应用到上下文`)
+}
+
+async function doRenameWorkspace(item: Workspace, name: string) {
+  await renameWorkspace(item.id, name)
+  item.name = name
+  message.success('已修改')
+}
+
+async function updateWorkspaceContext(item: Workspace, key: string, val: ContextDataItem) {
+  item.data = { ...item.data, [key]: val }
+  await patchWorkspaceData(item.id, item.data as Record<string, unknown>)
+  message.success(`已更新上下文「${key}」`)
 }
 
 function doDelete(item: Workspace) {
@@ -57,20 +64,23 @@ function doDelete(item: Workspace) {
 const columns: DataTableColumns<Workspace> = [
   {
     title: '名称', key: 'name', width: 180,
-    render: (row) => h('span', { style: 'font-weight:500' }, row.name),
+    render: (row) => h(InlineEdit, {
+      value: row.name,
+      displayStyle: 'font-weight:500',
+      onConfirm: (val: string) => doRenameWorkspace(row, val),
+    }),
   },
   {
     title: '快照内容', key: 'data',
     render: (row) => {
-      const tags = summarizeData(row.data)
-      if (!tags.length) return h('span', { style: 'color:#d1d5db' }, '空')
-      return h(NSpace, { size: 4, wrap: true }, {
-        default: () => tags.map(({ key, label }) =>
-          h(NTag, { size: 'small', bordered: false, style: 'background:#f1f4fb; color:#4b5563; font-size:11px' }, {
-            default: () => `${key}: ${label}`,
-          })
-        ),
-      })
+      if (!Object.keys(row.data ?? {}).length) return h('span', { style: 'color:#d1d5db' }, '空')
+      return h('div', { style: 'padding:4px 0' }, [
+        h(ContextTags, {
+          data: row.data as Record<string, unknown>,
+          editable: true,
+          onSelect: (key: string, val: ContextDataItem) => updateWorkspaceContext(row, key, val),
+        }),
+      ])
     },
   },
   {
