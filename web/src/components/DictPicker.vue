@@ -24,6 +24,16 @@
           @keydown.down.prevent="moveCursor(1)"
           @keydown.esc="innerShow = false"
         />
+        <button
+          v-if="fetchItems.clearCache"
+          class="alfred-search__refresh"
+          :class="{ 'is-spinning': refreshing }"
+          :disabled="refreshing"
+          title="刷新（清除缓存）"
+          @click="handleRefresh"
+        >
+          <component :is="RefreshCw" :size="14" />
+        </button>
         <kbd class="alfred-search__esc" @click="innerShow = false">esc</kbd>
       </div>
 
@@ -67,8 +77,17 @@
               <component :is="isSelected(item) ? Check : FileText" :size="15" />
             </span>
             <span class="alfred-item__body">
-              <span class="alfred-item__name">{{ item.name }}</span>
-              <span v-if="item.value && item.value !== item.name" class="alfred-item__sub">{{ item.value }}</span>
+              <span class="alfred-item__name-row">
+                <span class="alfred-item__name">{{ item.name }}</span>
+                <span
+                  v-for="tag in (item.tags ?? [])"
+                  :key="tag.label"
+                  class="alfred-item__tag"
+                  :data-color="tag.color || 'indigo'"
+                >{{ tag.label }}</span>
+              </span>
+              <span v-if="item.description" class="alfred-item__sub">{{ item.description }}</span>
+              <span v-else-if="item.value && item.value !== item.name" class="alfred-item__sub">{{ item.value }}</span>
             </span>
             <component :is="CornerDownLeft" v-if="cursor === idx" :size="13" class="alfred-item__enter" />
           </div>
@@ -80,16 +99,17 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
-import { Search, PencilLine, Check, FileText, CornerDownLeft } from '@lucide/vue'
+import { Search, PencilLine, Check, FileText, CornerDownLeft, RefreshCw } from '@lucide/vue'
 import { NModal, NSpin } from 'naive-ui'
 import { matchQuery } from '@/utils/search'
+import type { FetchItemsFn } from '@/utils/dict'
 import type { DictItem, ContextDataItem } from '@/types'
 
 const props = defineProps<{
   show: boolean
   dictKey: string
   dictName: string
-  fetchItems: () => Promise<DictItem[]>
+  fetchItems: FetchItemsFn
   currentValue?: ContextDataItem | null
   allowInput?: boolean  // 是否允许手动输入（默认 true）
 }>()
@@ -104,8 +124,9 @@ const innerShow = computed({
   set: (v) => emit('update:show', v),
 })
 
-const search   = ref('')
-const loading  = ref(false)
+const search     = ref('')
+const loading    = ref(false)
+const refreshing = ref(false)
 const items    = ref<DictItem[]>([])
 const cursor   = ref(-2)
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -131,6 +152,13 @@ async function load() {
   items.value   = []
   try { items.value = await props.fetchItems() }
   finally { loading.value = false }
+}
+
+async function handleRefresh() {
+  refreshing.value = true
+  props.fetchItems.clearCache?.()
+  await load()
+  refreshing.value = false
 }
 
 watch(() => props.show, async (v) => {
@@ -231,6 +259,31 @@ function onEnter() {
 }
 .alfred-search__input::placeholder { color: #cbd5e1; }
 
+.alfred-search__refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+  padding: 0;
+}
+.alfred-search__refresh:hover { background: #f1f5f9; color: #475569; }
+.alfred-search__refresh:disabled { opacity: 0.4; cursor: not-allowed; }
+.alfred-search__refresh.is-spinning svg {
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 .alfred-search__esc {
   font-size: 11px;
   color: #94a3b8;
@@ -290,12 +343,40 @@ function onEnter() {
   gap: 1px;
 }
 
+.alfred-item__name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
 .alfred-item__name {
   font-size: 14px;
   font-weight: 500;
   color: #0f172a;
   line-height: 1.4;
   word-break: break-all;
+}
+
+.alfred-item__tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  line-height: 1.5;
+  flex-shrink: 0;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+.alfred-item__tag[data-color="emerald"] { background: #d1fae5; color: #059669; }
+.alfred-item__tag[data-color="amber"]   { background: #fef3c7; color: #b45309; }
+.alfred-item__tag[data-color="slate"]   { background: #f1f5f9; color: #475569; }
+.alfred-item__tag[data-color="rose"]    { background: #ffe4e6; color: #e11d48; }
+.alfred-item.is-active .alfred-item__tag {
+  background: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.9);
 }
 
 .alfred-item__sub {

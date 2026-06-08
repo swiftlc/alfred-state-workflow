@@ -37,12 +37,13 @@
 import { ref, computed } from 'vue'
 import { ChevronDown, X } from '@lucide/vue'
 import DictPicker from './DictPicker.vue'
+import type { FetchItemsFn } from '@/utils/dict'
 import type { DictItem, ContextDataItem } from '@/types'
 
 const props = defineProps<{
   modelValue: string | null | undefined
   dictKey: string
-  fetchItems: () => Promise<DictItem[]>
+  fetchItems: FetchItemsFn
   dictName?: string
   placeholder?: string
   clearable?: boolean
@@ -72,10 +73,14 @@ const currentItem = computed<ContextDataItem | null>(() => {
     : { id: v, name: v, value: v }
 })
 
-async function fetchAndCache(): Promise<DictItem[]> {
-  const items     = await props.fetchItems()
+const fetchAndCache: FetchItemsFn = async () => {
+  const items = await props.fetchItems()
   cachedItems.value = items
   return items
+}
+// 透传 clearCache，DictPicker 据此决定是否显示刷新按钮
+if (props.fetchItems.clearCache) {
+  fetchAndCache.clearCache = () => props.fetchItems.clearCache?.()
 }
 
 function onSelect(item: ContextDataItem) {

@@ -1,102 +1,96 @@
 <template>
+  <ContextGroup>
   <div class="flex flex-col overflow-hidden" style="height: 100%">
-    <!-- 标题 + 查询栏 -->
+
+    <!-- 标题 + 刷新 -->
     <div class="shrink-0 mb-4">
       <div class="flex items-center justify-between mb-3">
         <h1 class="text-lg font-semibold text-slate-800 tracking-tight">Octo RPC</h1>
-        <span v-if="nodesLoading || methodsLoading" class="flex items-center gap-1.5 text-xs text-slate-400">
-          <n-spin :size="12" />
-          {{ nodesLoading ? '查询节点…' : '加载方法…' }}
-        </span>
-      </div>
-      <div class="flex items-center gap-2">
-        <DictSelect
-          v-model="appkeyInput"
-          dict-key="appkey"
-          dict-name="Appkey"
-          :fetch-items="fetchAppkeyItems"
-          placeholder="com.sankuai.xxx"
-          clearable
-          style="flex: 1"
-        />
-        <DictSelect
-          v-model="swimlaneInput"
-          dict-key="swimlane"
-          dict-name="泳道"
-          :fetch-items="fetchSwimlaneItems"
-          placeholder="泳道（主干）"
-          clearable
-          style="width: 180px"
-        />
-        <n-button type="primary" :loading="nodesLoading" :disabled="!appkeyInput" @click="doQueryNodes">
-          查询节点
-        </n-button>
+        <div class="flex items-center gap-2">
+          <span v-if="nodesLoading || methodsLoading" class="flex items-center gap-1.5 text-xs text-slate-400">
+            <n-spin :size="12" />
+            {{ nodesLoading ? '查询节点…' : '加载方法…' }}
+          </span>
+          <n-button size="tiny" :loading="nodesLoading" :disabled="!appkeyInput" ghost @click="doQueryNodes">
+            刷新节点
+          </n-button>
+        </div>
       </div>
 
-      <!-- 节点信息条 -->
-      <div v-if="currentNode" class="flex items-center gap-2 mt-2 flex-wrap">
-        <!-- 多节点：可点击切换 -->
-        <n-popover
-          v-if="allNodes.length > 1"
-          trigger="click"
-          placement="bottom-start"
-          :show-arrow="false"
-          style="padding: 4px 0; min-width: 260px"
+      <!-- 主 chip 行：appkey / 节点 / 接口 -->
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <ContextItem
+          context-key="appkey"
+          :value="appkeyInput ?? ''"
+          label="Appkey"
+          :fetch-items="fetchAppkeyItems"
+          custom-edit
+          @edit="onAppkeyEdit"
         >
-          <template #trigger>
-            <span class="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md border border-emerald-200 text-xs cursor-pointer hover:bg-emerald-100 transition-colors select-none">
+          <span class="octo-chip" :class="appkeyInput ? 'octo-chip--slate' : 'octo-chip--empty'">
+            <span class="font-mono">{{ appkeyInput || 'Appkey…' }}</span>
+          </span>
+        </ContextItem>
+
+        <span class="octo-sep">/</span>
+
+        <template v-if="currentNode">
+          <ContextItem
+            context-key="node"
+            :value="`${currentNode.ip}:${currentNode.port}`"
+            label="节点"
+            :fetch-items="fetchNodeItems"
+            custom-edit
+            @action="handleNodeAction"
+            @edit="handleNodeEdit"
+          >
+            <span class="octo-chip octo-chip--emerald">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
               <span class="font-mono">{{ currentNode.ip }}:{{ currentNode.port }}</span>
-              <span class="text-emerald-500 truncate max-w-36">{{ currentNode.name }}</span>
-              <ChevronDown :size="11" class="text-emerald-400 ml-0.5 flex-shrink-0" />
+              <span class="text-emerald-500">{{ currentNode.name }}</span>
             </span>
-          </template>
-          <div style="max-height: 240px; overflow-y: auto">
-            <div
-              v-for="node in allNodes"
-              :key="`${node.ip}:${node.port}`"
-              class="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors"
-              :class="isCurrentNode(node) ? 'bg-indigo-50' : 'hover:bg-slate-50'"
-              @click="switchNode(node)"
-            >
-              <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="isCurrentNode(node) ? 'bg-indigo-400' : 'bg-slate-300'" />
-              <span class="font-mono text-xs" :class="isCurrentNode(node) ? 'text-indigo-700 font-medium' : 'text-slate-700'">{{ node.ip }}:{{ node.port }}</span>
-              <span class="text-xs text-slate-400 truncate flex-1">{{ node.name }}</span>
-              <span v-if="node.swimlane" class="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded border border-indigo-100 flex-shrink-0">{{ node.swimlane }}</span>
-            </div>
-          </div>
-        </n-popover>
-        <!-- 单节点：静态展示 -->
-        <span v-else class="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md border border-emerald-200 text-xs">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-          <span class="font-mono">{{ currentNode.ip }}:{{ currentNode.port }}</span>
-          <span class="text-emerald-500 truncate max-w-36">{{ currentNode.name }}</span>
+          </ContextItem>
+        </template>
+        <span v-else class="octo-chip octo-chip--empty">
+          <n-spin v-if="nodesLoading" :size="10" />
+          <span v-else>节点…</span>
         </span>
-        <span v-if="currentNode.swimlane" class="bg-indigo-50 text-indigo-600 px-2 py-1 rounded border border-indigo-200 text-xs">
-          泳道: {{ currentNode.swimlane }}
-        </span>
-        <span v-if="currentNode.version" class="text-xs text-slate-400">{{ currentNode.version }}</span>
-        <span class="ml-auto text-xs text-slate-400">{{ allNodes.length }} 个节点</span>
-      </div>
 
-      <!-- 方法选择触发器 -->
-      <div v-if="currentNode" class="mt-2">
-        <div
-          class="flex items-center gap-2 min-h-[34px] px-3 border rounded-lg cursor-pointer transition-all select-none"
-          :class="methodsLoading
-            ? 'border-slate-200 bg-slate-50 cursor-not-allowed'
-            : 'border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm'"
+        <span class="octo-sep">/</span>
+
+        <template v-if="selectedMethod">
+          <ContextItem
+            context-key="reference"
+            :value="`${selectedMethod.serviceName}#${selectedMethod.methodName}`"
+            label="接口引用"
+            :meta="{ serviceName: selectedMethod.serviceName, methodName: selectedMethod.methodName }"
+            edit-target="custom"
+            @edit:open="methodPickerVisible = true"
+          >
+            <span class="octo-chip octo-chip--indigo">
+              <span class="text-indigo-400 flex-shrink-0">{{ shortName(selectedMethod.serviceName) }}#</span>
+              <span class="font-medium">{{ selectedMethod.methodName }}</span>
+            </span>
+          </ContextItem>
+        </template>
+        <span
+          v-else-if="currentNode"
+          class="octo-chip octo-chip--empty"
+          :class="!methodsLoading && 'octo-chip--clickable'"
           @click="!methodsLoading && (methodPickerVisible = true)"
         >
-          <n-spin v-if="methodsLoading" :size="12" class="flex-shrink-0" />
-          <template v-else-if="selectedMethod">
-            <span class="text-[13px] text-slate-500 flex-shrink-0">{{ shortName(selectedMethod.serviceName) }}#</span>
-            <span class="text-[13px] text-slate-800 font-medium flex-1 truncate">{{ selectedMethod.methodName }}</span>
-          </template>
-          <span v-else class="text-[13px] text-slate-400 flex-1">
-            {{ methodsLoading ? '加载方法中…' : totalMethodCount ? `选择方法… (共 ${totalMethodCount} 个)` : '选择方法…' }}
-          </span>
-          <ChevronDown :size="14" class="text-slate-400 flex-shrink-0" />
+          <n-spin v-if="methodsLoading" :size="10" />
+          <span v-else>{{ totalMethodCount ? `方法 (${totalMethodCount})…` : '方法…' }}</span>
+        </span>
+
+        <!-- 右侧：泳道 + 节点数 -->
+        <div v-if="allNodes.length > 0" class="ml-auto flex items-center gap-2 flex-shrink-0">
+          <ContextItem v-if="swimlaneInput" context-key="swimlane" :value="swimlaneInput ?? ''" label="泳道">
+            <span class="octo-swim-badge">
+              <span class="octo-swim-badge__dot" />{{ swimlaneInput }}
+            </span>
+          </ContextItem>
+          <span class="text-xs text-slate-400">{{ allNodes.length }} 节点</span>
         </div>
       </div>
     </div>
@@ -154,105 +148,110 @@
       </div>
     </n-modal>
 
-    <!-- 主体：调用面板（全宽） -->
+    <!-- 主体：调用面板 -->
     <div class="flex-1 min-h-0 overflow-y-auto">
       <template v-if="selectedMethod">
-          <!-- 方法信息 -->
-          <div class="mb-4 bg-slate-50 rounded-lg p-3 border border-slate-100">
-            <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">服务</div>
-            <div class="font-mono text-xs text-slate-600 break-all leading-relaxed">{{ selectedMethod.serviceName }}</div>
-            <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-2 mb-1">方法签名</div>
-            <div class="font-mono text-xs text-indigo-600 break-all leading-relaxed">{{ selectedMethod.methodKey }}</div>
-            <div v-if="selectedMethod.returnType" class="text-[10px] text-slate-400 mt-1">
-              返回: <span class="font-mono">{{ shortName(selectedMethod.returnType) }}</span>
-            </div>
-          </div>
 
-          <!-- 参数编辑器 -->
-          <div v-if="templateLoading" class="flex items-center gap-1.5 text-xs text-slate-400 mb-3">
-            <n-spin :size="12" />
-            自动填充参数模板…
-          </div>
-          <div
-            v-for="(paramType, i) in selectedMethod.paramTypes"
-            :key="i"
-            class="mb-4"
-          >
-            <div class="flex items-center gap-2 mb-1.5">
-              <span class="text-xs font-semibold text-slate-700">参数 {{ i + 1 }}</span>
-              <span class="font-mono text-[10px] text-slate-400 truncate flex-1" :title="paramType">{{ shortName(paramType) }}</span>
-              <button
-                v-if="hasSchema(i)"
-                class="text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
-                @click="toggleSchema(i)"
-              >{{ schemaOpen[i] ? '▾' : '▸' }} Schema</button>
-              <button
-                class="text-[10px] text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded transition-colors"
-                @click="fillEmpty(i)"
-              >填充 {}</button>
-            </div>
-
-            <!-- schema 参考 -->
-            <pre
-              v-if="schemaOpen[i] && hasSchema(i)"
-              class="text-[10px] font-mono bg-slate-50 border border-slate-100 rounded p-2 overflow-auto max-h-44 mb-1.5 leading-relaxed"
-            >{{ formatSchema(i) }}</pre>
-
-            <n-input
-              v-model:value="paramValues[i]"
-              type="textarea"
-              :autosize="{ minRows: 4, maxRows: 14 }"
-              placeholder="{}"
-              class="font-mono text-xs"
-              @blur="prettyParam(i)"
-            />
-          </div>
-
-          <!-- 无参数方法 -->
-          <div v-if="selectedMethod.paramTypes.length === 0" class="mb-4 text-xs text-slate-400 italic">
-            该方法无需入参
-          </div>
-
-          <!-- 操作 -->
-          <div class="flex items-center gap-2 mb-4">
-            <n-button type="primary" :loading="invoking" @click="doInvoke">调用</n-button>
-            <n-button
-              v-if="invokeResult !== undefined || invokeError"
-              ghost
-              @click="resultModalShow = true"
-            >查看结果</n-button>
-            <span v-if="invokeMs != null" class="text-xs text-slate-400 ml-1">{{ invokeMs }}ms</span>
-            <span v-if="invokeError" class="text-xs text-red-500 ml-1 truncate max-w-60" :title="invokeError">{{ invokeError }}</span>
-          </div>
-        </template>
-
-        <!-- 空状态 -->
-        <div v-else class="flex flex-col items-center justify-center h-full text-slate-300 select-none">
-          <div class="text-5xl mb-3">🔌</div>
-          <div class="text-sm">查询节点后选择方法进行调用</div>
+        <!-- 参数编辑器 -->
+        <div v-if="templateLoading" class="flex items-center gap-1.5 text-xs text-slate-400 mb-3">
+          <n-spin :size="12" />
+          自动填充参数模板…
         </div>
+        <div v-for="(paramType, i) in selectedMethod.paramTypes" :key="i" class="mb-4">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-xs font-semibold text-slate-700">参数 {{ i + 1 }}</span>
+            <span class="font-mono text-[10px] text-slate-400 truncate flex-1" :title="paramType">{{ shortName(paramType) }}</span>
+            <button
+              v-if="hasSchema(i)"
+              class="text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
+              @click="toggleSchema(i)"
+            >{{ schemaOpen[i] ? '▾' : '▸' }} Schema</button>
+            <button
+              class="text-[10px] text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded transition-colors"
+              @click="fillEmpty(i)"
+            >填充 {}</button>
+          </div>
+          <pre
+            v-if="schemaOpen[i] && hasSchema(i)"
+            class="text-[10px] font-mono bg-slate-50 border border-slate-100 rounded p-2 overflow-auto max-h-44 mb-1.5 leading-relaxed"
+          >{{ formatSchema(i) }}</pre>
+          <n-input
+            v-model:value="paramValues[i]"
+            type="textarea"
+            :autosize="{ minRows: 4, maxRows: 14 }"
+            placeholder="{}"
+            class="font-mono text-xs"
+            @blur="prettyParam(i)"
+          />
+        </div>
+
+        <div v-if="selectedMethod.paramTypes.length === 0" class="mb-4 text-xs text-slate-400 italic">
+          该方法无需入参
+        </div>
+
+        <!-- 调用按钮 -->
+        <div class="flex items-center gap-2 mb-4">
+          <n-button type="primary" :loading="invoking" @click="doInvoke">调用</n-button>
+          <span v-if="invokeMs != null" class="text-xs text-slate-400">{{ invokeMs }}ms</span>
+        </div>
+
+        <!-- 内联调用结果 -->
+        <div v-if="invokeResult !== undefined || invokeError" class="invoke-result">
+          <!-- 结果头 -->
+          <div class="invoke-result__header">
+            <!-- 状态标签 -->
+            <span v-if="invokeError" class="invoke-result__badge invoke-result__badge--error">✗ 请求失败</span>
+            <template v-else-if="parsedResult">
+              <span
+                class="invoke-result__badge"
+                :class="parsedResult.success ? 'invoke-result__badge--success' : 'invoke-result__badge--fail'"
+              >
+                {{ parsedResult.success ? '✓ 成功' : '✗ 失败' }}
+              </span>
+              <span v-if="!parsedResult.success && parsedResult.code !== null" class="invoke-result__code">code: {{ parsedResult.code }}</span>
+              <span v-if="parsedResult.msg" class="invoke-result__msg">{{ parsedResult.msg }}</span>
+            </template>
+            <span v-if="invokeMs != null" class="invoke-result__ms">{{ invokeMs }}ms</span>
+            <!-- traceId 作为 ContextItem，在 group 内支持批量操作 -->
+            <ContextItem
+              v-if="parsedResult?.traceId"
+              context-key="traceId"
+              :value="parsedResult.traceId"
+              label="TraceId"
+              :meta="{ appkey: appkeyInput ?? 'ALL' }"
+            >
+              <span class="octo-chip octo-chip--amber font-mono" style="font-size:11px">{{ parsedResult.traceId }}</span>
+            </ContextItem>
+          </div>
+          <!-- 错误详情 -->
+          <div v-if="invokeError" class="invoke-result__error">{{ invokeError }}</div>
+          <!-- 返回数据 -->
+          <pre v-else-if="parsedResult?.returnStr" class="invoke-result__body">{{ parsedResult.returnStr }}</pre>
+        </div>
+
+      </template>
+
+      <!-- 空状态 -->
+      <div v-else class="flex flex-col items-center justify-center h-full text-slate-300 select-none">
+        <div class="text-5xl mb-3">🔌</div>
+        <div class="text-sm">查询节点后选择方法进行调用</div>
+      </div>
     </div>
 
-    <!-- 结果弹窗 -->
-    <OctoResultModal
-      v-model:show="resultModalShow"
-      :result="invokeResult"
-      :appkey="appkeyInput ?? undefined"
-      :invoke-ms="invokeMs"
-      :method-label="selectedMethod ? `${shortName(selectedMethod.serviceName)}#${selectedMethod.methodName}` : undefined"
-    />
   </div>
+  </ContextGroup>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, reactive, watch, nextTick } from 'vue'
-import { NInput, NButton, NSpin, NPopover, NModal, useMessage } from 'naive-ui'
-import { ChevronDown, Search, Zap, Check, CornerDownLeft } from '@lucide/vue'
+import { NInput, NButton, NSpin, NModal, useMessage } from 'naive-ui'
+import { Search, Zap, Check, CornerDownLeft } from '@lucide/vue'
 import { makeFetchItems } from '@/utils/dict'
 import { matchQuery } from '@/utils/search'
-import DictSelect from '@/components/DictSelect.vue'
-import OctoResultModal from '@/components/OctoResultModal.vue'
-import type { DictItem } from '@/types'
+import ContextItem from '@/components/ContextItem.vue'
+import ContextGroup from '@/components/ContextGroup.vue'
+import type { ContextDataItem } from '@/types'
+import type { FetchItemsFn } from '@/utils/dict'
 import { proxyGet } from '@/utils/proxy'
 
 const OCTO_BASE = 'https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck'
@@ -283,12 +282,12 @@ const LS_KEY = 'octo_query'
 
 // ─── 状态 ──────────────────────────────────────────────────────────────────────
 
-const appkeyInput   = ref<string | null>(null)
-const swimlaneInput = ref<string | null>(null)
+const appkeyInput    = ref<string | null>(null)
 
-const nodesLoading  = ref(false)
-const allNodes      = ref<OctoNode[]>([])
-const currentNode   = ref<OctoNode | null>(null)
+const nodesLoading   = ref(false)
+const allNodes       = ref<OctoNode[]>([])
+const currentNode    = ref<OctoNode | null>(null)
+const swimlaneInput  = computed(() => currentNode.value?.swimlane ?? null)
 
 const methodsLoading = ref(false)
 const methodGroups   = ref<Map<string, OctoMethodItem[]>>(new Map())
@@ -303,7 +302,6 @@ const templateLoading  = ref(false)
 const invokeResult     = ref<unknown>(undefined)
 const invokeError      = ref('')
 const invokeMs         = ref<number | null>(null)
-const resultModalShow  = ref(false)
 
 // 方法选择器
 const methodPickerVisible  = ref(false)
@@ -328,22 +326,46 @@ const filteredMethods = computed((): OctoMethodItem[] => {
   return allMethods.value.filter(m => matchQuery(q, shortName(m.serviceName), m.methodName))
 })
 
-const prettyResult = computed(() => {
-  if (invokeResult.value === undefined) return ''
-  try { return JSON.stringify(invokeResult.value, null, 2) } catch { return String(invokeResult.value) }
-})
 
-const parsedResult = computed((): { traceId: string; returnStr: string } | null => {
+interface ParsedInvokeResult {
+  success:   boolean
+  code:      number | null
+  msg:       string | null
+  traceId:   string
+  returnStr: string
+}
+
+const parsedResult = computed((): ParsedInvokeResult | null => {
   const r = invokeResult.value
-  if (!r || typeof r !== 'object') return null
-  const obj = r as Record<string, unknown>
-  const traceId = typeof obj.traceId === 'string' ? obj.traceId : ''
-  const returnVal = 'return' in obj ? obj['return'] : undefined
-  if (!traceId && returnVal === undefined) return null
-  const returnStr = returnVal === undefined
-    ? prettyResult.value
-    : (typeof returnVal === 'string' ? returnVal : JSON.stringify(returnVal, null, 2))
-  return { traceId, returnStr }
+  if (r === undefined) return null
+  if (!r || typeof r !== 'object') return { success: false, code: null, msg: null, traceId: '', returnStr: String(r) }
+
+  const obj  = r as Record<string, unknown>
+  const data = (obj.data && typeof obj.data === 'object') ? obj.data as Record<string, unknown> : null
+
+  // traceId: data.traceId 优先，fallback obj.traceId
+  const traceId = typeof data?.traceId === 'string' ? data.traceId
+    : typeof obj.traceId === 'string' ? obj.traceId : ''
+
+  // 返回值：data.return → data → obj.return → 原始 obj
+  const rawReturn = data?.['return'] !== undefined ? data['return']
+    : obj['return'] !== undefined ? obj['return']
+    : (data ?? r)
+
+  let returnStr = ''
+  if (typeof rawReturn === 'string') {
+    try { returnStr = JSON.stringify(JSON.parse(rawReturn), null, 2) } catch { returnStr = rawReturn }
+  } else if (rawReturn !== null && rawReturn !== undefined) {
+    returnStr = JSON.stringify(rawReturn, null, 2)
+  }
+
+  return {
+    success:   obj.success === true || obj.code === 0 || obj.code === '0',
+    code:      obj.code != null ? Number(obj.code) : null,
+    msg:       typeof obj.msg === 'string' && obj.msg ? obj.msg : null,
+    traceId,
+    returnStr,
+  }
 })
 
 // ─── 辅助 ──────────────────────────────────────────────────────────────────────
@@ -368,21 +390,48 @@ function isSelected(m: OctoMethodItem): boolean {
   return selectedMethod.value?.serviceName === m.serviceName && selectedMethod.value?.methodKey === m.methodKey
 }
 
+// ─── appkey / 泳道 ContextItem 编辑回调 ─────────────────────────────────────────
+
+function onAppkeyEdit(item: ContextDataItem) {
+  appkeyInput.value = item.value ?? null
+}
+
+const fetchNodeItems: FetchItemsFn = () =>
+  Promise.resolve(allNodes.value.map(n => ({
+    id:          `${n.ip}:${n.port}`,
+    name:        `${n.ip}:${n.port}`,
+    value:       `${n.ip}:${n.port}`,
+    description: n.name || '',
+    tags:        n.swimlane ? [{ label: n.swimlane, color: 'indigo' as const }] : [],
+    pinned:      false,
+    lastUsedAt:  0,
+  })))
+
+function handleNodeAction(key: string) {
+  if (key === 'machine_jump' && currentNode.value) {
+    const { ip, port } = currentNode.value
+    // TODO: 跳板机跳转，待实现具体协议（ssh / web terminal）
+    message.info(`机器跳转: ${ip}:${port}（待实现）`)
+  }
+}
+
+function handleNodeEdit(item: ContextDataItem) {
+  const [ip, portStr] = (item.value ?? '').split(':')
+  const node = allNodes.value.find(n => n.ip === ip && n.port === Number(portStr))
+  if (node) switchNode(node)
+}
+
 function isCurrentNode(node: OctoNode): boolean {
   return currentNode.value?.ip === node.ip && currentNode.value?.port === node.port
 }
 
 async function switchNode(node: OctoNode) {
   if (isCurrentNode(node)) return
-  currentNode.value = node
+  currentNode.value    = node
   selectedMethod.value = null
   paramValues.value = []
   clearResult()
   await loadMethods()
-}
-
-function copyTraceId(id: string) {
-  navigator.clipboard.writeText(id).then(() => message.success('TraceId 已复制'))
 }
 
 function hasSchema(paramIdx: number): boolean {
@@ -459,16 +508,20 @@ function confirmMethodByEnter() {
   if (m) confirmMethod(m)
 }
 
+// ─── 自动重查：appkey 变化时重新拉节点 ─────────────────────────────────────────
+
+// watchActive 防止 onMounted restoreLs 时触发
+let watchActive = false
+
+watch(appkeyInput, () => {
+  if (!watchActive) return
+  if (appkeyInput.value) doQueryNodes()
+})
+
 // ─── 字典加载（供 DictSelect 使用）─────────────────────────────────────────────
 
-async function fetchAppkeyItems(): Promise<DictItem[]> {
-  return makeFetchItems('appkey')()
-}
-
-async function fetchSwimlaneItems(): Promise<DictItem[]> {
-  const items = await makeFetchItems('swimlane')()
-  return [{ id: '', name: '主干', value: '', description: '', pinned: false, lastUsedAt: 0 }, ...items]
-}
+// 直接使用 makeFetchItems 返回值，保留 .clearCache 等附属属性
+const fetchAppkeyItems = makeFetchItems('appkey')
 
 // ─── 参数模板自动填充 ──────────────────────────────────────────────────────────
 
@@ -510,8 +563,6 @@ async function doQueryNodes() {
 
   try {
     const qs = new URLSearchParams({ appkey, env: 'test' })
-    const sl = swimlaneInput.value ?? ''
-    if (sl) qs.set('swimlane', sl)
 
     const res  = await fetch(`/api/octo-invoke/nodes?${qs}`)
     const json = await res.json() as { success: boolean; data: OctoNode[]; msg?: string }
@@ -611,7 +662,6 @@ async function doInvoke() {
     invokeError.value = (e as Error).message
   } finally {
     invoking.value = false
-    resultModalShow.value = true
   }
 }
 
@@ -619,10 +669,7 @@ async function doInvoke() {
 
 function saveLs() {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify({
-      appkey:   appkeyInput.value,
-      swimlane: swimlaneInput.value,
-    }))
+    localStorage.setItem(LS_KEY, JSON.stringify({ appkey: appkeyInput.value }))
   } catch { /* ignore */ }
 }
 
@@ -630,20 +677,182 @@ function restoreLs() {
   try {
     const raw = localStorage.getItem(LS_KEY)
     if (!raw) return
-    const { appkey, swimlane } = JSON.parse(raw)
-    if (appkey)   appkeyInput.value  = appkey
-    if (swimlane) swimlaneInput.value = swimlane
+    const { appkey } = JSON.parse(raw)
+    if (appkey) appkeyInput.value = appkey
   } catch { /* ignore */ }
 }
 
 // ─── 初始化 ────────────────────────────────────────────────────────────────────
 
-onMounted(() => {
+onMounted(async () => {
   restoreLs()
+  await nextTick()   // 等 restoreLs 触发的 watcher 先以 watchActive=false 消费
+  watchActive = true
+  if (appkeyInput.value) doQueryNodes()
 })
 </script>
 
 <style scoped>
+/* ─── 统一 chip 样式 ──────────────────────────────────────────── */
+.octo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  border: 1px solid;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  user-select: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.octo-chip--slate {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+.octo-chip--slate:hover { background: #e8ecf2; border-color: #c8d0db; }
+
+.octo-chip--emerald {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+.octo-chip--emerald:hover { background: #d1fae5; border-color: #6ee7b7; }
+
+.octo-chip--indigo {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
+}
+.octo-chip--indigo:hover { background: #e0e7ff; border-color: #a5b4fc; }
+
+/* 空值 / 占位态 */
+.octo-chip--empty {
+  background: transparent;
+  border-style: dashed;
+  border-color: #cbd5e1;
+  color: #94a3b8;
+  cursor: default;
+}
+.octo-chip--empty.octo-chip--clickable {
+  cursor: pointer;
+}
+.octo-chip--empty.octo-chip--clickable:hover {
+  border-color: #818cf8;
+  color: #6366f1;
+  background: #f5f3ff;
+}
+
+.octo-sep {
+  color: #cbd5e1;
+  font-size: 11px;
+  padding: 0 1px;
+  flex-shrink: 0;
+}
+
+/* 琥珀色 chip（traceId） */
+.octo-chip--amber {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+.octo-chip--amber:hover { background: #fef3c7; border-color: #f59e0b; }
+
+/* 泳道 badge（内联于右侧元信息区） */
+.octo-swim-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 1px 8px 1px 5px;
+  border-radius: 10px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #4338ca;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  white-space: nowrap;
+}
+.octo-swim-badge:hover { background: #e0e7ff; border-color: #a5b4fc; }
+.octo-swim-badge__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #818cf8;
+  flex-shrink: 0;
+}
+
+/* 内联调用结果面板 */
+.invoke-result {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.invoke-result__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+.invoke-result__badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.invoke-result__badge--success { background: #d1fae5; color: #065f46; }
+.invoke-result__badge--fail    { background: #fee2e2; color: #991b1b; }
+.invoke-result__badge--error   { background: #fee2e2; color: #991b1b; }
+.invoke-result__code {
+  font-size: 11px;
+  font-family: monospace;
+  color: #64748b;
+}
+.invoke-result__msg {
+  font-size: 11px;
+  color: #94a3b8;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.invoke-result__ms {
+  font-size: 11px;
+  color: #cbd5e1;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.invoke-result__error {
+  padding: 12px;
+  font-size: 12px;
+  color: #dc2626;
+  background: #fff5f5;
+}
+.invoke-result__body {
+  padding: 12px;
+  font-size: 12px;
+  font-family: monospace;
+  line-height: 1.6;
+  background: #fff;
+  overflow: auto;
+  max-height: 480px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  color: #1e293b;
+}
+
+/* ─── 方法选择器 ─────────────────────────────────────────────── */
 .method-picker-wrap {
   width: 580px;
   background: #fff;

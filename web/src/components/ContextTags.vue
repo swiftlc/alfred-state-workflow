@@ -72,10 +72,11 @@
 import { computed, reactive, h } from 'vue'
 import { NDropdown, NModal, NCheckbox, NButton, useMessage } from 'naive-ui'
 import type { DropdownOption } from 'naive-ui'
-import { Layers, Check, Pencil, Copy, Files } from '@lucide/vue'
+import { Layers, Check, Pencil, Copy, Files, Zap } from '@lucide/vue'
 import DictPicker from '@/components/DictPicker.vue'
 import { READONLY_DICTS } from '@/config/dicts'
 import { makeFetchItems } from '@/utils/dict'
+import { KEY_CONFIGS } from '@/config/contextKeyConfig'
 import type { ContextDataItem, DictItem } from '@/types'
 
 const props = withDefaults(defineProps<{
@@ -146,6 +147,13 @@ function menuFor(tag: TagItem): DropdownOption[] {
   } else if (total > 2) {
     opts.push({ key: 'batch-copy', label: '批量复制', icon: icon(Files) })
   }
+  const extraActions = KEY_CONFIGS[tag.key]?.extraActions ?? []
+  if (extraActions.length) {
+    opts.push({ key: 'div2', type: 'divider' } as DropdownOption)
+    for (const act of extraActions) {
+      opts.push({ key: `action:${tag.key}:${act.key}`, label: act.label, icon: icon(Zap), disabled: act.disabled })
+    }
+  }
   return opts
 }
 
@@ -166,6 +174,12 @@ function handleMenu(key: string, tag: TagItem) {
     const obj = Object.fromEntries(tagItems.value.map(t => [t.key, rawValue(t)]))
     navigator.clipboard.writeText(JSON.stringify(obj, null, 2))
     message.success(`已复制 ${tagItems.value.length} 项`)
+  } else if (key.startsWith('action:')) {
+    const parts = key.split(':')
+    const dictKey   = parts[1]
+    const actionKey = parts.slice(2).join(':')
+    const tagValue  = rawValue(tag)
+    KEY_CONFIGS[dictKey]?.onAction?.(actionKey, tagValue)
   }
 }
 

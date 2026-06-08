@@ -13,15 +13,17 @@ async function proxyGet<T>(destUrl: string, extraHeaders: Record<string, string>
 }
 
 export interface ReadonlyDictConfig {
-  key: string
-  name: string
+  key:        string
+  name:       string
   fetchItems: () => Promise<DictItem[]>
+  cacheTtl?:  number  // 毫秒，不传则不缓存
 }
 
 export const READONLY_DICTS: ReadonlyDictConfig[] = [
   {
-    key: 'appkey',
-    name: 'Appkey',
+    key:      'appkey',
+    name:     'Appkey',
+    cacheTtl: 7 * 24 * 60 * 60 * 1000,
     fetchItems: async () => {
       const data = await proxyGet<{ success: boolean; data: string[] }>(
         `${OCTO_BASE_URL}/api/octo/v2/common/apps?mis=${MIS_USERNAME}`
@@ -33,8 +35,9 @@ export const READONLY_DICTS: ReadonlyDictConfig[] = [
     },
   },
   {
-    key: 'kafka_topic',
-    name: 'Kafka Topic',
+    key:      'kafka_topic',
+    name:     'Kafka Topic',
+    cacheTtl: 24 * 60 * 60 * 1000,
     fetchItems: async () => {
       const data = await proxyGet<{
         code: number

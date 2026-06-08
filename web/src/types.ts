@@ -3,11 +3,17 @@ export interface DictMeta {
   name: string
 }
 
+export interface DictItemTag {
+  label: string
+  color?: string  // 'indigo' | 'emerald' | 'amber' | 'slate' | 'rose'
+}
+
 export interface DictItem {
   id: string
   name: string
   value: string
   description: string
+  tags?: DictItemTag[]
   pinned: boolean
   lastUsedAt: number
 }

@@ -47,12 +47,19 @@
     />
 
     <!-- 详情抽屉 -->
-    <n-drawer v-model:show="detail.show" :width="540">
+    <ContextGroup>
+    <n-drawer v-model:show="detail.show" :width="580">
       <n-drawer-content :native-scrollbar="false" closable>
         <template #header>
-          <div class="flex items-center gap-2">
-            <span class="font-semibold text-slate-800 text-sm">{{ detail.item?.name }}</span>
-            <n-tag size="small" :bordered="false" type="info">{{ detail.item?.apiGroupName }}</n-tag>
+          <div class="flex items-center gap-2 min-w-0">
+            <ContextItem context-key="api_name" :value="detail.item?.name ?? ''" label="接口名">
+              <span class="font-mono font-semibold text-slate-800">{{ detail.item?.name }}</span>
+            </ContextItem>
+            <ContextItem context-key="api_group" :value="detail.item?.apiGroupName ?? ''" label="分组">
+              <span class="text-[11px] bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded-full font-medium flex-shrink-0 cursor-pointer hover:bg-indigo-100 transition-colors">
+                {{ detail.item?.apiGroupName }}
+              </span>
+            </ContextItem>
           </div>
         </template>
 
@@ -62,69 +69,103 @@
         <template v-else-if="detail.item">
 
           <!-- 描述 -->
-          <p v-if="detail.item.description" class="text-xs text-slate-500 mb-4 leading-relaxed">
+          <p v-if="detail.item.description" class="text-sm text-slate-500 mb-5 leading-relaxed">
             {{ detail.item.description }}
           </p>
 
-          <!-- 路径卡片 -->
-          <div
-            class="group flex items-start gap-2 bg-slate-50 hover:bg-indigo-50 rounded-lg px-3 py-2.5 mb-4 cursor-pointer transition-colors"
-            title="点击复制路径"
-            @click="copy(detail.item!.path, '路径')"
-          >
-            <span class="font-mono text-xs text-indigo-600 break-all flex-1 leading-relaxed">{{ detail.item.path || '—' }}</span>
-            <div class="flex items-center gap-1 flex-shrink-0 mt-0.5">
-              <n-tag
-                v-for="m in (detail.data?.frontRequestView?.methodTypes ?? '').split(',').filter(Boolean)"
-                :key="m"
-                size="small" :bordered="false"
-                style="font-size:10px; padding:0 5px; height:18px; line-height:18px"
-                class="uppercase"
-              >{{ m }}</n-tag>
-              <span v-if="detail.data?.frontRequestView?.timeout" class="text-[10px] text-slate-400 ml-1">
+          <!-- 路径区块 -->
+          <div class="mb-5">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">路径</span>
+              <div class="flex items-center gap-1">
+                <ContextItem
+                  v-for="m in (detail.data?.frontRequestView?.methodTypes ?? '').split(',').filter(Boolean)"
+                  :key="m"
+                  context-key="http_method"
+                  :value="m"
+                  :label="m"
+                >
+                  <span
+                    class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded cursor-pointer"
+                    :class="m.toLowerCase()==='get'    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                            m.toLowerCase()==='post'   ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                            m.toLowerCase()==='put'    ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                            m.toLowerCase()==='delete' ? 'bg-red-50 text-red-600 border border-red-100' :
+                                                         'bg-slate-100 text-slate-600 border border-slate-200'"
+                  >{{ m }}</span>
+                </ContextItem>
+              </div>
+              <span v-if="detail.data?.frontRequestView?.timeout" class="text-[10px] text-slate-300 ml-auto">
                 {{ detail.data.frontRequestView.timeout }}ms
               </span>
             </div>
+            <ContextItem
+              context-key="route"
+              :value="detail.item.path"
+              label="路径"
+              :extra-actions="[{ key: 'open_shepherd', label: '在 Shepherd 查看' }]"
+              bare
+              class="block"
+              @action="handleRouteAction"
+            >
+              <div class="font-mono text-xs text-indigo-600 bg-indigo-50/60 border border-transparent rounded-lg px-3 py-2.5 break-all leading-relaxed cursor-pointer hover:border-indigo-100 hover:bg-indigo-50 transition-colors">
+                {{ detail.item.path || '—' }}
+              </div>
+            </ContextItem>
           </div>
 
           <!-- 后端服务 -->
           <template v-if="detail.data?.invokerViews?.length">
-            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">后端服务</p>
+            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">后端服务</div>
             <div
               v-for="(inv, idx) in detail.data.invokerViews"
               :key="idx"
-              class="bg-slate-50 rounded-lg p-3 mb-3"
+              class="border border-slate-100 rounded-xl p-4 mb-3 bg-white"
             >
-              <!-- Appkey -->
-              <div
-                v-if="inv.appkey"
-                class="flex items-center gap-1.5 mb-2.5 cursor-pointer group/ak"
-                @click="copy(inv.appkey!, 'Appkey')"
-              >
-                <span class="text-[10px] font-medium text-slate-400 uppercase flex-shrink-0">Appkey</span>
-                <span class="font-mono text-xs text-slate-600 group-hover/ak:text-indigo-600 truncate transition-colors">{{ inv.appkey }}</span>
+              <!-- 类型 badge + appkey -->
+              <div class="flex items-center gap-2 mb-3">
+                <span
+                  class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex-shrink-0"
+                  :class="inv.type === 'http'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                    : 'bg-violet-50 text-violet-700 border border-violet-100'"
+                >{{ inv.type ?? 'rpc' }}</span>
+                <ContextItem
+                  v-if="inv.appkey"
+                  context-key="appkey"
+                  :value="inv.appkey"
+                  label="Appkey"
+                  :fetch-items="fetchAppkeyItems"
+                  bare
+                  class="flex-1 min-w-0"
+                >
+                  <span class="font-mono text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded px-2 py-0.5 truncate max-w-full cursor-pointer hover:bg-slate-100 transition-colors block">
+                    {{ inv.appkey }}
+                  </span>
+                </ContextItem>
               </div>
 
-              <!-- 服务 + 方法 引用块 -->
-              <template v-if="inv.serviceName || inv.methodName">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="flex-1 min-w-0">
-                    <code v-if="inv.serviceName" class="block text-xs font-mono text-slate-700 break-all leading-relaxed">{{ inv.serviceName }}</code>
-                    <code v-if="inv.methodName" class="block text-xs font-mono text-indigo-500 mt-0.5">#{{ inv.methodName }}</code>
+              <!-- 服务 + 方法 -->
+              <ContextItem
+                v-if="inv.serviceName"
+                context-key="reference"
+                :value="inv.methodName ? `${inv.serviceName}#${inv.methodName}` : inv.serviceName"
+                label="接口引用"
+                :meta="{ serviceName: inv.serviceName, methodName: inv.methodName }"
+                bare
+                class="block w-full"
+              >
+                <div class="bg-slate-50 rounded-lg px-3 py-2.5 font-mono cursor-pointer hover:bg-indigo-50/40 transition-colors">
+                  <div class="text-[11px] text-slate-500 break-all leading-relaxed">{{ inv.serviceName }}</div>
+                  <div v-if="inv.methodName" class="text-xs text-indigo-600 font-semibold mt-1.5">
+                    <span class="text-slate-300 mr-0.5">#</span>{{ inv.methodName }}
                   </div>
-                  <n-dropdown
-                    trigger="click"
-                    :options="invCopyOptions(inv)"
-                    @select="(key: string) => copy(invCopyValue(key), invCopyLabel(key, inv))"
-                  >
-                    <n-button size="tiny" ghost class="flex-shrink-0 mt-0.5">复制 ↓</n-button>
-                  </n-dropdown>
                 </div>
-              </template>
+              </ContextItem>
 
               <!-- HTTP URL -->
-              <div v-if="inv.url" class="mt-2 pt-2 border-t border-slate-200">
-                <span class="font-mono text-xs text-slate-500 break-all">{{ inv.url }}</span>
+              <div v-if="inv.url" class="mt-2.5 font-mono text-[11px] text-slate-500 bg-slate-50 rounded-lg px-3 py-2 break-all">
+                {{ inv.url }}
               </div>
             </div>
           </template>
@@ -132,18 +173,14 @@
 
           <!-- 返回模板 -->
           <template v-if="detail.data?.responseView?.response">
-            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">返回模板</p>
-            <pre class="text-xs bg-slate-50 p-2.5 rounded-lg overflow-auto max-h-36 font-mono leading-relaxed text-slate-600 whitespace-pre-wrap break-all mb-4">{{ detail.data.responseView.response }}</pre>
+            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">返回模板</div>
+            <pre class="text-xs bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-xl overflow-auto max-h-40 font-mono leading-relaxed text-slate-600 whitespace-pre-wrap break-all mb-4">{{ detail.data.responseView.response }}</pre>
           </template>
 
-          <!-- 底部操作 -->
-          <div class="flex gap-2 pt-3 border-t border-slate-100">
-            <n-button size="small" ghost @click="openShepherdUI">在 Shepherd 打开</n-button>
-            <n-button size="small" ghost @click="copy(detail.item!.path, '路径')">复制路径</n-button>
-          </div>
         </template>
       </n-drawer-content>
     </n-drawer>
+    </ContextGroup>
   </div>
 </template>
 
@@ -152,12 +189,15 @@ defineOptions({ name: 'ShepherdView' })
 
 import { ref, computed, watch, onMounted, h, reactive } from 'vue'
 import {
-  NInput, NDataTable, NDrawer, NDrawerContent, NSpin, NButton, NTag, NDropdown,
+  NInput, NDataTable, NDrawer, NDrawerContent, NSpin, NButton,
   useMessage,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { matchQuery, formatTime } from '@/utils/search'
 import { proxyGet } from '@/utils/proxy'
+import { makeFetchItems } from '@/utils/dict'
+import ContextItem from '@/components/ContextItem.vue'
+import ContextGroup from '@/components/ContextGroup.vue'
 
 const message = useMessage()
 
@@ -374,32 +414,10 @@ function openShepherdUI() {
   window.open(url, '_blank')
 }
 
-function copy(text: string, label: string) {
-  navigator.clipboard.writeText(text)
-  message.success(`已复制${label}`)
-}
+const fetchAppkeyItems = makeFetchItems('appkey')
 
-// ─── 下拉复制选项 ──────────────────────────────────────────────────────────────
-
-const REF_SUFFIX = '::ref'
-
-function invCopyOptions(inv: InvokerView) {
-  const opts: { key: string; label: string }[] = []
-  if (inv.serviceName) opts.push({ key: inv.serviceName,  label: '复制服务名' })
-  if (inv.methodName)  opts.push({ key: inv.methodName,   label: '复制方法名' })
-  if (inv.serviceName && inv.methodName)
-    opts.push({ key: `${inv.serviceName}#${inv.methodName}${REF_SUFFIX}`, label: '复制引用' })
-  return opts
-}
-
-function invCopyLabel(key: string, inv: InvokerView): string {
-  if (key.endsWith(REF_SUFFIX)) return '接口引用'
-  if (key === inv.serviceName)  return '服务名'
-  return '方法名'
-}
-
-function invCopyValue(key: string): string {
-  return key.endsWith(REF_SUFFIX) ? key.slice(0, -REF_SUFFIX.length) : key
+function handleRouteAction(key: string) {
+  if (key === 'open_shepherd') openShepherdUI()
 }
 
 // ─── 表格行点击 ────────────────────────────────────────────────────────────────
