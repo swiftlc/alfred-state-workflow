@@ -1,7 +1,5 @@
 // @ts-ignore
 import pinyinMatch from 'pinyin-match'
-// @ts-ignore
-import fuzzysort from 'fuzzysort'
 
 export function matchQuery(query: string, ...targets: (string | undefined | null)[]): boolean {
   if (!query) return true
@@ -10,11 +8,9 @@ export function matchQuery(query: string, ...targets: (string | undefined | null
   const validTargets = targets.filter((t): t is string => t != null && t !== '')
   if (validTargets.length === 0) return false
   return terms.every(term =>
-    validTargets.some(target => {
-      if (pinyinMatch.match(target, term)) return true
-      const result = fuzzysort.single(term, target) as { score: number } | null
-      return result !== null && result.score > -10000
-    })
+    validTargets.some(target =>
+      target.toLowerCase().includes(term.toLowerCase()) || pinyinMatch.match(target, term)
+    )
   )
 }
 

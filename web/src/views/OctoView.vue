@@ -11,6 +11,9 @@
             <n-spin :size="12" />
             {{ nodesLoading ? '查询节点…' : '加载方法…' }}
           </span>
+          <n-button size="tiny" ghost @click="historyTogglePanel">
+            历史{{ historyEntries.length ? ` (${historyEntries.length})` : '' }}
+          </n-button>
           <n-button size="tiny" :loading="nodesLoading" :disabled="!appkeyInput" ghost @click="doQueryNodes">
             刷新节点
           </n-button>
@@ -148,8 +151,38 @@
       </div>
     </n-modal>
 
-    <!-- 主体：调用面板 -->
-    <div class="flex-1 min-h-0 overflow-y-auto">
+    <!-- 收藏调用 Modal -->
+    <n-modal
+      v-model:show="savePopover.show"
+      preset="dialog"
+      title="收藏此次调用"
+      positive-text="保存"
+      negative-text="取消"
+      :show-icon="false"
+      @positive-click="doSave"
+    >
+      <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px">
+        <n-input v-model:value="savePopover.note" placeholder="这次调用是干什么的…" />
+        <n-input
+          v-model:value="savePopover.tagInput"
+          placeholder="输入标签后回车添加…"
+          @keydown.enter.prevent="addSaveTag"
+        />
+        <div v-if="savePopover.tags.length" style="display:flex; flex-wrap:wrap; gap:4px">
+          <span
+            v-for="t in savePopover.tags"
+            :key="t"
+            class="octo-chip octo-chip--slate"
+            style="font-size:11px; cursor:pointer"
+            @click="removeSaveTag(t)"
+          >{{ t }} ×</span>
+        </div>
+      </div>
+    </n-modal>
+
+    <!-- 主体：调用面板 + 历史面板 -->
+    <div class="flex-1 min-h-0 flex gap-0" style="overflow:hidden">
+    <div :style="historyPanelOpen ? 'flex:0 0 60%; overflow-y:auto; padding-right:8px' : 'flex:1; overflow-y:auto'">
       <template v-if="selectedMethod">
 
         <!-- 参数编辑器 -->
@@ -212,6 +245,11 @@
               <span v-if="parsedResult.msg" class="invoke-result__msg">{{ parsedResult.msg }}</span>
             </template>
             <span v-if="invokeMs != null" class="invoke-result__ms">{{ invokeMs }}ms</span>
+            <button
+              class="invoke-save-btn"
+              title="收藏此次调用"
+              @click="openSavePopover"
+            >⭐ 收藏</button>
             <!-- traceId 作为 ContextItem，在 group 内支持批量操作 -->
             <ContextItem
               v-if="parsedResult?.traceId"
@@ -236,7 +274,23 @@
         <div class="text-5xl mb-3">🔌</div>
         <div class="text-sm">查询节点后选择方法进行调用</div>
       </div>
+    </div><!-- 结束参数区 -->
+
+    <!-- 历史面板 -->
+    <div v-if="historyPanelOpen" style="flex:0 0 40%; overflow:hidden">
+      <OctoHistoryPanel
+        :entries="historyEntries"
+        :all-tags="historyAllTags"
+        :active-entry-id="activeHistoryId"
+        @restore="restoreFromHistory"
+        @remove="historyRemove"
+        @pin="historyTogglePin"
+        @update-note="historyUpdateNote"
+        @clear="historyClear"
+      />
     </div>
+
+    </div><!-- 结束主体 flex-row -->
 
   </div>
   </ContextGroup>
@@ -253,6 +307,9 @@ import ContextGroup from '@/components/ContextGroup.vue'
 import type { ContextDataItem } from '@/types'
 import type { FetchItemsFn } from '@/utils/dict'
 import { proxyGet } from '@/utils/proxy'
+import { useOctoHistory } from '@/composables/useOctoHistory'
+import type { OctoHistoryEntry } from '@/composables/useOctoHistory'
+import OctoHistoryPanel from '@/components/OctoHistoryPanel.vue'
 
 const OCTO_BASE = 'https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck'
 
@@ -302,6 +359,23 @@ const templateLoading  = ref(false)
 const invokeResult     = ref<unknown>(undefined)
 const invokeError      = ref('')
 const invokeMs         = ref<number | null>(null)
+
+// ─── 调用历史 ──────────────────────────────────────────────────────────────────
+
+const { entries: historyEntries, panelOpen: historyPanelOpen, allTags: historyAllTags,
+        save: historySave, remove: historyRemove, clear: historyClear,
+        togglePin: historyTogglePin, updateNote: historyUpdateNote, togglePanel: historyTogglePanel } = useOctoHistory()
+
+// 当前已从历史恢复的条目 id（用于高亮）
+const activeHistoryId = ref<string | null>(null)
+
+// 收藏 popover 状态
+const savePopover = reactive({
+  show:     false,
+  note:     '',
+  tagInput: '',
+  tags:     [] as string[],
+})
 
 // 方法选择器
 const methodPickerVisible  = ref(false)
@@ -551,9 +625,9 @@ async function loadParamTemplate(m: OctoMethodItem) {
 
 // ─── 节点查询 ──────────────────────────────────────────────────────────────────
 
-async function doQueryNodes() {
+async function doQueryNodes(): Promise<boolean> {
   const appkey = appkeyInput.value?.trim()
-  if (!appkey) return
+  if (!appkey) return false
 
   nodesLoading.value  = true
   currentNode.value   = null
@@ -563,19 +637,20 @@ async function doQueryNodes() {
 
   try {
     const qs = new URLSearchParams({ appkey, env: 'test' })
-
     const res  = await fetch(`/api/octo-invoke/nodes?${qs}`)
     const json = await res.json() as { success: boolean; data: OctoNode[]; msg?: string }
     if (!json.success) throw new Error(json.msg || '查询节点失败')
 
     allNodes.value = json.data
-    if (!json.data.length) { message.warning('未找到匹配节点'); return }
+    if (!json.data.length) { message.warning('未找到匹配节点'); return false }
 
     currentNode.value = json.data[0]
     saveLs()
     await loadMethods()
+    return true
   } catch (e) {
     message.error(`查询节点失败: ${(e as Error).message}`)
+    return false
   } finally {
     nodesLoading.value = false
   }
@@ -662,6 +737,105 @@ async function doInvoke() {
     invokeError.value = (e as Error).message
   } finally {
     invoking.value = false
+  }
+}
+
+// ─── 历史收藏 ──────────────────────────────────────────────────────────────────
+
+function openSavePopover() {
+  savePopover.note     = ''
+  savePopover.tagInput = ''
+  savePopover.tags     = []
+  savePopover.show     = true
+}
+
+function addSaveTag() {
+  const t = savePopover.tagInput.trim()
+  if (t && !savePopover.tags.includes(t)) savePopover.tags.push(t)
+  savePopover.tagInput = ''
+}
+
+function removeSaveTag(t: string) {
+  savePopover.tags = savePopover.tags.filter(x => x !== t)
+}
+
+function doSave() {
+  const m    = selectedMethod.value
+  const node = currentNode.value
+  const appkey = appkeyInput.value?.trim()
+  if (!m || !node || !appkey) {
+    message.warning('请先完成调用再收藏')
+    return
+  }
+
+  const savedId = historySave(
+    {
+      appkey,
+      node: { ip: node.ip, port: node.port, name: node.name,
+              version: node.version, swimlane: node.swimlane, cell: node.cell },
+      serviceName:  m.serviceName,
+      methodKey:    m.methodKey,
+      methodName:   m.methodName,
+      paramTypes:   m.paramTypes,
+      paramValues:  [...paramValues.value],
+      result:       invokeResult.value,
+      invokeMs:     invokeMs.value,
+      success:      parsedResult.value?.success ?? false,
+    },
+    savePopover.note,
+    savePopover.tags,
+  )
+  if (savedId === null) {
+    message.warning('所有条目均已置顶，无法保存，请先取消部分置顶')
+    return
+  }
+  savePopover.show = false
+  activeHistoryId.value = null
+}
+
+// ─── 历史恢复 ──────────────────────────────────────────────────────────────────
+
+async function restoreFromHistory(entry: OctoHistoryEntry) {
+  activeHistoryId.value = entry.id
+
+  // 1. 如果 appkey 不同，重新查节点
+  if (appkeyInput.value !== entry.appkey) {
+    appkeyInput.value = entry.appkey
+    const ok = await doQueryNodes()
+    if (!ok) {
+      message.warning('节点查询失败，无法恢复调用现场')
+      return
+    }
+  }
+
+  // 2. 切换到历史中记录的节点
+  const targetNode = allNodes.value.find(
+    n => n.ip === entry.node.ip && n.port === entry.node.port,
+  ) ?? entry.node
+  if (!isCurrentNode(targetNode)) {
+    await switchNode(targetNode as unknown as OctoNode)
+  }
+
+  // 3. 找到对应方法
+  const method = allMethods.value.find(
+    m => m.serviceName === entry.serviceName && m.methodKey === entry.methodKey,
+  )
+  if (method) {
+    selectedMethod.value = method
+    paramValues.value    = [...entry.paramValues]
+    Object.keys(schemaOpen).forEach(k => { delete schemaOpen[Number(k)] })
+    clearResult()
+  } else {
+    selectedMethod.value = {
+      serviceName: entry.serviceName,
+      methodKey:   entry.methodKey,
+      methodName:  entry.methodName,
+      paramTypes:  entry.paramTypes,
+      returnType:  '',
+      schema:      null,
+    }
+    paramValues.value = [...entry.paramValues]
+    clearResult()
   }
 }
 
@@ -962,4 +1136,18 @@ onMounted(async () => {
 }
 
 .method-picker-item__enter { color: #cbd5e1; flex-shrink: 0; }
+
+/* 收藏按钮（结果头部） */
+.invoke-save-btn {
+  font-size: 11px;
+  padding: 1px 8px;
+  border: 1px solid #fcd34d;
+  border-radius: 5px;
+  background: #fffbeb;
+  color: #92400e;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  flex-shrink: 0;
+}
+.invoke-save-btn:hover { background: #fef3c7; border-color: #f59e0b; }
 </style>

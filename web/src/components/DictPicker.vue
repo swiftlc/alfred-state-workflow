@@ -140,7 +140,7 @@ function setItemRef(el: unknown, idx: number) {
 const filteredItems = computed(() => {
   const q = search.value.trim()
   if (!q) return items.value
-  return items.value.filter(i => matchQuery(q, i.name, i.value, i.description))
+  return items.value.filter(i => matchQuery(q, i.name, i.value, i.description, ...(i.tags?.map(t => t.label) ?? [])))
 })
 
 function isSelected(item: DictItem) {
