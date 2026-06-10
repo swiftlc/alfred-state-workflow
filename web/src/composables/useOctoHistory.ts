@@ -5,24 +5,15 @@ const LS_KEY = 'octo_history'
 const PANEL_KEY = 'octo_history_panel_open'
 const MAX_ENTRIES = 50
 
-export interface OctoHistoryNode {
-  ip: string
-  port: number
-  name: string
-  version?: string
-  swimlane?: string
-  cell?: string
-}
-
 export interface OctoHistoryEntry {
   id: string
   savedAt: number
   note: string
   tags: string[]
   pinned: boolean
-  // 调用快照
+  // 调用快照（node 不持久化，因节点随时变化）
   appkey: string
-  node: OctoHistoryNode
+  swimlane?: string     // 泳道偏好，恢复时驱动节点选择
   serviceName: string
   methodKey: string     // 含签名，如 "submitTask(Req):Resp"
   methodName: string    // 仅方法名

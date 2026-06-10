@@ -8,7 +8,7 @@
     @after-leave="resetState"
     @keydown.esc.native="innerShow = false"
   >
-    <div class="alfred-wrap" @keydown.esc="innerShow = false">
+    <div class="alfred-wrap" :style="wrapStyle" @keydown.esc="innerShow = false">
       <!-- 搜索框 -->
       <div class="alfred-search">
         <component :is="Search" :size="18" class="alfred-search__icon" />
@@ -16,7 +16,7 @@
           ref="inputRef"
           v-model="search"
           class="alfred-search__input"
-          :placeholder="`搜索 ${dictName}...`"
+          :placeholder="placeholder || `搜索 ${dictName}...`"
           autocomplete="off"
           spellcheck="false"
           @keydown.enter="onEnter"
@@ -24,8 +24,10 @@
           @keydown.down.prevent="moveCursor(1)"
           @keydown.esc="innerShow = false"
         />
+        <!-- 搜索框右侧扩展区 -->
+        <slot name="search-suffix" :search="search" :count="filteredItems.length" />
         <button
-          v-if="fetchItems.clearCache"
+          v-if="fetchItems?.clearCache"
           class="alfred-search__refresh"
           :class="{ 'is-spinning': refreshing }"
           :disabled="refreshing"
@@ -43,9 +45,9 @@
           <n-spin size="small" />
         </div>
         <template v-else>
-          <!-- 自定义输入项 -->
+          <!-- 自定义输入项（仅 fetchItems 模式） -->
           <div
-            v-if="search.trim() && allowInput !== false"
+            v-if="fetchItems && search.trim() && allowInput !== false"
             class="alfred-item"
             :class="{ 'is-active': cursor === -1 }"
             @click="confirmManual"
@@ -70,28 +72,53 @@
             :ref="el => setItemRef(el, idx)"
             class="alfred-item"
             :class="{ 'is-active': cursor === idx }"
-            @click="confirmItem(item)"
+            @click="handleItemClick(item, idx)"
             @mouseenter="cursor = idx"
           >
-            <span class="alfred-item__icon" :class="{ 'alfred-item__icon--selected': isSelected(item) }">
-              <component :is="isSelected(item) ? Check : FileText" :size="15" />
-            </span>
-            <span class="alfred-item__body">
-              <span class="alfred-item__name-row">
-                <span class="alfred-item__name">{{ item.name }}</span>
-                <span
-                  v-for="tag in (item.tags ?? [])"
-                  :key="tag.label"
-                  class="alfred-item__tag"
-                  :data-color="tag.color || 'indigo'"
-                >{{ tag.label }}</span>
+            <!-- item slot：完全自定义条目内容 -->
+            <slot
+              name="item"
+              :item="item"
+              :is-active="cursor === idx"
+              :is-selected="isSelected(item)"
+              :close="() => { innerShow = false }"
+            >
+              <!-- 默认渲染 -->
+              <span class="alfred-item__icon" :class="{ 'alfred-item__icon--selected': isSelected(item) }">
+                <component :is="isSelected(item) ? Check : FileText" :size="15" />
               </span>
-              <span v-if="item.description" class="alfred-item__sub">{{ item.description }}</span>
-              <span v-else-if="item.value && item.value !== item.name" class="alfred-item__sub">{{ item.value }}</span>
+              <span class="alfred-item__body">
+                <span class="alfred-item__name-row">
+                  <span class="alfred-item__name">{{ item.name }}</span>
+                  <span
+                    v-for="tag in (item.tags ?? [])"
+                    :key="tag.label"
+                    class="alfred-item__tag"
+                    :data-color="tag.color || 'indigo'"
+                  >{{ tag.label }}</span>
+                </span>
+                <span v-if="item.description" class="alfred-item__sub">{{ item.description }}</span>
+                <span v-else-if="item.value && item.value !== item.name" class="alfred-item__sub">{{ item.value }}</span>
+              </span>
+              <component :is="CornerDownLeft" v-if="cursor === idx" :size="13" class="alfred-item__enter" />
+            </slot>
+
+            <!-- item-actions slot：条目右侧操作区，阻止事件冒泡到条目 click -->
+            <span v-if="$slots['item-actions']" class="alfred-item__actions" @click.stop>
+              <slot
+                name="item-actions"
+                :item="item"
+                :is-active="cursor === idx"
+                :close="() => { innerShow = false }"
+              />
             </span>
-            <component :is="CornerDownLeft" v-if="cursor === idx" :size="13" class="alfred-item__enter" />
           </div>
         </template>
+      </div>
+
+      <!-- footer slot -->
+      <div v-if="$slots.footer" class="alfred-footer">
+        <slot name="footer" :close="() => { innerShow = false }" />
       </div>
     </div>
   </n-modal>
@@ -109,9 +136,13 @@ const props = defineProps<{
   show: boolean
   dictKey: string
   dictName: string
-  fetchItems: FetchItemsFn
+  fetchItems?: FetchItemsFn          // 可选：外部传 items 时无需
+  items?: DictItem[]                 // 可选：直接传数据，绕开 fetchItems 加载
   currentValue?: ContextDataItem | null
-  allowInput?: boolean  // 是否允许手动输入（默认 true）
+  allowInput?: boolean
+  placeholder?: string               // 自定义搜索占位符
+  width?: string                     // 自定义弹窗宽度，默认 580px
+  searchFields?: (item: DictItem) => string[]  // 自定义搜索字段提取
 }>()
 
 const emit = defineEmits<{
@@ -124,14 +155,19 @@ const innerShow = computed({
   set: (v) => emit('update:show', v),
 })
 
+const wrapStyle = computed(() => props.width ? { width: props.width } : {})
+
 const search     = ref('')
 const loading    = ref(false)
 const refreshing = ref(false)
-const items    = ref<DictItem[]>([])
-const cursor   = ref(-2)
+const fetchedItems = ref<DictItem[]>([])
+const cursor   = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
 const listRef  = ref<HTMLElement | null>(null)
 const itemRefs = ref<(HTMLElement | null)[]>([])
+
+// 最终条目：优先使用外部传入的 items prop，否则用 fetchItems 拉取的结果
+const allItems = computed(() => props.items ?? fetchedItems.value)
 
 function setItemRef(el: unknown, idx: number) {
   itemRefs.value[idx] = el as HTMLElement | null
@@ -139,8 +175,13 @@ function setItemRef(el: unknown, idx: number) {
 
 const filteredItems = computed(() => {
   const q = search.value.trim()
-  if (!q) return items.value
-  return items.value.filter(i => matchQuery(q, i.name, i.value, i.description, ...(i.tags?.map(t => t.label) ?? [])))
+  if (!q) return allItems.value
+  return allItems.value.filter(i => {
+    const fields = props.searchFields
+      ? props.searchFields(i)
+      : [i.name, i.value, i.description, ...(i.tags?.map(t => t.label) ?? [])]
+    return matchQuery(q, ...fields)
+  })
 })
 
 function isSelected(item: DictItem) {
@@ -148,13 +189,15 @@ function isSelected(item: DictItem) {
 }
 
 async function load() {
+  if (!props.fetchItems) return
   loading.value = true
-  items.value   = []
-  try { items.value = await props.fetchItems() }
+  fetchedItems.value = []
+  try { fetchedItems.value = await props.fetchItems() }
   finally { loading.value = false }
 }
 
 async function handleRefresh() {
+  if (!props.fetchItems) return
   refreshing.value = true
   props.fetchItems.clearCache?.()
   await load()
@@ -164,22 +207,32 @@ async function handleRefresh() {
 watch(() => props.show, async (v) => {
   if (v) {
     search.value = ''
-    cursor.value = -2
-    await load()
+    cursor.value = 0
+    if (props.fetchItems) await load()
     await nextTick()
     inputRef.value?.focus()
+  } else {
+    // 立即重置，避免关闭动画期间高亮闪烁
+    cursor.value = 0
+    search.value = ''
   }
 })
 
+// 搜索内容变化时：始终高亮第一条，处理列表缩短/扩张的情况
+watch(search, () => {
+  cursor.value   = 0
+  itemRefs.value = []
+})
+
 function resetState() {
-  search.value    = ''
-  items.value     = []
-  cursor.value    = -2
-  itemRefs.value  = []
+  search.value       = ''
+  fetchedItems.value = []
+  cursor.value       = 0
+  itemRefs.value     = []
 }
 
 function moveCursor(dir: number) {
-  const hasManual = !!(search.value.trim() && props.allowInput !== false)
+  const hasManual = !!(props.fetchItems && search.value.trim() && props.allowInput !== false)
   const min = hasManual ? -1 : 0
   const max = filteredItems.value.length - 1
   if (max < 0 && !hasManual) return
@@ -199,7 +252,9 @@ function moveCursor(dir: number) {
   })
 }
 
-function confirmItem(item: DictItem) {
+// 有 item slot 时，点击由 slot 内部处理；无 slot 时走默认 select 逻辑
+function handleItemClick(item: DictItem, _idx: number) {
+  // 如果外部没有自定义 item slot，走默认行为
   emit('select', { id: item.id, name: item.name, value: item.value, description: item.description })
   innerShow.value = false
 }
@@ -212,10 +267,11 @@ function confirmManual() {
 }
 
 function onEnter() {
-  if (cursor.value === -1 && props.allowInput !== false) { confirmManual(); return }
-  const item = filteredItems.value[cursor.value >= 0 ? cursor.value : 0]
-  if (item) confirmItem(item)
-  else if (search.value.trim() && props.allowInput !== false) confirmManual()
+  if (cursor.value === -1 && props.fetchItems && props.allowInput !== false) { confirmManual(); return }
+  const idx  = Math.max(0, cursor.value)
+  const item = filteredItems.value[idx]
+  if (item) handleItemClick(item, idx)
+  else if (props.fetchItems && search.value.trim() && props.allowInput !== false) confirmManual()
 }
 </script>
 
@@ -314,12 +370,14 @@ function onEnter() {
   transition: background 0.08s;
 }
 .alfred-item.is-active {
-  background: #4f46e5;
+  background: #f1f5f9;
+  color: #0f172a;
 }
-.alfred-item.is-active .alfred-item__name { color: #fff; }
-.alfred-item.is-active .alfred-item__sub  { color: rgba(255,255,255,0.65); }
-.alfred-item.is-active .alfred-item__icon { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.15); }
-.alfred-item.is-active .alfred-item__enter { color: rgba(255,255,255,0.6); }
+/* 默认渲染模式的子元素颜色 */
+.alfred-item.is-active .alfred-item__name  { color: #0f172a; }
+.alfred-item.is-active .alfred-item__sub   { color: #475569; }
+.alfred-item.is-active .alfred-item__icon  { color: #475569; background: #e2e8f0; }
+.alfred-item.is-active .alfred-item__enter { color: #94a3b8; }
 
 .alfred-item__icon {
   width: 32px;
@@ -374,10 +432,11 @@ function onEnter() {
 .alfred-item__tag[data-color="amber"]   { background: #fef3c7; color: #b45309; }
 .alfred-item__tag[data-color="slate"]   { background: #f1f5f9; color: #475569; }
 .alfred-item__tag[data-color="rose"]    { background: #ffe4e6; color: #e11d48; }
-.alfred-item.is-active .alfred-item__tag {
-  background: rgba(255,255,255,0.2);
-  color: rgba(255,255,255,0.9);
-}
+.alfred-item.is-active .alfred-item__tag                    { background: #e0e7ff; color: #4338ca; }
+.alfred-item.is-active .alfred-item__tag[data-color="emerald"] { background: #bbf7d0; color: #047857; }
+.alfred-item.is-active .alfred-item__tag[data-color="amber"]   { background: #fde68a; color: #92400e; }
+.alfred-item.is-active .alfred-item__tag[data-color="slate"]   { background: #cbd5e1; color: #334155; }
+.alfred-item.is-active .alfred-item__tag[data-color="rose"]    { background: #fecdd3; color: #be123c; }
 
 .alfred-item__sub {
   font-family: monospace;
@@ -398,5 +457,30 @@ function onEnter() {
   padding: 28px 0;
   color: #94a3b8;
   font-size: 13px;
+}
+
+/* ── 条目操作区（item-actions slot） ── */
+.alfred-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.alfred-item:hover .alfred-item__actions,
+.alfred-item.is-active .alfred-item__actions {
+  opacity: 1;
+}
+
+/* ── footer slot ── */
+.alfred-footer {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid #f1f5f9;
+  background: #fafafa;
+  padding: 8px 16px;
+  flex-shrink: 0;
 }
 </style>

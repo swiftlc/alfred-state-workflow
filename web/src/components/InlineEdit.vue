@@ -1,5 +1,5 @@
 <template>
-  <span ref="rootRef">
+  <span ref="rootRef" style="display:inline-block;line-height:1.5;width:100%">
     <span
       v-if="!editing"
       class="ied-display"
@@ -100,6 +100,9 @@ onBeforeUnmount(() => {
   cursor: pointer;
   display: inline-block;
   min-width: 1em;
+  line-height: 1.5;
+  padding: 0;
+  margin: 0;
 }
 .ied-display:hover {
   text-decoration: underline;
@@ -118,8 +121,12 @@ onBeforeUnmount(() => {
   outline: none;
   background: transparent;
   padding: 0;
+  margin: 0;
   font: inherit;
   width: 100%;
   color: inherit;
+  line-height: 1.5;
+  height: 1.5em;
+  box-sizing: border-box;
 }
 </style>

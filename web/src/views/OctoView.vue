@@ -11,8 +11,8 @@
             <n-spin :size="12" />
             {{ nodesLoading ? '查询节点…' : '加载方法…' }}
           </span>
-          <n-button size="tiny" ghost @click="historyTogglePanel">
-            历史{{ historyEntries.length ? ` (${historyEntries.length})` : '' }}
+          <n-button size="tiny" ghost @click="openFavoritesModal">
+            收藏{{ historyEntries.length ? ` (${historyEntries.length})` : '' }}
           </n-button>
           <n-button size="tiny" :loading="nodesLoading" :disabled="!appkeyInput" ghost @click="doQueryNodes">
             刷新节点
@@ -86,14 +86,24 @@
           <span v-else>{{ totalMethodCount ? `方法 (${totalMethodCount})…` : '方法…' }}</span>
         </span>
 
-        <!-- 右侧：泳道 + 节点数 -->
-        <div v-if="allNodes.length > 0" class="ml-auto flex items-center gap-2 flex-shrink-0">
-          <ContextItem v-if="swimlaneInput" context-key="swimlane" :value="swimlaneInput ?? ''" label="泳道">
-            <span class="octo-swim-badge">
-              <span class="octo-swim-badge__dot" />{{ swimlaneInput }}
+        <!-- 右侧：泳道偏好 + 节点数 -->
+        <div class="ml-auto flex items-center gap-2 flex-shrink-0">
+          <!-- 泳道偏好：始终可见，标准 ContextItem 菜单，选项从已加载节点实时派生 -->
+          <ContextItem
+            context-key="swimlane"
+            :value="swimlanePreference ?? ''"
+            label="泳道偏好"
+            :fetch-items="fetchSwimlaneItems"
+            custom-edit
+            bare
+            @edit="onSwimlaneEdit"
+          >
+            <span class="octo-swim-badge" :class="swimlaneDisplay ? '' : 'octo-swim-badge--empty'">
+              <span class="octo-swim-badge__dot" />
+              {{ swimlaneDisplay || '泳道…' }}
             </span>
           </ContextItem>
-          <span class="text-xs text-slate-400">{{ allNodes.length }} 节点</span>
+          <span v-if="allNodes.length > 0" class="text-xs text-slate-400">{{ allNodes.length }} 节点</span>
         </div>
       </div>
     </div>
@@ -151,38 +161,10 @@
       </div>
     </n-modal>
 
-    <!-- 收藏调用 Modal -->
-    <n-modal
-      v-model:show="savePopover.show"
-      preset="dialog"
-      title="收藏此次调用"
-      positive-text="保存"
-      negative-text="取消"
-      :show-icon="false"
-      @positive-click="doSave"
-    >
-      <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px">
-        <n-input v-model:value="savePopover.note" placeholder="这次调用是干什么的…" />
-        <n-input
-          v-model:value="savePopover.tagInput"
-          placeholder="输入标签后回车添加…"
-          @keydown.enter.prevent="addSaveTag"
-        />
-        <div v-if="savePopover.tags.length" style="display:flex; flex-wrap:wrap; gap:4px">
-          <span
-            v-for="t in savePopover.tags"
-            :key="t"
-            class="octo-chip octo-chip--slate"
-            style="font-size:11px; cursor:pointer"
-            @click="removeSaveTag(t)"
-          >{{ t }} ×</span>
-        </div>
-      </div>
-    </n-modal>
 
-    <!-- 主体：调用面板 + 历史面板 -->
+    <!-- 主体：调用面板 -->
     <div class="flex-1 min-h-0 flex gap-0" style="overflow:hidden">
-    <div :style="historyPanelOpen ? 'flex:0 0 60%; overflow-y:auto; padding-right:8px' : 'flex:1; overflow-y:auto'">
+    <div style="flex:1; overflow-y:auto">
       <template v-if="selectedMethod">
 
         <!-- 参数编辑器 -->
@@ -193,29 +175,61 @@
         <div v-for="(paramType, i) in selectedMethod.paramTypes" :key="i" class="mb-4">
           <div class="flex items-center gap-2 mb-1.5">
             <span class="text-xs font-semibold text-slate-700">参数 {{ i + 1 }}</span>
-            <span class="font-mono text-[10px] text-slate-400 truncate flex-1" :title="paramType">{{ shortName(paramType) }}</span>
+            <span class="font-mono text-[10px] text-slate-400 truncate" :title="paramType">{{ shortName(paramType) }}</span>
+            <!-- 预设 badge：左侧 ContextItem 标准菜单，右侧箭头折叠 -->
+            <span
+              v-if="hasPreset(i)"
+              class="param-preset-badge"
+              :class="presetCollapsed[i] ? 'param-preset-badge--collapsed' : 'param-preset-badge--open'"
+            >
+              <ContextItem
+                context-key="tenantId"
+                :value="tenantIdInput ?? ''"
+                label="TenantId"
+                :fetch-items="fetchTenantItems"
+                custom-edit
+                bare
+                @edit="onTenantEdit"
+              >
+                <span class="param-preset-badge__left">✨ 预设{{ tenantIdInput ? ` · ${tenantIdInput}` : '' }}</span>
+              </ContextItem>
+              <span
+                class="param-preset-badge__arrow"
+                :title="presetCollapsed[i] ? '展开' : '折叠'"
+                @click.stop="presetCollapsed[i] = !presetCollapsed[i]"
+              >{{ presetCollapsed[i] ? '▸' : '▾' }}</span>
+            </span>
+            <span class="flex-1" />
             <button
-              v-if="hasSchema(i)"
+              v-if="hasSchema(i) && !presetCollapsed[i]"
               class="text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
               @click="toggleSchema(i)"
             >{{ schemaOpen[i] ? '▾' : '▸' }} Schema</button>
             <button
+              v-if="!hasPreset(i)"
               class="text-[10px] text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded transition-colors"
               @click="fillEmpty(i)"
             >填充 {}</button>
           </div>
-          <pre
-            v-if="schemaOpen[i] && hasSchema(i)"
-            class="text-[10px] font-mono bg-slate-50 border border-slate-100 rounded p-2 overflow-auto max-h-44 mb-1.5 leading-relaxed"
-          >{{ formatSchema(i) }}</pre>
-          <n-input
-            v-model:value="paramValues[i]"
-            type="textarea"
-            :autosize="{ minRows: 4, maxRows: 14 }"
-            placeholder="{}"
-            class="font-mono text-xs"
-            @blur="prettyParam(i)"
-          />
+          <!-- 折叠时只显示紧凑提示 -->
+          <div v-if="hasPreset(i) && presetCollapsed[i]" class="param-preset-collapsed">
+            {{ shortName(selectedMethod.paramTypes[i]) }} 已由预设自动注入（Shepherd / Octo 鉴权上下文），点击 ✨ 展开编辑或修改租户
+          </div>
+          <!-- 展开时显示完整编辑区 -->
+          <template v-else>
+            <pre
+              v-if="schemaOpen[i] && hasSchema(i)"
+              class="text-[10px] font-mono bg-slate-50 border border-slate-100 rounded p-2 overflow-auto max-h-44 mb-1.5 leading-relaxed"
+            >{{ formatSchema(i) }}</pre>
+            <n-input
+              v-model:value="paramValues[i]"
+              type="textarea"
+              :autosize="{ minRows: 4, maxRows: 14 }"
+              placeholder="{}"
+              class="font-mono text-xs"
+              @blur="prettyParam(i)"
+            />
+          </template>
         </div>
 
         <div v-if="selectedMethod.paramTypes.length === 0" class="mb-4 text-xs text-slate-400 italic">
@@ -232,39 +246,66 @@
         <div v-if="invokeResult !== undefined || invokeError" class="invoke-result">
           <!-- 结果头 -->
           <div class="invoke-result__header">
-            <!-- 状态标签 -->
-            <span v-if="invokeError" class="invoke-result__badge invoke-result__badge--error">✗ 请求失败</span>
-            <template v-else-if="parsedResult">
-              <span
-                class="invoke-result__badge"
-                :class="parsedResult.success ? 'invoke-result__badge--success' : 'invoke-result__badge--fail'"
+            <!-- 左：状态 + 耗时 + msg -->
+            <div class="invoke-result__left">
+              <span v-if="invokeError" class="invoke-result__badge invoke-result__badge--error">✗ 失败</span>
+              <template v-else-if="parsedResult">
+                <span
+                  class="invoke-result__badge"
+                  :class="parsedResult.success ? 'invoke-result__badge--success' : 'invoke-result__badge--fail'"
+                >{{ parsedResult.success ? '✓ 成功' : '✗ 失败' }}</span>
+                <span v-if="!parsedResult.success && parsedResult.code !== null" class="invoke-result__code">code {{ parsedResult.code }}</span>
+              </template>
+              <span v-if="invokeMs != null" class="invoke-result__ms">{{ invokeMs }}ms</span>
+              <span v-if="parsedResult?.msg && !invokeError" class="invoke-result__msg">{{ parsedResult.msg }}</span>
+            </div>
+
+            <!-- 右：traceId + 收藏 -->
+            <div class="invoke-result__right">
+              <ContextItem
+                v-if="parsedResult?.traceId"
+                context-key="traceId"
+                :value="parsedResult.traceId"
+                label="TraceId"
+                :meta="{ appkey: appkeyInput ?? 'ALL' }"
               >
-                {{ parsedResult.success ? '✓ 成功' : '✗ 失败' }}
-              </span>
-              <span v-if="!parsedResult.success && parsedResult.code !== null" class="invoke-result__code">code: {{ parsedResult.code }}</span>
-              <span v-if="parsedResult.msg" class="invoke-result__msg">{{ parsedResult.msg }}</span>
-            </template>
-            <span v-if="invokeMs != null" class="invoke-result__ms">{{ invokeMs }}ms</span>
-            <button
-              class="invoke-save-btn"
-              title="收藏此次调用"
-              @click="openSavePopover"
-            >⭐ 收藏</button>
-            <!-- traceId 作为 ContextItem，在 group 内支持批量操作 -->
-            <ContextItem
-              v-if="parsedResult?.traceId"
-              context-key="traceId"
-              :value="parsedResult.traceId"
-              label="TraceId"
-              :meta="{ appkey: appkeyInput ?? 'ALL' }"
-            >
-              <span class="octo-chip octo-chip--amber font-mono" style="font-size:11px">{{ parsedResult.traceId }}</span>
-            </ContextItem>
+                <span class="octo-chip octo-chip--amber font-mono" style="font-size:11px">{{ parsedResult.traceId }}</span>
+              </ContextItem>
+
+              <!-- inline 收藏区 -->
+              <template v-if="saveDraft.active">
+                <input
+                  ref="saveDraftInputRef"
+                  v-model="saveDraft.note"
+                  class="invoke-save-input"
+                  placeholder="备注…"
+                  autocomplete="off"
+                  spellcheck="false"
+                  @keydown.enter.prevent="doSave"
+                  @keydown.esc.prevent="cancelSaveDraft"
+                />
+                <button class="invoke-save-btn invoke-save-btn--confirm" title="保存 (Enter)" @click="doSave">↵</button>
+                <button class="invoke-save-btn invoke-save-btn--cancel" title="取消 (Esc)" @click="cancelSaveDraft">✕</button>
+              </template>
+              <button
+                v-else
+                class="invoke-save-btn"
+                :class="{ 'invoke-save-btn--saved': saveDraft.saved }"
+                :disabled="saveDraft.saved"
+                title="收藏此次调用"
+                @click="openSaveDraft"
+              >{{ saveDraft.saved ? '✓ 已收藏' : '⭐ 收藏' }}</button>
+            </div>
           </div>
           <!-- 错误详情 -->
           <div v-if="invokeError" class="invoke-result__error">{{ invokeError }}</div>
           <!-- 返回数据 -->
-          <pre v-else-if="parsedResult?.returnStr" class="invoke-result__body">{{ parsedResult.returnStr }}</pre>
+          <MonacoPreview
+            v-else-if="parsedResult?.returnStr"
+            :content="parsedResult.returnStr"
+            height="480px"
+            style="border:none; border-top:1px solid #e2e8f0; border-radius:0;"
+          />
         </div>
 
       </template>
@@ -276,23 +317,22 @@
       </div>
     </div><!-- 结束参数区 -->
 
-    <!-- 历史面板 -->
-    <div v-if="historyPanelOpen" style="flex:0 0 40%; overflow:hidden">
-      <OctoHistoryPanel
-        :entries="historyEntries"
-        :all-tags="historyAllTags"
-        :active-entry-id="activeHistoryId"
-        @restore="restoreFromHistory"
-        @remove="historyRemove"
-        @pin="historyTogglePin"
-        @update-note="historyUpdateNote"
-        @clear="historyClear"
-      />
-    </div>
-
     </div><!-- 结束主体 flex-row -->
 
   </div>
+
+  <!-- 收藏弹窗 -->
+  <OctoFavoritesModal
+    :show="favoritesModalOpen"
+    :entries="historyEntries"
+    :active-entry-id="activeHistoryId"
+    @update:show="v => { if (!v) onFavoritesClose() }"
+    @restore="restoreFromHistory"
+    @remove="historyRemove"
+    @update-note="historyUpdateNote"
+    @clear="historyClear"
+  />
+
   </ContextGroup>
 </template>
 
@@ -304,12 +344,14 @@ import { makeFetchItems } from '@/utils/dict'
 import { matchQuery } from '@/utils/search'
 import ContextItem from '@/components/ContextItem.vue'
 import ContextGroup from '@/components/ContextGroup.vue'
+import MonacoPreview from '@/components/MonacoPreview.vue'
 import type { ContextDataItem } from '@/types'
 import type { FetchItemsFn } from '@/utils/dict'
 import { proxyGet } from '@/utils/proxy'
+import { PARAM_PRESETS } from '@/config/paramPresets'
 import { useOctoHistory } from '@/composables/useOctoHistory'
 import type { OctoHistoryEntry } from '@/composables/useOctoHistory'
-import OctoHistoryPanel from '@/components/OctoHistoryPanel.vue'
+import OctoFavoritesModal from '@/components/OctoFavoritesModal.vue'
 
 const OCTO_BASE = 'https://octo.mws-test.sankuai.com/api/octo/v2/thriftcheck'
 
@@ -339,12 +381,15 @@ const LS_KEY = 'octo_query'
 
 // ─── 状态 ──────────────────────────────────────────────────────────────────────
 
-const appkeyInput    = ref<string | null>(null)
+const appkeyInput        = ref<string | null>(null)
+const tenantIdInput      = ref<string | null>(null)
+const swimlanePreference = ref<string | null>(null)
+// 显示值：优先实际节点泳道，节点未加载时降级展示存储偏好
+const swimlaneDisplay    = computed(() => currentNode.value?.swimlane ?? swimlanePreference.value ?? null)
 
 const nodesLoading   = ref(false)
 const allNodes       = ref<OctoNode[]>([])
 const currentNode    = ref<OctoNode | null>(null)
-const swimlaneInput  = computed(() => currentNode.value?.swimlane ?? null)
 
 const methodsLoading = ref(false)
 const methodGroups   = ref<Map<string, OctoMethodItem[]>>(new Map())
@@ -362,20 +407,30 @@ const invokeMs         = ref<number | null>(null)
 
 // ─── 调用历史 ──────────────────────────────────────────────────────────────────
 
-const { entries: historyEntries, panelOpen: historyPanelOpen, allTags: historyAllTags,
-        save: historySave, remove: historyRemove, clear: historyClear,
-        togglePin: historyTogglePin, updateNote: historyUpdateNote, togglePanel: historyTogglePanel } = useOctoHistory()
+const { entries: historyEntries, save: historySave, remove: historyRemove, clear: historyClear,
+        updateNote: historyUpdateNote } = useOctoHistory()
+
+// 收藏弹窗开关
+const favoritesModalOpen = ref(false)
+let favoritesJustClosed = false
+
+function openFavoritesModal() {
+  if (favoritesJustClosed) return
+  favoritesModalOpen.value = true
+}
+
+function onFavoritesClose() {
+  favoritesModalOpen.value = false
+  favoritesJustClosed = true
+  setTimeout(() => { favoritesJustClosed = false }, 300)
+}
 
 // 当前已从历史恢复的条目 id（用于高亮）
 const activeHistoryId = ref<string | null>(null)
 
-// 收藏 popover 状态
-const savePopover = reactive({
-  show:     false,
-  note:     '',
-  tagInput: '',
-  tags:     [] as string[],
-})
+// inline 收藏草稿状态
+const saveDraft = reactive({ active: false, note: '', saved: false })
+const saveDraftInputRef = ref<HTMLInputElement | null>(null)
 
 // 方法选择器
 const methodPickerVisible  = ref(false)
@@ -470,6 +525,12 @@ function onAppkeyEdit(item: ContextDataItem) {
   appkeyInput.value = item.value ?? null
 }
 
+function onTenantEdit(item: ContextDataItem) {
+  tenantIdInput.value = item.value ?? null
+  saveLs()
+  if (selectedMethod.value) forceApplyParamPresets(selectedMethod.value)
+}
+
 const fetchNodeItems: FetchItemsFn = () =>
   Promise.resolve(allNodes.value.map(n => ({
     id:          `${n.ip}:${n.port}`,
@@ -501,7 +562,9 @@ function isCurrentNode(node: OctoNode): boolean {
 
 async function switchNode(node: OctoNode) {
   if (isCurrentNode(node)) return
-  currentNode.value    = node
+  currentNode.value        = node
+  swimlanePreference.value = node.swimlane ?? null
+  saveLs()
   selectedMethod.value = null
   paramValues.value = []
   clearResult()
@@ -595,7 +658,31 @@ watch(appkeyInput, () => {
 // ─── 字典加载（供 DictSelect 使用）─────────────────────────────────────────────
 
 // 直接使用 makeFetchItems 返回值，保留 .clearCache 等附属属性
-const fetchAppkeyItems = makeFetchItems('appkey')
+const fetchAppkeyItems  = makeFetchItems('appkey')
+const fetchTenantItems  = makeFetchItems('tenant')
+
+// 泳道选项：从已加载节点的 swimlane 字段实时派生（支持手写 allowInput）
+const fetchSwimlaneItems: FetchItemsFn = () => {
+  const unique = [...new Set(allNodes.value.map(n => n.swimlane).filter((s): s is string => !!s))]
+  return Promise.resolve(unique.map(s => ({ id: s, name: s, value: s, pinned: false, lastUsedAt: 0 })))
+}
+
+function onSwimlaneEdit(item: ContextDataItem) {
+  swimlanePreference.value = item.value?.trim() || null
+  saveLs()
+  // 立即在已加载节点中切换到匹配的节点
+  if (allNodes.value.length && swimlanePreference.value) {
+    const matched = allNodes.value.find(n => n.swimlane === swimlanePreference.value)
+    if (matched && !isCurrentNode(matched)) switchNode(matched)
+  }
+}
+
+// preset 参数折叠状态（true = 折叠展示）
+const presetCollapsed = reactive<Record<number, boolean>>({})
+
+function hasPreset(i: number): boolean {
+  return !!PARAM_PRESETS[shortName(selectedMethod.value?.paramTypes[i] ?? '')]
+}
 
 // ─── 参数模板自动填充 ──────────────────────────────────────────────────────────
 
@@ -615,12 +702,34 @@ async function loadParamTemplate(m: OctoMethodItem) {
       `${OCTO_BASE}/paramTemplate?${qs}`
     )
     if (json.success && Array.isArray(json.data) && json.data.length) {
-      paramValues.value = json.data.map(s => {
+      // 有本地 preset 的参数不用 API 模板覆盖，由 applyParamPresets 保障
+      paramValues.value = json.data.map((s, i) => {
+        if (PARAM_PRESETS[shortName(m.paramTypes[i])]) return paramValues.value[i] ?? ''
         try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s }
       })
     }
   } catch { /* 静默失败，保留空白占位 */ }
   finally { templateLoading.value = false }
+  applyParamPresets(m)
+}
+
+// 对 API 模板未覆盖的空参数，用本地 PARAM_PRESETS 填充（不覆盖已有值）
+function applyParamPresets(m: OctoMethodItem) {
+  const ctx = { tenantId: tenantIdInput.value ?? undefined }
+  for (let i = 0; i < m.paramTypes.length; i++) {
+    if (paramValues.value[i]?.trim()) continue
+    const presetFn = PARAM_PRESETS[shortName(m.paramTypes[i])]
+    if (presetFn) paramValues.value[i] = JSON.stringify(presetFn(ctx), null, 2)
+  }
+}
+
+// tenantId 变化时强制刷新所有 preset 参数（不管是否已有值）
+function forceApplyParamPresets(m: OctoMethodItem) {
+  const ctx = { tenantId: tenantIdInput.value ?? undefined }
+  for (let i = 0; i < m.paramTypes.length; i++) {
+    const presetFn = PARAM_PRESETS[shortName(m.paramTypes[i])]
+    if (presetFn) paramValues.value[i] = JSON.stringify(presetFn(ctx), null, 2)
+  }
 }
 
 // ─── 节点查询 ──────────────────────────────────────────────────────────────────
@@ -644,7 +753,10 @@ async function doQueryNodes(): Promise<boolean> {
     allNodes.value = json.data
     if (!json.data.length) { message.warning('未找到匹配节点'); return false }
 
-    currentNode.value = json.data[0]
+    const preferred = swimlanePreference.value
+      ? json.data.find(n => n.swimlane === swimlanePreference.value) ?? json.data[0]
+      : json.data[0]
+    currentNode.value = preferred
     saveLs()
     await loadMethods()
     return true
@@ -690,7 +802,13 @@ function selectMethod(m: OctoMethodItem) {
   selectedMethod.value = m
   paramValues.value    = m.paramTypes.map(() => '')
   Object.keys(schemaOpen).forEach(k => { delete schemaOpen[Number(k)] })
+  // preset 参数默认折叠
+  Object.keys(presetCollapsed).forEach(k => { delete presetCollapsed[Number(k)] })
+  m.paramTypes.forEach((type, i) => {
+    if (PARAM_PRESETS[shortName(type)]) presetCollapsed[i] = true
+  })
   clearResult()
+  applyParamPresets(m)
   loadParamTemplate(m)
 }
 
@@ -742,28 +860,22 @@ async function doInvoke() {
 
 // ─── 历史收藏 ──────────────────────────────────────────────────────────────────
 
-function openSavePopover() {
-  savePopover.note     = ''
-  savePopover.tagInput = ''
-  savePopover.tags     = []
-  savePopover.show     = true
+async function openSaveDraft() {
+  saveDraft.active = true
+  saveDraft.note   = ''
+  await nextTick()
+  saveDraftInputRef.value?.focus()
 }
 
-function addSaveTag() {
-  const t = savePopover.tagInput.trim()
-  if (t && !savePopover.tags.includes(t)) savePopover.tags.push(t)
-  savePopover.tagInput = ''
-}
-
-function removeSaveTag(t: string) {
-  savePopover.tags = savePopover.tags.filter(x => x !== t)
+function cancelSaveDraft() {
+  saveDraft.active = false
+  saveDraft.note   = ''
 }
 
 function doSave() {
-  const m    = selectedMethod.value
-  const node = currentNode.value
+  const m      = selectedMethod.value
   const appkey = appkeyInput.value?.trim()
-  if (!m || !node || !appkey) {
+  if (!m || !appkey) {
     message.warning('请先完成调用再收藏')
     return
   }
@@ -771,52 +883,52 @@ function doSave() {
   const savedId = historySave(
     {
       appkey,
-      node: { ip: node.ip, port: node.port, name: node.name,
-              version: node.version, swimlane: node.swimlane, cell: node.cell },
-      serviceName:  m.serviceName,
-      methodKey:    m.methodKey,
-      methodName:   m.methodName,
-      paramTypes:   m.paramTypes,
-      paramValues:  [...paramValues.value],
-      result:       invokeResult.value,
-      invokeMs:     invokeMs.value,
-      success:      parsedResult.value?.success ?? false,
+      swimlane:    currentNode.value?.swimlane,
+      serviceName: m.serviceName,
+      methodKey:   m.methodKey,
+      methodName:  m.methodName,
+      paramTypes:  m.paramTypes,
+      paramValues: [...paramValues.value],
+      result:      invokeResult.value,
+      invokeMs:    invokeMs.value,
+      success:     parsedResult.value?.success ?? false,
     },
-    savePopover.note,
-    savePopover.tags,
+    saveDraft.note.trim(),
   )
   if (savedId === null) {
     message.warning('所有条目均已置顶，无法保存，请先取消部分置顶')
     return
   }
-  savePopover.show = false
+  saveDraft.active = false
+  saveDraft.note   = ''
+  saveDraft.saved  = true
   activeHistoryId.value = null
+  setTimeout(() => { saveDraft.saved = false }, 1500)
 }
 
 // ─── 历史恢复 ──────────────────────────────────────────────────────────────────
 
 async function restoreFromHistory(entry: OctoHistoryEntry) {
+  onFavoritesClose()
   activeHistoryId.value = entry.id
 
-  // 1. 如果 appkey 不同，重新查节点
-  if (appkeyInput.value !== entry.appkey) {
+  // 1. 如果 appkey 不同 或 节点尚未加载，重新查节点（泳道偏好驱动节点选择）
+  if (appkeyInput.value !== entry.appkey || !currentNode.value) {
     appkeyInput.value = entry.appkey
+    if (entry.swimlane) swimlanePreference.value = entry.swimlane
     const ok = await doQueryNodes()
     if (!ok) {
       message.warning('节点查询失败，无法恢复调用现场')
       return
     }
+  } else if (entry.swimlane && entry.swimlane !== swimlanePreference.value) {
+    // appkey 相同但泳道不同：切换泳道偏好并选匹配节点
+    swimlanePreference.value = entry.swimlane
+    const matched = allNodes.value.find(n => n.swimlane === entry.swimlane)
+    if (matched && !isCurrentNode(matched)) await switchNode(matched)
   }
 
-  // 2. 切换到历史中记录的节点
-  const targetNode = allNodes.value.find(
-    n => n.ip === entry.node.ip && n.port === entry.node.port,
-  ) ?? entry.node
-  if (!isCurrentNode(targetNode)) {
-    await switchNode(targetNode as unknown as OctoNode)
-  }
-
-  // 3. 找到对应方法
+  // 2. 恢复方法 + 参数（不切换具体节点，由当前节点执行）
   const method = allMethods.value.find(
     m => m.serviceName === entry.serviceName && m.methodKey === entry.methodKey,
   )
@@ -843,7 +955,11 @@ async function restoreFromHistory(entry: OctoHistoryEntry) {
 
 function saveLs() {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify({ appkey: appkeyInput.value }))
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      appkey:    appkeyInput.value,
+      tenantId:  tenantIdInput.value,
+      swimlane:  swimlanePreference.value,
+    }))
   } catch { /* ignore */ }
 }
 
@@ -851,8 +967,10 @@ function restoreLs() {
   try {
     const raw = localStorage.getItem(LS_KEY)
     if (!raw) return
-    const { appkey } = JSON.parse(raw)
-    if (appkey) appkeyInput.value = appkey
+    const { appkey, tenantId, swimlane } = JSON.parse(raw)
+    if (appkey)   appkeyInput.value        = appkey
+    if (tenantId) tenantIdInput.value      = tenantId
+    if (swimlane) swimlanePreference.value = swimlane
   } catch { /* ignore */ }
 }
 
@@ -936,6 +1054,7 @@ onMounted(async () => {
 }
 .octo-chip--amber:hover { background: #fef3c7; border-color: #f59e0b; }
 
+
 /* 泳道 badge（内联于右侧元信息区） */
 .octo-swim-badge {
   display: inline-flex;
@@ -952,6 +1071,13 @@ onMounted(async () => {
   white-space: nowrap;
 }
 .octo-swim-badge:hover { background: #e0e7ff; border-color: #a5b4fc; }
+.octo-swim-badge--empty {
+  border-style: dashed;
+  border-color: #e2e8f0;
+  background: transparent;
+  color: #94a3b8;
+}
+.octo-swim-badge--empty .octo-swim-badge__dot { background: #cbd5e1; }
 .octo-swim-badge__dot {
   width: 5px;
   height: 5px;
@@ -970,11 +1096,24 @@ onMounted(async () => {
 .invoke-result__header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
-  flex-wrap: wrap;
+}
+.invoke-result__left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.invoke-result__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .invoke-result__badge {
   font-size: 11px;
@@ -989,41 +1128,27 @@ onMounted(async () => {
 .invoke-result__code {
   font-size: 11px;
   font-family: monospace;
-  color: #64748b;
-}
-.invoke-result__msg {
-  font-size: 11px;
   color: #94a3b8;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex-shrink: 0;
 }
 .invoke-result__ms {
   font-size: 11px;
   color: #cbd5e1;
-  margin-left: auto;
   flex-shrink: 0;
+}
+.invoke-result__msg {
+  font-size: 11px;
+  color: #94a3b8;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .invoke-result__error {
   padding: 12px;
   font-size: 12px;
   color: #dc2626;
   background: #fff5f5;
-}
-.invoke-result__body {
-  padding: 12px;
-  font-size: 12px;
-  font-family: monospace;
-  line-height: 1.6;
-  background: #fff;
-  overflow: auto;
-  max-height: 480px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
-  color: #1e293b;
 }
 
 /* ─── 方法选择器 ─────────────────────────────────────────────── */
@@ -1137,17 +1262,103 @@ onMounted(async () => {
 
 .method-picker-item__enter { color: #cbd5e1; flex-shrink: 0; }
 
-/* 收藏按钮（结果头部） */
-.invoke-save-btn {
-  font-size: 11px;
-  padding: 1px 8px;
-  border: 1px solid #fcd34d;
-  border-radius: 5px;
-  background: #fffbeb;
-  color: #92400e;
+/* 预设 badge（左侧 = 改租户，右侧箭头 = 折叠） */
+.param-preset-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  border-radius: 8px;
+  user-select: none;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid #a7f3d0;
+}
+.param-preset-badge--collapsed { background: #ecfdf5; color: #065f46; }
+.param-preset-badge--open      { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+
+.param-preset-badge__left {
+  padding: 1px 6px 1px 7px;
   cursor: pointer;
-  transition: background 0.1s, border-color 0.1s;
+  transition: background 0.1s;
+}
+.param-preset-badge__left:hover { background: rgba(0,0,0,0.05); }
+
+.param-preset-badge__arrow {
+  padding: 1px 5px 1px 4px;
+  font-size: 9px;
+  opacity: 0.7;
+  cursor: pointer;
+  border-left: 1px solid currentColor;
+  opacity: 0.4;
+  transition: opacity 0.1s, background 0.1s;
+}
+.param-preset-badge__arrow:hover { opacity: 0.8; background: rgba(0,0,0,0.05); }
+
+.param-preset-collapsed {
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 6px 10px;
+  background: #f8fafc;
+  border: 1px dashed #e2e8f0;
+  border-radius: 6px;
+  font-style: italic;
+}
+
+/* ─── 收藏区（结果头部右侧） ──────────────────────────────────── */
+.invoke-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
   flex-shrink: 0;
 }
-.invoke-save-btn:hover { background: #fef3c7; border-color: #f59e0b; }
+.invoke-save-btn:hover { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+.invoke-save-btn--saved {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #059669;
+  cursor: default;
+}
+.invoke-save-btn--confirm {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #059669;
+  padding: 0 8px;
+}
+.invoke-save-btn--confirm:hover { background: #d1fae5; border-color: #6ee7b7; }
+.invoke-save-btn--cancel {
+  border-color: #e2e8f0;
+  background: transparent;
+  color: #94a3b8;
+  padding: 0 7px;
+}
+.invoke-save-btn--cancel:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+
+/* inline 收藏备注输入框 */
+.invoke-save-input {
+  width: 160px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  background: #fffbeb;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.invoke-save-input:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.15);
+}
+.invoke-save-input::placeholder { color: #c4a85a; }
 </style>
