@@ -26,7 +26,7 @@
             <InlineEdit
               :value="getMeta(item)?.note ?? ''"
               placeholder="添加备注…"
-              display-style="font-size:14px;font-weight:600;color:#0f172a"
+              display-style="font-size:14px;font-weight:600;color:#334155"
               input-style="font-size:14px;font-weight:600;"
               @confirm="note => handleUpdateNote(item, note)"
             />
@@ -64,7 +64,7 @@
     <!-- 底部 footer -->
     <template #footer>
       <span class="fav-footer__count">{{ entries.length }} 条收藏</span>
-      <button class="fav-clear-btn" @click="emit('clear')">清空未置顶</button>
+      <button class="fav-clear-btn" @click="emit('clear')">清空全部</button>
     </template>
   </DictPicker>
 </template>
@@ -74,6 +74,7 @@ import { computed } from 'vue'
 import { Trash2 } from '@lucide/vue'
 import DictPicker from '@/components/DictPicker.vue'
 import InlineEdit from '@/components/InlineEdit.vue'
+import { shortName } from '@/utils/search'
 import type { DictItem, ContextDataItem } from '@/types'
 import type { OctoHistoryEntry } from '@/composables/useOctoHistory'
 
@@ -125,10 +126,6 @@ function visibleTags(item: DictItem): string[] {
   return (item.tags ?? []).map(t => t.label)
 }
 
-// 取全限定名最后一段（服务短名）
-function shortName(name: string): string {
-  return name.split('.').at(-1) ?? name
-}
 
 function handleSelect(ctx: ContextDataItem) {
   const entry = metaMap.get(ctx.id)

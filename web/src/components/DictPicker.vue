@@ -8,7 +8,7 @@
     @after-leave="resetState"
     @keydown.esc.native="innerShow = false"
   >
-    <div class="alfred-wrap" :style="wrapStyle" @keydown.esc="innerShow = false">
+    <div class="alfred-wrap" :style="props.width ? { width: props.width } : {}" @keydown.esc="innerShow = false">
       <!-- 搜索框 -->
       <div class="alfred-search">
         <component :is="Search" :size="18" class="alfred-search__icon" />
@@ -155,7 +155,6 @@ const innerShow = computed({
   set: (v) => emit('update:show', v),
 })
 
-const wrapStyle = computed(() => props.width ? { width: props.width } : {})
 
 const search     = ref('')
 const loading    = ref(false)

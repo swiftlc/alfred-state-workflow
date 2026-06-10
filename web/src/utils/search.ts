@@ -14,6 +14,11 @@ export function matchQuery(query: string, ...targets: (string | undefined | null
   )
 }
 
+// 取全限定名最后一段，如 "com.sankuai.foo.Bar" → "Bar"
+export function shortName(full: string): string {
+  return full.split('.').at(-1) ?? full
+}
+
 export function formatTime(ts: number): string {
   if (!ts) return ''
   const diff = Date.now() - ts

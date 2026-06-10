@@ -13,6 +13,7 @@
           </span>
           <n-button size="tiny" ghost @click="openFavoritesModal">
             收藏{{ historyEntries.length ? ` (${historyEntries.length})` : '' }}
+            <span class="octo-kbd">⌘K</span>
           </n-button>
           <n-button size="tiny" :loading="nodesLoading" :disabled="!appkeyInput" ghost @click="doQueryNodes">
             刷新节点
@@ -337,11 +338,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, reactive, watch, nextTick } from 'vue'
 import { NInput, NButton, NSpin, NModal, useMessage } from 'naive-ui'
 import { Search, Zap, Check, CornerDownLeft } from '@lucide/vue'
 import { makeFetchItems } from '@/utils/dict'
-import { matchQuery } from '@/utils/search'
+import { matchQuery, shortName } from '@/utils/search'
 import ContextItem from '@/components/ContextItem.vue'
 import ContextGroup from '@/components/ContextGroup.vue'
 import MonacoPreview from '@/components/MonacoPreview.vue'
@@ -499,10 +500,6 @@ const parsedResult = computed((): ParsedInvokeResult | null => {
 
 // ─── 辅助 ──────────────────────────────────────────────────────────────────────
 
-function shortName(full: string): string {
-  if (!full) return ''
-  return full.split('.').at(-1) ?? full
-}
 
 function parseMethodSig(sig: string): { methodName: string; paramTypes: string[]; returnType: string } {
   const parenOpen  = sig.indexOf('(')
@@ -528,7 +525,7 @@ function onAppkeyEdit(item: ContextDataItem) {
 function onTenantEdit(item: ContextDataItem) {
   tenantIdInput.value = item.value ?? null
   saveLs()
-  if (selectedMethod.value) forceApplyParamPresets(selectedMethod.value)
+  if (selectedMethod.value) applyParamPresets(selectedMethod.value, true)
 }
 
 const fetchNodeItems: FetchItemsFn = () =>
@@ -664,7 +661,7 @@ const fetchTenantItems  = makeFetchItems('tenant')
 // 泳道选项：从已加载节点的 swimlane 字段实时派生（支持手写 allowInput）
 const fetchSwimlaneItems: FetchItemsFn = () => {
   const unique = [...new Set(allNodes.value.map(n => n.swimlane).filter((s): s is string => !!s))]
-  return Promise.resolve(unique.map(s => ({ id: s, name: s, value: s, pinned: false, lastUsedAt: 0 })))
+  return Promise.resolve(unique.map(s => ({ id: s, name: s, value: s, description: '', pinned: false, lastUsedAt: 0 })))
 }
 
 function onSwimlaneEdit(item: ContextDataItem) {
@@ -714,19 +711,11 @@ async function loadParamTemplate(m: OctoMethodItem) {
 }
 
 // 对 API 模板未覆盖的空参数，用本地 PARAM_PRESETS 填充（不覆盖已有值）
-function applyParamPresets(m: OctoMethodItem) {
+// force=true 时无视已有值，强制覆盖（tenantId 变化时用）
+function applyParamPresets(m: OctoMethodItem, force = false) {
   const ctx = { tenantId: tenantIdInput.value ?? undefined }
   for (let i = 0; i < m.paramTypes.length; i++) {
-    if (paramValues.value[i]?.trim()) continue
-    const presetFn = PARAM_PRESETS[shortName(m.paramTypes[i])]
-    if (presetFn) paramValues.value[i] = JSON.stringify(presetFn(ctx), null, 2)
-  }
-}
-
-// tenantId 变化时强制刷新所有 preset 参数（不管是否已有值）
-function forceApplyParamPresets(m: OctoMethodItem) {
-  const ctx = { tenantId: tenantIdInput.value ?? undefined }
-  for (let i = 0; i < m.paramTypes.length; i++) {
+    if (!force && paramValues.value[i]?.trim()) continue
     const presetFn = PARAM_PRESETS[shortName(m.paramTypes[i])]
     if (presetFn) paramValues.value[i] = JSON.stringify(presetFn(ctx), null, 2)
   }
@@ -976,15 +965,46 @@ function restoreLs() {
 
 // ─── 初始化 ────────────────────────────────────────────────────────────────────
 
+function onKeydown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault()
+    openFavoritesModal()
+  }
+}
+
 onMounted(async () => {
   restoreLs()
-  await nextTick()   // 等 restoreLs 触发的 watcher 先以 watchActive=false 消费
+  await nextTick()
   watchActive = true
   if (appkeyInput.value) doQueryNodes()
+})
+
+onActivated(() => {
+  window.addEventListener('keydown', onKeydown)
+})
+
+onDeactivated(() => {
+  window.removeEventListener('keydown', onKeydown)
 })
 </script>
 
 <style scoped>
+/* ─── 快捷键 badge ── */
+.octo-kbd {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-family: monospace;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-left: 4px;
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+
 /* ─── 统一 chip 样式 ──────────────────────────────────────────── */
 .octo-chip {
   display: inline-flex;
