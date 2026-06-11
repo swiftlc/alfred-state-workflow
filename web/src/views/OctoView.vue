@@ -1341,27 +1341,27 @@ onDeactivated(() => {
   transition: background 0.1s, border-color 0.1s, color 0.1s;
   flex-shrink: 0;
 }
-.invoke-save-btn:hover { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+.invoke-save-btn:hover { background: #f1f5f9; border-color: #cbd5e1; color: #334155; }
 .invoke-save-btn--saved {
-  border-color: #a7f3d0;
-  background: #ecfdf5;
-  color: #059669;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
   cursor: default;
 }
 .invoke-save-btn--confirm {
-  border-color: #a7f3d0;
-  background: #ecfdf5;
-  color: #059669;
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
   padding: 0 8px;
 }
-.invoke-save-btn--confirm:hover { background: #d1fae5; border-color: #6ee7b7; }
+.invoke-save-btn--confirm:hover { background: #e2e8f0; border-color: #cbd5e1; color: #1e293b; }
 .invoke-save-btn--cancel {
   border-color: #e2e8f0;
   background: transparent;
   color: #94a3b8;
   padding: 0 7px;
 }
-.invoke-save-btn--cancel:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+.invoke-save-btn--cancel:hover { background: #f1f5f9; border-color: #cbd5e1; color: #64748b; }
 
 /* inline 收藏备注输入框 */
 .invoke-save-input {
@@ -1369,16 +1369,16 @@ onDeactivated(() => {
   height: 24px;
   padding: 0 8px;
   font-size: 11px;
-  border: 1px solid #fcd34d;
+  border: 1px solid #e2e8f0;
   border-radius: 6px;
-  background: #fffbeb;
+  background: #f8fafc;
   color: #0f172a;
   outline: none;
   transition: border-color 0.12s, box-shadow 0.12s;
 }
 .invoke-save-input:focus {
-  border-color: #f59e0b;
-  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.15);
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.12);
 }
-.invoke-save-input::placeholder { color: #c4a85a; }
+.invoke-save-input::placeholder { color: #94a3b8; }
 </style>
