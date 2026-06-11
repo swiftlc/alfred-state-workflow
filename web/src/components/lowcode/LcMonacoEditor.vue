@@ -17,6 +17,57 @@ if (!self.MonacoEnvironment) {
   }
 }
 
+// 注册低代码内置 API 智能提示（全局只注册一次）
+let _completionDispose: { dispose(): void } | null = null
+function ensureCompletions() {
+  if (_completionDispose) return
+  _completionDispose = monaco.languages.registerCompletionItemProvider('javascript', {
+    triggerCharacters: ['$', '.'],
+    provideCompletionItems(model, position) {
+      const word    = model.getWordUntilPosition(position)
+      const range   = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn }
+      const mk      = monaco.languages.CompletionItemKind
+      const items: monaco.languages.CompletionItem[] = [
+        {
+          label: '$sql',
+          kind:  mk.Function,
+          insertText: '$sql(\'${1:SELECT * FROM table}\')',
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          documentation: '执行 SQL 查询，返回结果数组',
+          detail: '(query: string) => Promise<unknown>',
+          range,
+        },
+        {
+          label: '$set',
+          kind:  mk.Function,
+          insertText: '$set(\'${1:key}\', ${2:value})',
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          documentation: '设置运行时变量',
+          detail: '(key: string, val: unknown) => void',
+          range,
+        },
+        {
+          label: '$vars',
+          kind:  mk.Variable,
+          insertText: '$vars',
+          documentation: '运行时变量 store（只读引用）',
+          detail: 'Record<string, unknown>',
+          range,
+        },
+        {
+          label: '$page',
+          kind:  mk.Variable,
+          insertText: '$page',
+          documentation: '当前页面配置对象',
+          detail: 'LowCodePage',
+          range,
+        },
+      ]
+      return { suggestions: items }
+    },
+  })
+}
+
 const props = defineProps<{
   modelValue: string
   language?: string   // 'javascript' | 'json' | 'plaintext'
@@ -31,6 +82,7 @@ let editor: monaco.editor.IStandaloneCodeEditor | null = null
 
 onMounted(() => {
   if (!container.value) return
+  ensureCompletions()
   editor = monaco.editor.create(container.value, {
     value:            props.modelValue,
     language:         props.language ?? 'javascript',

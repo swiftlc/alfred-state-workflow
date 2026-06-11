@@ -1,16 +1,19 @@
 <template>
-  <div class="w-full h-full flex flex-col p-3 border-l border-slate-100 bg-white overflow-y-auto">
-    <div v-if="!widget" class="flex-1 flex items-center justify-center text-slate-300 text-xs">
-      选中组件后在此编辑属性
+  <div class="w-full h-full flex flex-col bg-white overflow-y-auto">
+    <!-- 头部：组件类型 + 关闭 -->
+    <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-100 shrink-0">
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">{{ widget.type }} 属性</span>
+      <button
+        class="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors text-xs"
+        title="关闭"
+        @click="emit('close')"
+      >✕</button>
     </div>
-    <template v-else>
-      <div class="text-xs font-medium text-slate-400 mb-3 uppercase tracking-wider">
-        {{ widget.type }} 属性
-      </div>
 
+    <div class="p-3 flex flex-col gap-4">
       <!-- 通用样式 -->
-      <section class="mb-4">
-        <div class="text-[11px] font-medium text-slate-500 mb-2">样式</div>
+      <section>
+        <div class="text-[11px] font-medium text-slate-400 mb-2">样式</div>
         <div class="flex flex-col gap-2">
           <label class="lc-field">
             <span>字号</span>
@@ -39,24 +42,28 @@
         </div>
       </section>
 
-      <!-- 位置 -->
-      <section class="mb-4">
-        <div class="text-[11px] font-medium text-slate-500 mb-2">位置 / 尺寸</div>
-        <div class="flex flex-col gap-2">
-          <label class="lc-field"><span>列起始</span>
-            <input type="number" :value="widget.pos.col" min="1" @change="updatePos('col', Number(($event.target as HTMLInputElement).value))" /></label>
-          <label class="lc-field"><span>行起始</span>
-            <input type="number" :value="widget.pos.row" min="1" @change="updatePos('row', Number(($event.target as HTMLInputElement).value))" /></label>
-          <label class="lc-field"><span>列宽</span>
-            <input type="number" :value="widget.pos.w" min="1" @change="updatePos('w', Number(($event.target as HTMLInputElement).value))" /></label>
-          <label class="lc-field"><span>行高</span>
-            <input type="number" :value="widget.pos.h" min="1" @change="updatePos('h', Number(($event.target as HTMLInputElement).value))" /></label>
+      <!-- 位置 / 尺寸 -->
+      <section>
+        <div class="text-[11px] font-medium text-slate-400 mb-2">位置 / 尺寸</div>
+        <div class="grid grid-cols-2 gap-1.5">
+          <label class="lc-field-sm"><span>列</span>
+            <input type="number" :value="widget.pos.col" min="1"
+              @change="updatePos('col', Number(($event.target as HTMLInputElement).value))" /></label>
+          <label class="lc-field-sm"><span>行</span>
+            <input type="number" :value="widget.pos.row" min="1"
+              @change="updatePos('row', Number(($event.target as HTMLInputElement).value))" /></label>
+          <label class="lc-field-sm"><span>宽</span>
+            <input type="number" :value="widget.pos.w" min="1"
+              @change="updatePos('w', Number(($event.target as HTMLInputElement).value))" /></label>
+          <label class="lc-field-sm"><span>高</span>
+            <input type="number" :value="widget.pos.h" min="1"
+              @change="updatePos('h', Number(($event.target as HTMLInputElement).value))" /></label>
         </div>
       </section>
 
       <!-- 组件专属属性 -->
       <section>
-        <div class="text-[11px] font-medium text-slate-500 mb-2">组件属性</div>
+        <div class="text-[11px] font-medium text-slate-400 mb-2">组件属性</div>
 
         <!-- Label -->
         <template v-if="widget.type === 'label'">
@@ -85,17 +92,18 @@
           <label class="lc-field"><span>按钮文字</span>
             <input :value="(widget.props as ButtonProps).label"
               @change="updateProp('label', ($event.target as HTMLInputElement).value)" /></label>
-          <div class="lc-field-col mt-2">
-            <span>点击脚本</span>
-            <div class="border border-slate-200 rounded overflow-hidden mt-1">
-              <LcMonacoEditor
-                :model-value="(widget.props as ButtonProps).onClick"
-                language="javascript"
-                height="160px"
-                @update:model-value="updateProp('onClick', $event)"
-              />
+          <div class="mt-2">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[11px] text-slate-500">点击脚本</span>
+              <button
+                class="text-[11px] text-indigo-500 hover:text-indigo-700 transition-colors"
+                @click="emit('open-script', '按钮点击脚本', (widget.props as ButtonProps).onClick ?? '', (c) => updateProp('onClick', c))"
+              >{{ (widget.props as ButtonProps).onClick?.trim() ? '编辑 ✏️' : '+ 添加' }}</button>
             </div>
-            <span class="text-[10px] text-slate-300 mt-0.5">可用：$sql(query)  $set(key, val)  $vars</span>
+            <div v-if="(widget.props as ButtonProps).onClick?.trim()"
+              class="text-[10px] font-mono text-slate-400 bg-slate-50 border border-slate-100 rounded px-2 py-1.5 line-clamp-3 leading-relaxed">
+              {{ (widget.props as ButtonProps).onClick }}
+            </div>
           </div>
         </template>
 
@@ -105,42 +113,43 @@
             <input :value="(widget.props as TableProps).dataVar"
               placeholder="如 rows"
               @change="updateProp('dataVar', ($event.target as HTMLInputElement).value)" /></label>
-          <div class="lc-field-col mt-2">
-            <span>列定义 (JSON)</span>
-            <div class="border border-slate-200 rounded overflow-hidden mt-1">
-              <LcMonacoEditor
-                :model-value="JSON.stringify((widget.props as TableProps).columns ?? [], null, 2)"
-                language="json"
-                height="140px"
-                @update:model-value="onColumnsChange($event)"
-              />
+          <div class="mt-2">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[11px] text-slate-500">列定义 (JSON)</span>
+              <button
+                class="text-[11px] text-indigo-500 hover:text-indigo-700 transition-colors"
+                @click="emit('open-script', '列定义 JSON', JSON.stringify((widget.props as TableProps).columns ?? [], null, 2), (c) => onColumnsChange(c), 'json')"
+              >编辑 ✏️</button>
+            </div>
+            <div class="text-[10px] font-mono text-slate-400 bg-slate-50 border border-slate-100 rounded px-2 py-1.5 line-clamp-2 leading-relaxed">
+              {{ JSON.stringify((widget.props as TableProps).columns ?? []) }}
             </div>
           </div>
         </template>
       </section>
-    </template>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { Widget, WidgetStyle, GridPos, LabelProps, InputProps, ButtonProps, TableProps } from '@/types/lowcode'
-import LcMonacoEditor from './LcMonacoEditor.vue'
 
-const props = defineProps<{ widget: Widget | null }>()
-const emit  = defineEmits<{ update: [widget: Widget] }>()
+const props = defineProps<{ widget: Widget }>()
+const emit  = defineEmits<{
+  update:      [widget: Widget]
+  close:       []
+  'open-script': [title: string, code: string, onSave: (c: string) => void, lang?: string]
+}>()
 
 function updateStyle(key: keyof WidgetStyle, val: unknown) {
-  if (!props.widget) return
   emit('update', { ...props.widget, style: { ...props.widget.style, [key]: val } })
 }
 
 function updatePos(key: keyof GridPos, val: number) {
-  if (!props.widget) return
   emit('update', { ...props.widget, pos: { ...props.widget.pos, [key]: val } })
 }
 
 function updateProp(key: string, val: unknown) {
-  if (!props.widget) return
   const newProps = { ...props.widget.props, [key]: val } as Widget['props']
   emit('update', { ...props.widget, props: newProps })
 }
@@ -161,7 +170,7 @@ function onColumnsChange(raw: string) {
   font-size: 11px;
   color: #475569;
 }
-.lc-field span { width: 56px; flex-shrink: 0; }
+.lc-field span { width: 52px; flex-shrink: 0; }
 .lc-field input,
 .lc-field select {
   flex: 1;
@@ -174,6 +183,26 @@ function onColumnsChange(raw: string) {
 }
 .lc-field input:focus,
 .lc-field select:focus { border-color: #818cf8; }
+
+.lc-field-sm {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #475569;
+}
+.lc-field-sm span { width: 20px; flex-shrink: 0; }
+.lc-field-sm input {
+  flex: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  padding: 2px 5px;
+  font-size: 11px;
+  outline: none;
+  background: #f8fafc;
+  min-width: 0;
+}
+.lc-field-sm input:focus { border-color: #818cf8; }
 
 .lc-field-col {
   display: flex;

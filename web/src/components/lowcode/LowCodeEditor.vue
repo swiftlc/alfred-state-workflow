@@ -15,7 +15,7 @@
           <span class="text-[11px] font-medium text-slate-400">初始化脚本</span>
           <button
             class="text-[11px] text-indigo-500 hover:text-indigo-700 transition-colors"
-            @click="scriptModal.show = true"
+            @click="openScriptModal('初始化脚本', localPage.initScript, (c) => localPage.initScript = c)"
           >{{ localPage.initScript.trim() ? '已配置 ✏️' : '+ 配置' }}</button>
           <span class="ml-auto text-[10px] text-slate-300">可用 API：$sql(query)  $set(key, val)  $vars</span>
         </div>
@@ -31,20 +31,20 @@
         />
       </div>
 
-      <!-- 右：属性侧栏（选中 widget 时滑入） -->
-      <transition name="panel-slide">
-        <div v-if="selectedWidget" style="width:240px; flex-shrink:0; border-left:1px solid #f1f5f9; position:relative">
-          <button
-            class="absolute -left-3 top-4 w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-slate-600 z-10 text-xs"
-            title="关闭属性面板"
-            @click="selectedId = null"
-          >✕</button>
-          <PropertyPanel
-            :widget="selectedWidget"
-            @update="handleWidgetUpdate"
-          />
-        </div>
-      </transition>
+      <!-- 右：属性侧栏（固定宽度，选中时显示内容） -->
+      <div
+        style="width:240px; flex-shrink:0; border-left:1px solid #f1f5f9; position:relative; transition: width 0.15s ease;"
+        :style="selectedWidget ? 'width:240px' : 'width:0; overflow:hidden; border:none'"
+      >
+        <PropertyPanel
+          v-if="selectedWidget"
+          :widget="selectedWidget"
+          :key="selectedWidget.id"
+          @update="handleWidgetUpdate"
+          @close="selectedId = null"
+          @open-script="(title, code, onSave, lang) => openScriptModal(title, code, onSave, lang)"
+        />
+      </div>
 
       <!-- 保存按钮 -->
       <div class="absolute bottom-4 right-4 z-10">
@@ -61,23 +61,25 @@
     <n-modal
       v-model:show="scriptModal.show"
       preset="dialog"
-      title="初始化脚本"
-      style="width:680px"
+      :title="scriptModal.title"
+      style="width:780px"
       positive-text="确定"
-      @positive-click="scriptModal.show = false"
+      @positive-click="() => { scriptModal.onSave(scriptModal.code); scriptModal.show = false }"
     >
       <div class="pt-2">
         <p class="text-xs text-slate-400 mb-2">
-          页面加载时自动执行。可用 API：
-          <code class="font-mono">$sql(query)</code>、
-          <code class="font-mono">$set(key, val)</code>、
-          <code class="font-mono">$vars</code>
+          可用 API：
+          <code class="font-mono bg-slate-100 px-1 rounded">$sql(query)</code>
+          <code class="font-mono bg-slate-100 px-1 rounded ml-1">$set(key, val)</code>
+          <code class="font-mono bg-slate-100 px-1 rounded ml-1">$vars</code>
+          <code class="font-mono bg-slate-100 px-1 rounded ml-1">$page</code>
         </p>
         <div class="border border-slate-200 rounded-lg overflow-hidden">
           <LcMonacoEditor
-            v-model="localPage.initScript"
-            language="javascript"
-            height="300px"
+            v-if="scriptModal.show"
+            v-model="scriptModal.code"
+            :language="scriptModal.lang"
+            height="420px"
           />
         </div>
       </div>
@@ -101,7 +103,25 @@ const emit  = defineEmits<{ save: [page: LowCodePage] }>()
 // 本地副本，保存时才写回
 const localPage   = reactive<LowCodePage>({ ...props.page, widgets: [...props.page.widgets] })
 const selectedId  = ref<string | null>(null)
-const scriptModal = reactive({ show: false })
+
+// 脚本编辑弹窗（initScript + button onClick + table columns 共用）
+const scriptModal = reactive<{
+  show:     boolean
+  title:    string
+  code:     string
+  lang:     string
+  onSave:   (code: string) => void
+}>({
+  show: false, title: '', code: '', lang: 'javascript', onSave: () => {},
+})
+
+function openScriptModal(title: string, code: string, onSave: (code: string) => void, lang = 'javascript') {
+  scriptModal.title  = title
+  scriptModal.code   = code
+  scriptModal.lang   = lang
+  scriptModal.onSave = onSave
+  scriptModal.show   = true
+}
 
 watch(() => props.page, (p) => {
   Object.assign(localPage, { ...p, widgets: [...p.widgets] })
@@ -148,15 +168,3 @@ function handleMove(id: string, col: number, row: number) {
 }
 </script>
 
-<style scoped>
-.panel-slide-enter-active,
-.panel-slide-leave-active {
-  transition: width 0.2s ease, opacity 0.2s ease;
-  overflow: hidden;
-}
-.panel-slide-enter-from,
-.panel-slide-leave-to {
-  width: 0 !important;
-  opacity: 0;
-}
-</style>
