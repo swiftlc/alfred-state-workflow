@@ -43,7 +43,8 @@
           padding:    '2px',
           opacity:    draggingId === w.id ? 0.4 : 1,
         }"
-        @click.stop="emit('select', w.id)"
+        @mousedown.stop="onWidgetMouseDown($event)"
+        @mouseup.stop="onWidgetMouseUp($event, w.id)"
         @dragstart="onWidgetDragStart($event, w.id)"
         @dragend="draggingId = null"
       >
@@ -99,6 +100,22 @@ const emit = defineEmits<{
 const canvasEl    = ref<HTMLElement>()
 const dropPreview = ref<{ col: number; row: number; w: number; h: number } | null>(null)
 const draggingId  = ref<string | null>(null)
+
+// 用 mousedown/mouseup 区分点击和拖拽（draggable 会吃掉 click 事件）
+let mouseDownPos = { x: 0, y: 0 }
+
+function onWidgetMouseDown(e: MouseEvent) {
+  mouseDownPos = { x: e.clientX, y: e.clientY }
+}
+
+function onWidgetMouseUp(e: MouseEvent, id: string) {
+  const dx = Math.abs(e.clientX - mouseDownPos.x)
+  const dy = Math.abs(e.clientY - mouseDownPos.y)
+  if (dx < 5 && dy < 5) {
+    // 位移 < 5px 视为点击，不是拖拽
+    emit('select', id)
+  }
+}
 
 const cellW = computed(() => {
   const el = canvasEl.value
