@@ -48,15 +48,15 @@
 
     <!-- 详情抽屉 -->
     <ContextGroup>
-    <n-drawer v-model:show="detail.show" :width="580">
+    <n-drawer v-model:show="detail.show" :width="520">
       <n-drawer-content :native-scrollbar="false" closable>
         <template #header>
-          <div class="flex items-center gap-2 min-w-0">
+          <div class="flex items-center gap-2 min-w-0 pr-2">
             <ContextItem context-key="api_name" :value="detail.item?.name ?? ''" label="接口名">
-              <span class="font-mono font-semibold text-slate-800">{{ detail.item?.name }}</span>
+              <span class="text-sm font-semibold text-slate-800 leading-snug break-all">{{ detail.item?.name }}</span>
             </ContextItem>
             <ContextItem context-key="api_group" :value="detail.item?.apiGroupName ?? ''" label="分组">
-              <span class="text-[11px] bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded-full font-medium flex-shrink-0 cursor-pointer hover:bg-indigo-100 transition-colors">
+              <span class="text-[11px] bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded font-medium flex-shrink-0 cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap">
                 {{ detail.item?.apiGroupName }}
               </span>
             </ContextItem>
@@ -69,14 +69,14 @@
         <template v-else-if="detail.item">
 
           <!-- 描述 -->
-          <p v-if="detail.item.description" class="text-sm text-slate-500 mb-5 leading-relaxed">
+          <p v-if="detail.item.description" class="text-xs text-slate-500 mb-4 leading-relaxed">
             {{ detail.item.description }}
           </p>
 
-          <!-- 路径区块 -->
-          <div class="mb-5">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">路径</span>
+          <!-- 路径 -->
+          <div class="mb-4">
+            <div class="flex items-center gap-1.5 mb-1.5">
+              <span class="text-[11px] font-medium text-slate-400">路径</span>
               <div class="flex items-center gap-1">
                 <ContextItem
                   v-for="m in (detail.data?.frontRequestView?.methodTypes ?? '').split(',').filter(Boolean)"
@@ -87,11 +87,11 @@
                 >
                   <span
                     class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded cursor-pointer"
-                    :class="m.toLowerCase()==='get'    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                            m.toLowerCase()==='post'   ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                            m.toLowerCase()==='put'    ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                            m.toLowerCase()==='delete' ? 'bg-red-50 text-red-600 border border-red-100' :
-                                                         'bg-slate-100 text-slate-600 border border-slate-200'"
+                    :class="m.toLowerCase()==='get'    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                            m.toLowerCase()==='post'   ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                            m.toLowerCase()==='put'    ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                            m.toLowerCase()==='delete' ? 'bg-red-50 text-red-500 border border-red-100' :
+                                                         'bg-slate-100 text-slate-500 border border-slate-200'"
                   >{{ m }}</span>
                 </ContextItem>
               </div>
@@ -108,7 +108,7 @@
               class="block"
               @action="handleRouteAction"
             >
-              <div class="font-mono text-xs text-indigo-600 bg-indigo-50/60 border border-transparent rounded-lg px-3 py-2.5 break-all leading-relaxed cursor-pointer hover:border-indigo-100 hover:bg-indigo-50 transition-colors">
+              <div class="font-mono text-[12px] text-indigo-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 break-all leading-relaxed cursor-pointer hover:border-indigo-200 hover:bg-indigo-50/40 transition-colors">
                 {{ detail.item.path || '—' }}
               </div>
             </ContextItem>
@@ -116,19 +116,19 @@
 
           <!-- 后端服务 -->
           <template v-if="detail.data?.invokerViews?.length">
-            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">后端服务</div>
+            <div class="text-[11px] font-medium text-slate-400 mb-2">后端服务</div>
             <div
               v-for="(inv, idx) in detail.data.invokerViews"
               :key="idx"
-              class="border border-slate-100 rounded-xl p-4 mb-3 bg-white"
+              class="border border-slate-100 rounded-lg p-3 mb-2.5 bg-slate-50/50"
             >
               <!-- 类型 badge + appkey -->
-              <div class="flex items-center gap-2 mb-3">
+              <div class="flex items-center gap-2 mb-2">
                 <span
-                  class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex-shrink-0"
+                  class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded flex-shrink-0"
                   :class="inv.type === 'http'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                    : 'bg-violet-50 text-violet-700 border border-violet-100'"
+                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                    : 'bg-violet-50 text-violet-600 border border-violet-100'"
                 >{{ inv.type ?? 'rpc' }}</span>
                 <ContextItem
                   v-if="inv.appkey"
@@ -139,7 +139,7 @@
                   bare
                   class="flex-1 min-w-0"
                 >
-                  <span class="font-mono text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded px-2 py-0.5 truncate max-w-full cursor-pointer hover:bg-slate-100 transition-colors block">
+                  <span class="font-mono text-[11px] text-slate-500 bg-white border border-slate-200 rounded px-2 py-0.5 cursor-pointer hover:bg-slate-50 transition-colors block truncate">
                     {{ inv.appkey }}
                   </span>
                 </ContextItem>
@@ -155,26 +155,26 @@
                 bare
                 class="block w-full"
               >
-                <div class="bg-slate-50 rounded-lg px-3 py-2.5 font-mono cursor-pointer hover:bg-indigo-50/40 transition-colors">
-                  <div class="text-[11px] text-slate-500 break-all leading-relaxed">{{ inv.serviceName }}</div>
-                  <div v-if="inv.methodName" class="text-xs text-indigo-600 font-semibold mt-1.5">
+                <div class="bg-white border border-slate-100 rounded-lg px-3 py-2 font-mono cursor-pointer hover:border-indigo-200 hover:bg-indigo-50/30 transition-colors">
+                  <div class="text-[11px] text-slate-400 break-all leading-relaxed">{{ inv.serviceName }}</div>
+                  <div v-if="inv.methodName" class="text-[12px] text-indigo-500 font-semibold mt-1">
                     <span class="text-slate-300 mr-0.5">#</span>{{ inv.methodName }}
                   </div>
                 </div>
               </ContextItem>
 
               <!-- HTTP URL -->
-              <div v-if="inv.url" class="mt-2.5 font-mono text-[11px] text-slate-500 bg-slate-50 rounded-lg px-3 py-2 break-all">
+              <div v-if="inv.url" class="mt-2 font-mono text-[11px] text-slate-400 bg-white border border-slate-100 rounded-lg px-3 py-2 break-all">
                 {{ inv.url }}
               </div>
             </div>
           </template>
-          <p v-else-if="detail.data" class="text-xs text-slate-400 mb-4">无后端服务配置</p>
+          <p v-else-if="detail.data" class="text-xs text-slate-300 mb-4">无后端服务配置</p>
 
           <!-- 返回模板 -->
           <template v-if="detail.data?.responseView?.response">
-            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">返回模板</div>
-            <pre class="text-xs bg-slate-50 border border-slate-100 px-3 py-2.5 rounded-xl overflow-auto max-h-40 font-mono leading-relaxed text-slate-600 whitespace-pre-wrap break-all mb-4">{{ detail.data.responseView.response }}</pre>
+            <div class="text-[11px] font-medium text-slate-400 mb-2">返回模板</div>
+            <pre class="text-[11px] bg-slate-50 border border-slate-100 px-3 py-2 rounded-lg overflow-auto max-h-36 font-mono leading-relaxed text-slate-500 whitespace-pre-wrap break-all mb-3">{{ detail.data.responseView.response }}</pre>
           </template>
 
         </template>

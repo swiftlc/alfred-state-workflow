@@ -64,6 +64,41 @@
       :prod-value="diffModal.prodValue"
     />
 
+    <!-- 编辑 Test 配置弹窗 -->
+    <n-modal
+      v-model:show="editModal.show"
+      preset="dialog"
+      :title="`修改 Test 配置：${shortKey(editModal.key)}`"
+      style="width: 520px"
+      positive-text="保存"
+      negative-text="取消"
+      :loading="editModal.saving"
+      @positive-click="confirmEdit"
+      @negative-click="editModal.show = false"
+    >
+      <div class="pt-3 flex flex-col gap-3">
+        <p class="text-xs text-slate-400 font-mono break-all -mt-1">{{ editModal.key }}</p>
+        <div>
+          <p class="text-xs font-medium text-slate-600 mb-1">值</p>
+          <n-input
+            v-model:value="editModal.value"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 10 }"
+            placeholder="配置值…"
+            class="font-mono text-xs"
+          />
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-600 mb-1">描述</p>
+          <n-input v-model:value="editModal.desc" placeholder="描述…" />
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-600 mb-1">类型</p>
+          <n-select v-model:value="editModal.type" :options="TYPE_OPTS" style="width: 160px" />
+        </div>
+      </div>
+    </n-modal>
+
     <!-- 指定值弹窗 -->
     <n-modal
       v-model:show="specifyModal.show"
@@ -93,7 +128,7 @@
 defineOptions({ name: 'LionConfigView' })
 
 import { ref, computed, watch, onMounted, h, reactive } from 'vue'
-import { Pin } from '@lucide/vue'
+import { Pin, Pencil } from '@lucide/vue'
 import {
   NInput, NButton, NSelect, NDataTable, NModal, NSpin,
   useMessage,
@@ -140,6 +175,11 @@ const filterStatus      = ref<'all' | 'diff' | 'test_only' | 'prod_only'>('all')
 const pinnedKeys        = ref(new Set<string>())
 const overrides         = ref<Map<string, string>>(new Map())
 
+const editModal = reactive<{
+  show: boolean; saving: boolean
+  key: string; name: string; value: string; desc: string; type: string
+}>({ show: false, saving: false, key: '', name: '', value: '', desc: '', type: 'string' })
+
 const specifyModal = reactive<{ show: boolean; key: string; inputVal: string }>({
   show: false, key: '', inputVal: '',
 })
@@ -154,6 +194,14 @@ function openDiff(row: LionConfigItem) {
   diffModal.prodValue = row.prodValue
   diffModal.show      = true
 }
+
+const TYPE_OPTS = [
+  { label: 'string',  value: 'string'  },
+  { label: 'int',     value: 'int'     },
+  { label: 'float',   value: 'float'   },
+  { label: 'boolean', value: 'boolean' },
+  { label: 'json',    value: 'json'    },
+]
 
 const STATUS_OPTS = [
   { label: '全部',    value: 'all'       },
@@ -222,6 +270,60 @@ function togglePin(key: string) {
 function shortKey(key: string): string {
   const prefix = (appkeyInput.value ?? '') + '.'
   return key.startsWith(prefix) ? key.slice(prefix.length) : key
+}
+
+// ─── 编辑 Test 配置 ────────────────────────────────────────────────────────────
+
+function openEdit(row: LionConfigItem) {
+  editModal.key   = row.key
+  editModal.name  = row.name
+  editModal.value = row.testValue ?? ''
+  editModal.desc  = row.desc
+  editModal.type  = row.type || 'string'
+  editModal.show  = true
+}
+
+function lionUpdateUrl(appkey: string) {
+  return `https://lion.mws-test.sankuai.com/mwsapi/v1/env/test/appKey/${encodeURIComponent(appkey)}/group/default/config/type/key/update`
+}
+
+async function confirmEdit(): Promise<boolean> {
+  const appkey = appkeyInput.value?.trim()
+  if (!appkey) return true
+  editModal.saving = true
+  try {
+    const res = await proxyPost<{ code: number; msg?: string }>(
+      lionUpdateUrl(appkey),
+      {
+        appKey: appkey,
+        key:    editModal.key,
+        name:   editModal.name,
+        value:  editModal.value,
+        desc:   editModal.desc,
+        type:   editModal.type,
+      },
+      { 'x-requested-with': 'XMLHttpRequest' },
+    )
+    if (res?.code !== 0) {
+      message.error(`保存失败：${res?.msg ?? '未知错误'}`)
+      return false
+    }
+    // 本地同步更新，避免重新拉取全量
+    const item = allItems.value.find(i => i.key === editModal.key)
+    if (item) {
+      item.testValue = editModal.value
+      item.desc      = editModal.desc
+      item.type      = editModal.type
+      lsSet(lsCacheKey(appkey), allItems.value)
+    }
+    message.success('已保存')
+    return true
+  } catch (e) {
+    message.error(`保存失败：${(e as Error).message}`)
+    return false
+  } finally {
+    editModal.saving = false
+  }
 }
 
 // ─── 指定值 ────────────────────────────────────────────────────────────────────
@@ -300,8 +402,6 @@ async function doSearch() {
   if (!appkey) return
   loading.value      = true
   allItems.value     = []
-  filterRaw.value    = ''
-  filterQuery.value  = ''
   filterStatus.value = 'all'
   pinnedKeys.value   = new Set()
   loadOverrides(appkey)
@@ -373,7 +473,19 @@ const columns: DataTableColumns<LionConfigItem> = [
   },
   {
     title: 'Test', key: 'testValue',
-    render: (row) => valueCell(row.testValue, !!(row.testValue !== null && row.prodValue !== null && row.testValue !== row.prodValue), () => openDiff(row)),
+    render: (row) => {
+      const isDiff = !!(row.testValue !== null && row.prodValue !== null && row.testValue !== row.prodValue)
+      const cell   = valueCell(row.testValue, isDiff, () => openDiff(row))
+      const editBtn = h('span', {
+        class: 'lion-edit-btn',
+        title: '修改 Test 配置',
+        onClick: (e: Event) => { e.stopPropagation(); openEdit(row) },
+      }, [h(Pencil, { size: 11 })])
+      return h('div', { style: 'display:flex; align-items:flex-start; gap:4px; min-width:0' }, [
+        h('div', { style: 'flex:1; min-width:0' }, [cell]),
+        editBtn,
+      ])
+    },
   },
   {
     title: 'Prod', key: 'prodValue',
@@ -442,3 +554,26 @@ onMounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.lion-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: #cbd5e1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+:deep(tr:hover) .lion-edit-btn {
+  opacity: 1;
+}
+.lion-edit-btn:hover {
+  background: #eef2ff;
+  color: #6366f1;
+}
+</style>
