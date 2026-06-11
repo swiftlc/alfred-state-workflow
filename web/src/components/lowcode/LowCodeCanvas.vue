@@ -54,9 +54,13 @@
           :runtime="dummyRuntime"
           :selected="true"
         />
-        <!-- 删除按钮 -->
+        <!-- 编辑态遮罩：覆盖子元素，确保鼠标事件能被 widget 容器接收 -->
+        <div class="absolute inset-0 z-10" style="cursor:grab" />
+        <!-- 删除按钮（z-index 高于遮罩） -->
         <button
           class="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-400 text-white text-xs hidden group-hover:flex items-center justify-center z-20 leading-none"
+          @mousedown.stop
+          @mouseup.stop
           @click.stop="emit('remove', w.id)"
         >✕</button>
       </div>
@@ -112,7 +116,6 @@ function onWidgetMouseUp(e: MouseEvent, id: string) {
   const dx = Math.abs(e.clientX - mouseDownPos.x)
   const dy = Math.abs(e.clientY - mouseDownPos.y)
   if (dx < 5 && dy < 5) {
-    // 位移 < 5px 视为点击，不是拖拽
     emit('select', id)
   }
 }

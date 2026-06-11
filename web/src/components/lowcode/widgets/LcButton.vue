@@ -8,7 +8,6 @@
       opacity:      (selected || running) ? 0.7 : 1,
       cursor:       selected ? 'default' : running ? 'wait' : 'pointer',
     }"
-    :disabled="selected"
     @click="handleClick"
   >
     <span v-if="running" class="opacity-60">执行中…</span>
