@@ -33,15 +33,19 @@
         v-for="w in page.widgets"
         :key="w.id"
         class="relative group"
+        :draggable="true"
         :style="{
           gridColumn: `${w.pos.col} / span ${w.pos.w}`,
           gridRow:    `${w.pos.row} / span ${w.pos.h}`,
-          outline:    selectedId === w.id ? '2px solid #6366f1' : '1px solid transparent',
+          outline:    selectedId === w.id ? '2px solid #6366f1' : '1px solid #e2e8f0',
           zIndex:     selectedId === w.id ? 10 : 1,
-          cursor:     'pointer',
+          cursor:     'grab',
           padding:    '2px',
+          opacity:    draggingId === w.id ? 0.4 : 1,
         }"
         @click.stop="emit('select', w.id)"
+        @dragstart="onWidgetDragStart($event, w.id)"
+        @dragend="draggingId = null"
       >
         <component
           :is="widgetComponent(w.type)"
@@ -89,10 +93,12 @@ const emit = defineEmits<{
   select: [id: string]
   remove: [id: string]
   drop:   [type: WidgetType, col: number, row: number]
+  move:   [id: string, col: number, row: number]
 }>()
 
-const canvasEl = ref<HTMLElement>()
+const canvasEl    = ref<HTMLElement>()
 const dropPreview = ref<{ col: number; row: number; w: number; h: number } | null>(null)
+const draggingId  = ref<string | null>(null)
 
 const cellW = computed(() => {
   const el = canvasEl.value
@@ -109,17 +115,38 @@ function posToGrid(e: DragEvent): { col: number; row: number } {
   return { col, row }
 }
 
+function onWidgetDragStart(e: DragEvent, id: string) {
+  draggingId.value = id
+  e.dataTransfer?.setData('widget-id', id)
+  e.dataTransfer?.setData('widget-type', '')  // 清空，区分来源
+}
+
 function onDragOver(e: DragEvent) {
   const { col, row } = posToGrid(e)
-  dropPreview.value = { col, row, w: 4, h: 1 }
+  const id = e.dataTransfer?.getData('widget-id')
+  const movingWidget = id ? props.page.widgets.find(w => w.id === id) : null
+  dropPreview.value = {
+    col, row,
+    w: movingWidget?.pos.w ?? 4,
+    h: movingWidget?.pos.h ?? 1,
+  }
 }
 
 function onDrop(e: DragEvent) {
-  const type = e.dataTransfer?.getData('widget-type') as WidgetType | undefined
-  if (!type) return
   const { col, row } = posToGrid(e)
-  dropPreview.value = null
-  emit('drop', type, col, row)
+  dropPreview.value  = null
+  draggingId.value   = null
+
+  const widgetId = e.dataTransfer?.getData('widget-id')
+  const type     = e.dataTransfer?.getData('widget-type') as WidgetType | undefined
+
+  if (widgetId) {
+    // 移动已有组件
+    emit('move', widgetId, col, row)
+  } else if (type) {
+    // 从面板拖入新组件
+    emit('drop', type, col, row)
+  }
 }
 
 function widgetComponent(type: WidgetType) {

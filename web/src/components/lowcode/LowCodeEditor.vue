@@ -27,19 +27,27 @@
           @select="selectedId = $event"
           @remove="handleRemove"
           @drop="handleDrop"
+          @move="handleMove"
         />
       </div>
 
-      <!-- 右：属性面板 (200px) -->
-      <div style="width:200px; flex-shrink:0">
-        <PropertyPanel
-          :widget="selectedWidget"
-          @update="handleWidgetUpdate"
-        />
-      </div>
+      <!-- 右：属性侧栏（选中 widget 时滑入） -->
+      <transition name="panel-slide">
+        <div v-if="selectedWidget" style="width:240px; flex-shrink:0; border-left:1px solid #f1f5f9; position:relative">
+          <button
+            class="absolute -left-3 top-4 w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-slate-600 z-10 text-xs"
+            title="关闭属性面板"
+            @click="selectedId = null"
+          >✕</button>
+          <PropertyPanel
+            :widget="selectedWidget"
+            @update="handleWidgetUpdate"
+          />
+        </div>
+      </transition>
 
       <!-- 保存按钮 -->
-      <div class="absolute bottom-4 right-52 z-10">
+      <div class="absolute bottom-4 right-4 z-10">
         <n-button type="primary" @click="emit('save', localPage)">保存</n-button>
       </div>
     </template>
@@ -54,7 +62,7 @@
       v-model:show="scriptModal.show"
       preset="dialog"
       title="初始化脚本"
-      style="width:600px"
+      style="width:680px"
       positive-text="确定"
       @positive-click="scriptModal.show = false"
     >
@@ -65,13 +73,13 @@
           <code class="font-mono">$set(key, val)</code>、
           <code class="font-mono">$vars</code>
         </p>
-        <n-input
-          v-model:value="localPage.initScript"
-          type="textarea"
-          :autosize="{ minRows: 8, maxRows: 20 }"
-          class="font-mono text-xs"
-          placeholder="// 示例：查询数据并绑定到变量&#10;const rows = await $sql('SELECT * FROM your_table LIMIT 10')&#10;$set('rows', rows)"
-        />
+        <div class="border border-slate-200 rounded-lg overflow-hidden">
+          <LcMonacoEditor
+            v-model="localPage.initScript"
+            language="javascript"
+            height="300px"
+          />
+        </div>
       </div>
     </n-modal>
   </div>
@@ -79,7 +87,8 @@
 
 <script setup lang="ts">
 import { ref, computed, reactive, watch } from 'vue'
-import { NButton, NModal, NInput } from 'naive-ui'
+import { NButton, NModal } from 'naive-ui'
+import LcMonacoEditor from './LcMonacoEditor.vue'
 import type { LowCodePage, Widget, WidgetType } from '@/types/lowcode'
 import ComponentPalette from './ComponentPalette.vue'
 import PropertyPanel    from './PropertyPanel.vue'
@@ -131,4 +140,23 @@ function handleRemove(id: string) {
 function handleWidgetUpdate(updated: Widget) {
   localPage.widgets = localPage.widgets.map(w => w.id === updated.id ? updated : w)
 }
+
+function handleMove(id: string, col: number, row: number) {
+  localPage.widgets = localPage.widgets.map(w =>
+    w.id === id ? { ...w, pos: { ...w.pos, col, row } } : w
+  )
+}
 </script>
+
+<style scoped>
+.panel-slide-enter-active,
+.panel-slide-leave-active {
+  transition: width 0.2s ease, opacity 0.2s ease;
+  overflow: hidden;
+}
+.panel-slide-enter-from,
+.panel-slide-leave-to {
+  width: 0 !important;
+  opacity: 0;
+}
+</style>

@@ -85,14 +85,18 @@
           <label class="lc-field"><span>按钮文字</span>
             <input :value="(widget.props as ButtonProps).label"
               @change="updateProp('label', ($event.target as HTMLInputElement).value)" /></label>
-          <label class="lc-field-col mt-2">
+          <div class="lc-field-col mt-2">
             <span>点击脚本</span>
-            <textarea :value="(widget.props as ButtonProps).onClick"
-              placeholder="const rows = await $sql('SELECT ...')\n$set('data', rows)"
-              rows="5"
-              class="font-mono text-xs"
-              @change="updateProp('onClick', ($event.target as HTMLTextAreaElement).value)" />
-          </label>
+            <div class="border border-slate-200 rounded overflow-hidden mt-1">
+              <LcMonacoEditor
+                :model-value="(widget.props as ButtonProps).onClick"
+                language="javascript"
+                height="160px"
+                @update:model-value="updateProp('onClick', $event)"
+              />
+            </div>
+            <span class="text-[10px] text-slate-300 mt-0.5">可用：$sql(query)  $set(key, val)  $vars</span>
+          </div>
         </template>
 
         <!-- Table -->
@@ -101,15 +105,17 @@
             <input :value="(widget.props as TableProps).dataVar"
               placeholder="如 rows"
               @change="updateProp('dataVar', ($event.target as HTMLInputElement).value)" /></label>
-          <label class="lc-field-col mt-2">
+          <div class="lc-field-col mt-2">
             <span>列定义 (JSON)</span>
-            <textarea
-              :value="JSON.stringify((widget.props as TableProps).columns ?? [], null, 2)"
-              rows="5"
-              class="font-mono text-xs"
-              placeholder='[{"key":"id","title":"ID"},{"key":"name","title":"名称"}]'
-              @change="onColumnsChange(($event.target as HTMLTextAreaElement).value)" />
-          </label>
+            <div class="border border-slate-200 rounded overflow-hidden mt-1">
+              <LcMonacoEditor
+                :model-value="JSON.stringify((widget.props as TableProps).columns ?? [], null, 2)"
+                language="json"
+                height="140px"
+                @update:model-value="onColumnsChange($event)"
+              />
+            </div>
+          </div>
         </template>
       </section>
     </template>
@@ -118,6 +124,7 @@
 
 <script setup lang="ts">
 import type { Widget, WidgetStyle, GridPos, LabelProps, InputProps, ButtonProps, TableProps } from '@/types/lowcode'
+import LcMonacoEditor from './LcMonacoEditor.vue'
 
 const props = defineProps<{ widget: Widget | null }>()
 const emit  = defineEmits<{ update: [widget: Widget] }>()
