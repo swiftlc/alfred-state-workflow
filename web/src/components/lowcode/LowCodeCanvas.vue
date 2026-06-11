@@ -73,6 +73,13 @@
 import { ref, computed, defineAsyncComponent } from 'vue'
 import type { LowCodePage, WidgetType, RuntimeContext } from '@/types/lowcode'
 
+const WIDGET_COMPONENTS = {
+  label:  defineAsyncComponent(() => import('./widgets/LcLabel.vue')),
+  input:  defineAsyncComponent(() => import('./widgets/LcInput.vue')),
+  button: defineAsyncComponent(() => import('./widgets/LcButton.vue')),
+  table:  defineAsyncComponent(() => import('./widgets/LcTable.vue')),
+}
+
 const props = defineProps<{
   page: LowCodePage
   selectedId: string | null
@@ -116,13 +123,7 @@ function onDrop(e: DragEvent) {
 }
 
 function widgetComponent(type: WidgetType) {
-  const map: Record<WidgetType, ReturnType<typeof defineAsyncComponent>> = {
-    label:  defineAsyncComponent(() => import('./widgets/LcLabel.vue')),
-    input:  defineAsyncComponent(() => import('./widgets/LcInput.vue')),
-    button: defineAsyncComponent(() => import('./widgets/LcButton.vue')),
-    table:  defineAsyncComponent(() => import('./widgets/LcTable.vue')),
-  }
-  return map[type]
+  return WIDGET_COMPONENTS[type]
 }
 
 const dummyRuntime: RuntimeContext = {

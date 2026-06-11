@@ -29,6 +29,13 @@
 import { reactive, onMounted, defineAsyncComponent } from 'vue'
 import type { LowCodePage, RuntimeContext, WidgetType } from '@/types/lowcode'
 
+const WIDGET_COMPONENTS = {
+  label:  defineAsyncComponent(() => import('./widgets/LcLabel.vue')),
+  input:  defineAsyncComponent(() => import('./widgets/LcInput.vue')),
+  button: defineAsyncComponent(() => import('./widgets/LcButton.vue')),
+  table:  defineAsyncComponent(() => import('./widgets/LcTable.vue')),
+}
+
 const props = defineProps<{ page: LowCodePage }>()
 
 const vars = reactive<Record<string, unknown>>({})
@@ -57,13 +64,7 @@ async function execSql(query: string): Promise<unknown> {
 const runtime: RuntimeContext = { vars, setVar, runScript }
 
 function widgetComponent(type: WidgetType) {
-  const map: Record<WidgetType, ReturnType<typeof defineAsyncComponent>> = {
-    label:  defineAsyncComponent(() => import('./widgets/LcLabel.vue')),
-    input:  defineAsyncComponent(() => import('./widgets/LcInput.vue')),
-    button: defineAsyncComponent(() => import('./widgets/LcButton.vue')),
-    table:  defineAsyncComponent(() => import('./widgets/LcTable.vue')),
-  }
-  return map[type]
+  return WIDGET_COMPONENTS[type]
 }
 
 onMounted(async () => {

@@ -134,7 +134,8 @@ function updatePos(key: keyof GridPos, val: number) {
 
 function updateProp(key: string, val: unknown) {
   if (!props.widget) return
-  emit('update', { ...props.widget, props: { ...props.widget.props as object, [key]: val } as unknown as Widget['props'] })
+  const newProps = { ...props.widget.props, [key]: val } as Widget['props']
+  emit('update', { ...props.widget, props: newProps })
 }
 
 function onColumnsChange(raw: string) {
