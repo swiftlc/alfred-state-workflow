@@ -15,5 +15,6 @@ export default createRouter({
     { path: '/shepherd',     component: () => import('@/views/ShepherdView.vue'), meta: { keepAlive: true, componentName: 'ShepherdView' } },
     { path: '/octo',         component: () => import('@/views/OctoView.vue'),    meta: { keepAlive: true, componentName: 'OctoView' } },
     { path: '/mafka',        component: () => import('@/views/MafkaView.vue'),  meta: { keepAlive: true, componentName: 'MafkaView' } },
+    { path: '/lowcode',      component: () => import('@/views/LowCodeView.vue'), meta: { keepAlive: true, componentName: 'LowCodeView' } },
   ],
 })
