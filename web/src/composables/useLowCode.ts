@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { LowCodePage, Widget } from '@/types/lowcode'
+import type { LowCodePage } from '@/types/lowcode'
 
 const LS_KEY = 'lowcode_pages'
 
@@ -32,6 +32,19 @@ export function useLowCode() {
     return page
   }
 
+  /** 将外部 JSON 解析出的页面插入列表（新分配 id） */
+  function importPage(raw: LowCodePage): LowCodePage {
+    const page: LowCodePage = {
+      ...raw,
+      id:        crypto.randomUUID(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    pages.value = [page, ...pages.value]
+    savePages(pages.value)
+    return page
+  }
+
   function deletePage(id: string) {
     pages.value = pages.value.filter(p => p.id !== id)
     savePages(pages.value)
@@ -52,29 +65,5 @@ export function useLowCode() {
     savePages(pages.value)
   }
 
-  function addWidget(pageId: string, widget: Widget) {
-    const page = pages.value.find(p => p.id === pageId)
-    if (!page) return
-    page.widgets = [...page.widgets, widget]
-    page.updatedAt = Date.now()
-    savePages(pages.value)
-  }
-
-  function updateWidget(pageId: string, widget: Widget) {
-    const page = pages.value.find(p => p.id === pageId)
-    if (!page) return
-    page.widgets = page.widgets.map(w => w.id === widget.id ? widget : w)
-    page.updatedAt = Date.now()
-    savePages(pages.value)
-  }
-
-  function removeWidget(pageId: string, widgetId: string) {
-    const page = pages.value.find(p => p.id === pageId)
-    if (!page) return
-    page.widgets = page.widgets.filter(w => w.id !== widgetId)
-    page.updatedAt = Date.now()
-    savePages(pages.value)
-  }
-
-  return { pages, createPage, deletePage, renamePage, savePage, addWidget, updateWidget, removeWidget }
+  return { pages, createPage, importPage, deletePage, renamePage, savePage }
 }

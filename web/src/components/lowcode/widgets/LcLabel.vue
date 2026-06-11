@@ -17,7 +17,7 @@
 import { computed } from 'vue'
 import type { Widget, RuntimeContext, LabelProps } from '@/types/lowcode'
 
-const props = defineProps<{ widget: Widget; runtime: RuntimeContext; selected?: boolean }>()
+const props = defineProps<{ widget: Widget; runtime: RuntimeContext }>()
 
 const displayText = computed(() => {
   const text = (props.widget.props as LabelProps).text ?? ''

@@ -9,5 +9,5 @@
 
 <script setup lang="ts">
 import type { Widget, RuntimeContext, InputProps } from '@/types/lowcode'
-defineProps<{ widget: Widget; runtime: RuntimeContext; selected?: boolean }>()
+defineProps<{ widget: Widget; runtime: RuntimeContext }>()
 </script>

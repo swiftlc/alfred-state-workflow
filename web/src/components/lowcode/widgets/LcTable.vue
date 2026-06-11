@@ -28,7 +28,7 @@
 import { computed } from 'vue'
 import type { Widget, RuntimeContext, TableProps } from '@/types/lowcode'
 
-const props = defineProps<{ widget: Widget; runtime: RuntimeContext; selected?: boolean }>()
+const props = defineProps<{ widget: Widget; runtime: RuntimeContext }>()
 
 const tableProps = computed(() => props.widget.props as TableProps)
 const cols = computed(() => tableProps.value.columns ?? [])

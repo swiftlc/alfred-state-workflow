@@ -5,8 +5,8 @@
       background:   widget.style.background ?? '#6366f1',
       color:        widget.style.color ?? '#fff',
       borderRadius: (widget.style.borderRadius ?? 6) + 'px',
-      opacity:      (selected || running) ? 0.7 : 1,
-      cursor:       selected ? 'default' : running ? 'wait' : 'pointer',
+      opacity:      running ? 0.7 : 1,
+      cursor:       running ? 'wait' : 'pointer',
     }"
     @click="handleClick"
   >
@@ -19,7 +19,7 @@
 import { ref } from 'vue'
 import type { Widget, RuntimeContext, ButtonProps } from '@/types/lowcode'
 
-const props = defineProps<{ widget: Widget; runtime: RuntimeContext; selected?: boolean }>()
+const props = defineProps<{ widget: Widget; runtime: RuntimeContext }>()
 const running = ref(false)
 
 async function handleClick() {

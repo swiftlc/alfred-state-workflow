@@ -52,7 +52,6 @@
           :is="widgetComponent(w.type)"
           :widget="w"
           :runtime="dummyRuntime"
-          :selected="true"
         />
         <!-- 编辑态遮罩：覆盖子元素，确保鼠标事件能被 widget 容器接收 -->
         <div class="absolute inset-0 z-10" style="cursor:grab" />
