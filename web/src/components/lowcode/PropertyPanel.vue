@@ -1,13 +1,9 @@
 <template>
   <div class="w-full h-full flex flex-col bg-white overflow-y-auto">
     <!-- 头部：组件类型 + 关闭 -->
-    <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-100 shrink-0">
-      <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">{{ widget.type }} 属性</span>
-      <button
-        class="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors text-xs"
-        title="关闭"
-        @click="emit('close')"
-      >✕</button>
+    <div class="flex items-center justify-between px-3 py-2 border-b border-slate-100 shrink-0">
+      <span class="text-[11px] font-medium text-slate-500 uppercase tracking-wider">{{ widget.type }}</span>
+      <n-button size="tiny" ghost @click="emit('close')">✕</n-button>
     </div>
 
     <div class="p-3 flex flex-col gap-4">
@@ -132,6 +128,7 @@
 </template>
 
 <script setup lang="ts">
+import { NButton } from 'naive-ui'
 import type { Widget, WidgetStyle, GridPos, LabelProps, InputProps, ButtonProps, TableProps } from '@/types/lowcode'
 
 const props = defineProps<{ widget: Widget }>()

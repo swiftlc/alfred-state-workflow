@@ -10,14 +10,17 @@
 
       <!-- 中：画布区 -->
       <div class="flex-1 flex flex-col overflow-hidden">
-        <!-- initScript 编辑入口 -->
-        <div class="flex items-center gap-2 px-4 py-2 border-b border-slate-100 bg-white shrink-0">
-          <span class="text-[11px] font-medium text-slate-400">初始化脚本</span>
-          <button
-            class="text-[11px] text-indigo-500 hover:text-indigo-700 transition-colors"
+        <!-- 工具栏 -->
+        <div class="flex items-center gap-2 px-3 py-2 border-b border-slate-100 bg-white shrink-0">
+          <span class="text-[11px] text-slate-400">初始化脚本</span>
+          <n-button
+            size="tiny" ghost
             @click="openScriptModal('初始化脚本', localPage.initScript, (c) => localPage.initScript = c)"
-          >{{ localPage.initScript.trim() ? '已配置 ✏️' : '+ 配置' }}</button>
-          <span class="ml-auto text-[10px] text-slate-300">可用 API：$sql(query)  $set(key, val)  $vars</span>
+          >{{ localPage.initScript.trim() ? '已配置 ✏️' : '+ 配置' }}</n-button>
+          <span class="text-[10px] text-slate-300 hidden xl:inline">$sql(query)  $set(key, val)  $vars</span>
+          <div class="ml-auto">
+            <n-button type="primary" size="small" @click="emit('save', localPage)">保存</n-button>
+          </div>
         </div>
 
         <LowCodeCanvas
@@ -25,16 +28,17 @@
           :selected-id="selectedId"
           class="flex-1"
           @select="selectedId = $event"
+          @deselect="selectedId = null"
           @remove="handleRemove"
           @drop="handleDrop"
           @move="handleMove"
         />
       </div>
 
-      <!-- 右：属性侧栏（固定宽度，选中时显示内容） -->
+      <!-- 右：属性侧栏（宽度动态切换，transition 用 CSS） -->
       <div
-        style="width:240px; flex-shrink:0; border-left:1px solid #f1f5f9; position:relative; transition: width 0.15s ease;"
-        :style="selectedWidget ? 'width:240px' : 'width:0; overflow:hidden; border:none'"
+        class="lc-panel-side"
+        :class="selectedWidget ? 'lc-panel-side--open' : 'lc-panel-side--closed'"
       >
         <PropertyPanel
           v-if="selectedWidget"
@@ -44,11 +48,6 @@
           @close="selectedId = null"
           @open-script="(title, code, onSave, lang) => openScriptModal(title, code, onSave, lang)"
         />
-      </div>
-
-      <!-- 保存按钮 -->
-      <div class="absolute bottom-4 right-4 z-10">
-        <n-button type="primary" @click="emit('save', localPage)">保存</n-button>
       </div>
     </template>
 
@@ -167,4 +166,15 @@ function handleMove(id: string, col: number, row: number) {
   )
 }
 </script>
+
+<style scoped>
+.lc-panel-side {
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.18s ease;
+  border-left: 1px solid #f1f5f9;
+}
+.lc-panel-side--open   { width: 240px; }
+.lc-panel-side--closed { width: 0; border-left: none; }
+</style>
 

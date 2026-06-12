@@ -5,6 +5,7 @@
     :style="{ minHeight: '600px', background: '#fafafa' }"
     @dragover.prevent="onDragOver"
     @drop="onDrop"
+    @mouseup="onCanvasMouseUp"
   >
     <!-- 网格背景 -->
     <div
@@ -20,6 +21,7 @@
 
     <!-- CSS Grid 容器 -->
     <div
+      data-canvas-bg
       class="relative"
       :style="{
         display: 'grid',
@@ -64,6 +66,16 @@
         >✕</button>
       </div>
 
+      <!-- 空状态引导 -->
+      <div
+        v-if="!page.widgets.length && !dropPreview"
+        class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none"
+        style="z-index:0"
+      >
+        <div class="text-3xl mb-2 opacity-20">🧩</div>
+        <div class="text-xs text-slate-300">从左侧拖拽组件到此处</div>
+      </div>
+
       <!-- 拖拽落点预览 -->
       <div
         v-if="dropPreview"
@@ -78,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import type { LowCodePage, WidgetType, RuntimeContext } from '@/types/lowcode'
 
 const WIDGET_COMPONENTS = {
@@ -94,15 +106,30 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  select: [id: string]
-  remove: [id: string]
-  drop:   [type: WidgetType, col: number, row: number]
-  move:   [id: string, col: number, row: number]
+  select:  [id: string]
+  deselect: []
+  remove:  [id: string]
+  drop:    [type: WidgetType, col: number, row: number]
+  move:    [id: string, col: number, row: number]
 }>()
 
 const canvasEl    = ref<HTMLElement>()
 const dropPreview = ref<{ col: number; row: number; w: number; h: number } | null>(null)
 const draggingId  = ref<string | null>(null)
+const canvasWidth = ref(0)
+
+// ResizeObserver 追踪画布宽度变化
+let ro: ResizeObserver | null = null
+onMounted(() => {
+  if (canvasEl.value) {
+    canvasWidth.value = canvasEl.value.clientWidth
+    ro = new ResizeObserver(([entry]) => {
+      canvasWidth.value = entry.contentRect.width
+    })
+    ro.observe(canvasEl.value)
+  }
+})
+onUnmounted(() => { ro?.disconnect() })
 
 // 用 mousedown/mouseup 区分点击和拖拽（draggable 会吃掉 click 事件）
 let mouseDownPos = { x: 0, y: 0 }
@@ -119,11 +146,17 @@ function onWidgetMouseUp(e: MouseEvent, id: string) {
   }
 }
 
-const cellW = computed(() => {
-  const el = canvasEl.value
-  if (!el) return 40
-  return Math.floor(el.clientWidth / props.page.cols)
-})
+function onCanvasMouseUp(e: MouseEvent) {
+  // 点击的是画布背景（不是 widget），取消选中
+  if ((e.target as HTMLElement) === canvasEl.value ||
+      (e.target as HTMLElement).closest?.('[data-canvas-bg]')) {
+    emit('deselect')
+  }
+}
+
+const cellW = computed(() =>
+  canvasWidth.value > 0 ? Math.floor(canvasWidth.value / props.page.cols) : 40
+)
 
 function posToGrid(e: DragEvent): { col: number; row: number } {
   const rect = canvasEl.value!.getBoundingClientRect()
