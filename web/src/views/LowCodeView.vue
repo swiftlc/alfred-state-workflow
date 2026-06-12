@@ -26,13 +26,13 @@
           class="group relative border border-slate-100 rounded-xl p-4 bg-white hover:border-indigo-200 hover:shadow-sm cursor-pointer transition-all"
           @click="openPage(page)"
         >
-          <!-- 页面名：InlineEdit 改名 -->
-          <div class="text-sm font-medium text-slate-700 mb-1" @click.stop>
+          <!-- 页面名：固定行高，切换读写态不抖动 -->
+          <div class="mb-1" style="height:21px;line-height:21px;overflow:hidden" @click.stop>
             <InlineEdit
               :value="page.name"
               placeholder="页面名称"
-              display-style="font-size:14px;font-weight:500;color:#374151;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block"
-              input-style="font-size:14px;font-weight:500;color:#374151;max-width:180px"
+              display-style="font-size:14px;font-weight:500;color:#374151"
+              input-style="font-size:14px;font-weight:500;color:#374151"
               @confirm="(name) => renamePage(page.id, name)"
             />
           </div>
@@ -40,17 +40,9 @@
           <div class="text-[10px] text-slate-300 mt-2">{{ formatTime(page.updatedAt) }}</div>
 
           <!-- hover 操作 -->
-          <div class="absolute top-3 right-3 hidden group-hover:flex gap-1">
-            <button
-              class="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
-              title="导出 JSON"
-              @click.stop="handleExport(page)"
-            >↓</button>
-            <button
-              class="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-              title="删除"
-              @click.stop="handleDelete(page.id)"
-            >✕</button>
+          <div class="absolute top-2.5 right-2.5 hidden group-hover:flex gap-1">
+            <n-button size="tiny" ghost @click.stop="handleExport(page)" title="导出 JSON">↓</n-button>
+            <n-button size="tiny" ghost @click.stop="handleDelete(page.id)" title="删除">✕</n-button>
           </div>
         </div>
       </div>
@@ -61,9 +53,9 @@
       <n-drawer-content :native-scrollbar="false" :closable="false">
         <template #header>
           <div class="flex items-center gap-3 w-full">
-            <button class="text-slate-400 hover:text-slate-600 flex-shrink-0" @click="editor.show = false">← 返回</button>
-            <!-- 标题也支持 InlineEdit 改名 -->
-            <div @click.stop>
+            <n-button size="small" ghost @click="editor.show = false">← 返回</n-button>
+            <!-- 标题 InlineEdit 改名，固定高度避免抖动 -->
+            <div style="height:21px;line-height:21px;overflow:hidden" @click.stop>
               <InlineEdit
                 v-if="editor.page"
                 :value="editor.page.name"
