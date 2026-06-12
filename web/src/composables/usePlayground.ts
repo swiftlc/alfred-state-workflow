@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import type { PlaygroundPage } from '@/types/playground'
 import { DEMO_PAGE_HTML, DEMO_PAGE_NAME, DEMO_PAGE_PROMPT } from '@/components/playground/demoPage'
+import { SALE_STATUS_PAGE_HTML, SALE_STATUS_PAGE_NAME, SALE_STATUS_PAGE_PROMPT } from '@/components/playground/saleStatusPage'
 
 // 每个 page 用独立 key，互不干扰
 const INDEX_KEY = 'pg_index'   // 存 id 列表（有序）
@@ -33,19 +34,14 @@ function removePage(id: string) {
 // 模块级响应式列表
 const _stored = readIndex().map(id => readPage(id)).filter((p): p is PlaygroundPage => p !== null)
 
-// 首次无页面时注入 demo
+// 首次无页面时注入内置 demo
 if (_stored.length === 0) {
-  const demo: PlaygroundPage = {
-    id: 'demo-sql-query',
-    name: DEMO_PAGE_NAME,
-    html: DEMO_PAGE_HTML,
-    prompt: DEMO_PAGE_PROMPT,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  }
-  writeIndex([demo.id])
-  writePage(demo)
-  _stored.push(demo)
+  const builtins: PlaygroundPage[] = [
+    { id: 'demo-sale-status', name: SALE_STATUS_PAGE_NAME, html: SALE_STATUS_PAGE_HTML, prompt: SALE_STATUS_PAGE_PROMPT, createdAt: Date.now(), updatedAt: Date.now() },
+    { id: 'demo-sql-query',   name: DEMO_PAGE_NAME,        html: DEMO_PAGE_HTML,        prompt: DEMO_PAGE_PROMPT,        createdAt: Date.now(), updatedAt: Date.now() },
+  ]
+  writeIndex(builtins.map(p => p.id))
+  builtins.forEach(p => { writePage(p); _stored.push(p) })
 }
 
 const pages = ref<PlaygroundPage[]>(_stored)
