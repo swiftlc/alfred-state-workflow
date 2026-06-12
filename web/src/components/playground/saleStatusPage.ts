@@ -68,6 +68,14 @@ var CFG = {
 };
 var CH_NAME = {100:'外卖(100)',200:'团购(200)',0:'通用(0)'};
 var STATUS_OPTS = [[1,'上架'],[2,'下架'],[3,'售罄下架']];
+var SPU_DESC = {
+  '2064633193184702465': '源spu1:灰色001',
+  '2063966223661621332': '目标spu2:测试换绑003'
+};
+var SKU_DESC = {
+  '2064633193247629335': '源sku1:灰色001',
+  '2063966223783256069': '目标sku2:黑色xxs'
+};
 var originalData = {};
 var currentData  = {};
 var skuRows=[], spuRows=[], onlineRows=[];
@@ -183,19 +191,23 @@ function renderTree(){
       }catch(e){}
     }
     var skuSection=skus.map(function(kid){
+      var skuDesc=SKU_DESC[kid]||'';
       return '<div class="sku-card">'+
         '<div class="flex items-center gap-2 mb-2">'+
           '<span class="text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded font-medium">SKU</span>'+
-          '<span class="font-mono text-xs text-slate-600">'+kid+'</span>'+
+          (skuDesc?'<span class="text-sm font-semibold text-slate-700">'+skuDesc+'</span>':'')+
+          '<span class="font-mono text-xs text-slate-400 ml-1">'+kid+'</span>'+
         '</div>'+
         '<div class="sec-title">上下架状态</div>'+
         renderChannelSelects('sku',kid)+
       '</div>';
     }).join('');
+    var spuDesc=SPU_DESC[sid]||'';
     return '<div class="spu-card">'+
       '<div class="flex items-center gap-2 mb-3">'+
         '<span class="text-xs bg-violet-50 text-violet-600 border border-violet-100 px-2 py-0.5 rounded font-medium">SPU</span>'+
-        '<span class="font-mono text-sm font-semibold text-slate-700">'+sid+'</span>'+
+        (spuDesc?'<span class="text-sm font-semibold text-slate-700">'+spuDesc+'</span>':'')+
+        '<span class="font-mono text-xs text-slate-400 ml-1">'+sid+'</span>'+
       '</div>'+
       '<div class="sec-title">SPU 上下架状态</div>'+
       renderChannelSelects('spu',sid)+
