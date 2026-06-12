@@ -6,7 +6,7 @@ import { SALE_STATUS_PAGE_HTML, SALE_STATUS_PAGE_NAME, SALE_STATUS_PAGE_PROMPT }
 // 每个 page 用独立 key，互不干扰
 const INDEX_KEY = 'pg_index'   // 存 id 列表（有序）
 // 内置页面版本号，修改内置页面内容时递增，强制刷新 localStorage
-const BUILTIN_VERSION = 9
+const BUILTIN_VERSION = 17
 const BUILTIN_VER_KEY = 'pg_builtin_ver'
 
 function readIndex(): string[] {

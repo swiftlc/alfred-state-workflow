@@ -38,6 +38,29 @@ button:active{transform:scale(.95)}
 .rebind-tip{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:99;background:#1e293b;color:#f8fafc;font-size:11px;font-weight:400;padding:5px 9px;border-radius:6px;white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
 .rebind-tag:hover .rebind-tip{display:block}
 .rolling{animation:spin .5s linear infinite}
+/* 换绑执行面板 */
+.rebind-panel{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.rebind-panel .panel-title{font-size:13px;font-weight:700;color:#1e293b;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.input-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.input-label{font-size:11px;color:#64748b;font-weight:500;min-width:72px;flex-shrink:0}
+.ipt{font-size:12px;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;outline:none;background:#fff}
+.ipt:focus{border-color:#818cf8}
+.ipt-wide{width:280px}
+.exec-btn{font-size:12px;font-weight:600;color:#fff;background:#6366f1;border:none;border-radius:7px;padding:5px 14px;cursor:pointer;transition:background .15s}
+.exec-btn:hover{background:#4f46e5}
+.exec-btn:disabled{background:#a5b4fc;cursor:not-allowed}
+/* 任务状态卡片 */
+.task-card{margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#f8fafc;font-size:12px}
+.task-row{display:flex;gap:6px;margin-bottom:4px;align-items:flex-start}
+.task-lbl{color:#94a3b8;font-weight:500;min-width:64px;flex-shrink:0}
+.task-val{color:#334155;word-break:break-all}
+.status-badge{display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;font-weight:600}
+.status-running{background:#dbeafe;color:#1d4ed8}
+.status-success{background:#dcfce7;color:#166534}
+.status-fail{background:#fee2e2;color:#b91c1c}
+.status-pending{background:#f1f5f9;color:#64748b}
+.dl-btn{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;cursor:pointer;text-decoration:none}
+.dl-btn:hover{background:#ddd6fe}
 </style>
 </head>
 <body class="p-5">
@@ -52,6 +75,7 @@ button:active{transform:scale(.95)}
     <button id="refreshBtn" class="text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50" onclick="loadData()">↻ 刷新</button>
     <span id="diffCount" class="text-xs text-amber-600 hidden"></span>
     <button id="saveBtn" class="text-xs text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg px-4 py-1.5 hidden" onclick="saveChanges()">保存修改</button>
+    <button id="execRebindBtn" class="text-xs text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg px-4 py-1.5" onclick="submitRebindTask()">▶ 执行换绑</button>
   </div>
 </div>
 
@@ -60,6 +84,19 @@ button:active{transform:scale(.95)}
   <div class="text-sm">加载中…</div>
 </div>
 <div id="errorEl" class="hidden bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-3 mb-4"></div>
+<div id="taskPanel" class="hidden task-card mb-3">
+  <div class="flex items-center gap-2 mb-2">
+    <span class="text-xs font-bold text-slate-600">换绑任务</span>
+    <span id="taskStatusBadge" class="status-badge status-pending">-</span>
+    <span id="taskPolling" class="hidden text-xs text-slate-400"><span class="spin">↻</span> 轮询中…</span>
+  </div>
+  <div class="task-row"><span class="task-lbl">Task ID</span><span class="task-val" id="taskIdVal">-</span></div>
+  <div class="task-row"><span class="task-lbl">TraceId</span><span class="task-val" id="taskTraceVal">-</span></div>
+  <div class="task-row"><span class="task-lbl">开始时间</span><span class="task-val" id="taskBeginVal">-</span></div>
+  <div class="task-row"><span class="task-lbl">结束时间</span><span class="task-val" id="taskEndVal">-</span></div>
+  <div class="task-row"><span class="task-lbl">数量统计</span><span class="task-val" id="taskNumVal">-</span></div>
+  <div id="taskExcelRow" class="task-row hidden"><span class="task-lbl">结果文件</span><span class="task-val"><span id="taskExcelLink" class="dl-btn" onclick="$openUrl(this.dataset.url)">⬇ 下载 Excel</span></span></div>
+</div>
 <div id="treeEl" class="hidden"></div>
 
 <script>
@@ -372,6 +409,138 @@ function showToast(msg,ms){
   var t=$('toast');
   t.textContent=msg; t.classList.add('show');
   setTimeout(function(){ t.classList.remove('show'); }, ms||2000);
+}
+
+// ─── 换绑任务执行 ───────────────────────────────────────────────
+var REBIND_CFG = {
+  appkey:       'com.sankuai.sgshopmgmt.productbiz',
+  swimlane:     'selftest-260511-105325-880',
+  methodKeyword:'submitSkuRebindTask',
+  previewTaskId:'4056319',
+  userCtx: JSON.stringify({
+    accountId:   83704,
+    empId:       10048724,
+    authProvider:'',
+    cliPlugIn:   '',
+    accountName: 'majian22',
+    appId:       3,
+    empName:     '\u9a6c\u5065',
+    accountType: null,
+    tenantId:    1000338,
+    userAgent:   '',
+    source:      null
+  })
+};
+var _pollTimer = null;
+
+var TASK_STATUS_MAP = {
+  0: {label:'任务创建中', cls:'status-pending'},
+  5: {label:'已驳回',    cls:'status-fail'},
+  10:{label:'待执行',    cls:'status-pending'},
+  20:{label:'执行中',    cls:'status-running'},
+  21:{label:'执行等待中',cls:'status-running'},
+  22:{label:'等待回调中',cls:'status-running'},
+  30:{label:'执行成功',  cls:'status-success'},
+  40:{label:'执行失败',  cls:'status-fail'}
+};
+
+async function submitRebindTask(){
+  var btn=$('execRebindBtn');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spin">↻</span> 提交中…';
+  try{
+    var body={
+      appkey:       REBIND_CFG.appkey,
+      swimlane:     REBIND_CFG.swimlane,
+      methodKeyword:REBIND_CFG.methodKeyword,
+      params:       [
+        JSON.stringify({previewTaskId: REBIND_CFG.previewTaskId}),
+        REBIND_CFG.userCtx
+      ]
+    };
+    // 通过 postMessage 桥接发请求，避免 iframe sandbox 的 null-origin CORS 问题
+    var json=await $octo(body);
+    // 外层 code 判断 octo 调用是否成功
+    if(json.code!==0) throw new Error('octo 调用失败 code='+json.code+': '+(json.msg||JSON.stringify(json).slice(0,200)));
+    // traceId
+    var traceId=(json.data&&json.data.traceId)||'';
+    // data.return 是 JSON 字符串，需二次解析
+    var innerStr=(json.data&&json.data['return'])||'';
+    var inner={};
+    try{ inner=JSON.parse(innerStr); }catch(e2){ throw new Error('return 解析失败: '+innerStr.slice(0,200)); }
+    // inner.status.code 判断业务是否成功
+    if(inner.status&&inner.status.code!==0) throw new Error('换绑接口失败: '+(inner.status.msg||JSON.stringify(inner.status)));
+    // 解析 taskId
+    var taskId=(inner.data&&inner.data.taskId)||inner.taskId;
+    if(!taskId) throw new Error('未获取到 taskId，响应: '+JSON.stringify(inner).slice(0,200));
+    // 展示面板
+    show('taskPanel');
+    $('taskIdVal').textContent=taskId;
+    $('taskTraceVal').textContent=traceId||'-';
+    $('taskBeginVal').textContent='-';
+    $('taskEndVal').textContent='-';
+    $('taskNumVal').textContent='-';
+    hide('taskExcelRow');
+    showToast('✓ 换绑任务已提交，taskId='+taskId, 3000);
+    startPollTask(taskId);
+  }catch(e){
+    showToast('⚠ 提交失败: '+e.message, 5000);
+  }finally{
+    btn.disabled=false;
+    btn.textContent='▶ 执行换绑';
+  }
+}
+
+function startPollTask(taskId){
+  if(_pollTimer) clearInterval(_pollTimer);
+  show('taskPolling');
+  var attempts=0;
+  var maxAttempts=60; // 最多轮询 5 分钟（5s×60）
+  function poll(){
+    attempts++;
+    if(attempts>maxAttempts){ clearInterval(_pollTimer); hide('taskPolling'); return; }
+    $sql("select id,task_status,begin_time,end_time,total_num,success_num,failed_num,execute_result from task_info where id="+taskId)
+      .then(function(rows){
+        var row=rows&&rows[0];
+        if(!row) return;
+        var s=+row.task_status;
+        var info=TASK_STATUS_MAP[s]||{label:'未知('+s+')',cls:'status-pending'};
+        // 更新 badge
+        var badge=$('taskStatusBadge');
+        badge.textContent=info.label;
+        badge.className='status-badge '+info.cls;
+        // 更新时间
+        $('taskBeginVal').textContent=row.begin_time||'-';
+        $('taskEndVal').textContent=row.end_time||'-';
+        // 数量统计
+        var totalN=row.total_num!=null?row.total_num:'-';
+        var succN=row.success_num!=null?row.success_num:'-';
+        var failN=row.failed_num!=null?row.failed_num:'-';
+        $('taskNumVal').innerHTML='总计 <b>'+totalN+'</b> &nbsp;成功 <b style="color:#166534">'+succN+'</b> &nbsp;失败 <b style="color:#b91c1c">'+failN+'</b>';
+        // 终结状态
+        var isDone=(s===30||s===40||s===5);
+        if(isDone){
+          clearInterval(_pollTimer);
+          hide('taskPolling');
+          // 解析 execute_result 中的 resultFileUrl/resultFileName
+          try{
+            var result=typeof row.execute_result==='string'?JSON.parse(row.execute_result):row.execute_result;
+            if(result&&result.resultFileUrl){
+              var fname=result.resultFileName||'下载 Excel';
+              var lnk=$('taskExcelLink');
+              lnk.dataset.url=result.resultFileUrl;
+              lnk.textContent='⬇ '+fname;
+              show('taskExcelRow');
+            }
+          }catch(e2){ /* 无结果文件 */ }
+          if(s===30) showToast('✅ 换绑任务执行成功', 3000);
+          else       showToast('❌ 换绑任务'+info.label, 4000);
+        }
+      })
+      .catch(function(){ /* 忽略单次轮询失败 */ });
+  }
+  poll();
+  _pollTimer=setInterval(poll, 5000);
 }
 
 loadData();

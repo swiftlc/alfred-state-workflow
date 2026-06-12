@@ -22,7 +22,7 @@
       ref="iframeRef"
       class="w-full h-full border-none"
       :srcdoc="injectedHtml"
-      sandbox="allow-scripts allow-forms"
+      sandbox="allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation"
       @load="onLoad"
     />
   </div>
@@ -74,9 +74,11 @@ const BRIDGE_SCRIPT = `
     })
   }
 
-  window.$sql  = function(query)          { return _call('sql',  { query }) }
-  window.$http = function(url, options)   { return _call('http', { url, options: options || {} }) }
-  window.$pg   = { sql: window.$sql, http: window.$http }
+  window.$sql     = function(query)        { return _call('sql',  { query }) }
+  window.$http    = function(url, options) { return _call('http', { url, options: options || {} }) }
+  window.$octo    = function(body)         { return _call('octo', { body }) }
+  window.$openUrl = function(url)          { return _call('openUrl', { url }) }
+  window.$pg      = { sql: window.$sql, http: window.$http, octo: window.$octo, openUrl: window.$openUrl }
 })()
 <\/script>
 `
@@ -120,6 +122,18 @@ async function handleMessage(e: MessageEvent) {
         body:    d.options?.body ? JSON.stringify(d.options.body) : undefined,
       })
       result = await res.json()
+
+    } else if (type === 'octo') {
+      const res = await fetch('/api/octo-invoke', {
+        method:  'POST',
+        headers: { 'content-type': 'application/json' },
+        body:    JSON.stringify(d.body),
+      })
+      result = await res.json()
+
+    } else if (type === 'openUrl') {
+      window.open(d.url, '_blank')
+      result = { ok: true }
 
     } else {
       throw new Error(`未知请求类型: ${type}`)
