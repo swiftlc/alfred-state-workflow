@@ -116,11 +116,19 @@ async function handleMessage(e: MessageEvent) {
       result = json.data
 
     } else if (type === 'http') {
-      const res = await fetch('/proxy', {
-        method:  d.options?.method ?? 'GET',
-        headers: { 'x-proxy-dest': d.url, 'content-type': 'application/json', ...(d.options?.headers ?? {}) },
-        body:    d.options?.body ? JSON.stringify(d.options.body) : undefined,
-      })
+      // 本地 /api/* 路径直接 fetch，外部 URL 走 /proxy 转发
+      const isLocal = d.url.startsWith('/api/') || d.url.startsWith('/internal') || d.url.startsWith('/rules') || d.url.startsWith('/dictionaries')
+      const res = isLocal
+        ? await fetch(d.url, {
+            method:  d.options?.method ?? 'GET',
+            headers: { 'content-type': 'application/json', ...(d.options?.headers ?? {}) },
+            body:    d.options?.body ? JSON.stringify(d.options.body) : undefined,
+          })
+        : await fetch('/proxy', {
+            method:  d.options?.method ?? 'GET',
+            headers: { 'x-proxy-dest': d.url, 'content-type': 'application/json', ...(d.options?.headers ?? {}) },
+            body:    d.options?.body ? JSON.stringify(d.options.body) : undefined,
+          })
       result = await res.json()
 
     } else if (type === 'octo') {
