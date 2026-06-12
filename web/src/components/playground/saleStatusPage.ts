@@ -255,10 +255,10 @@ async function saveChanges(){
     var cur=currentData[k];
     try{
       if(k.startsWith('spu_')){
-        await $sql("update dim_spu_channel_info set sale_status="+cur.status+" where id="+cur.id+" limit 1");
+        await $sql("update dim_spu_channel_info set sale_status="+cur.status+" where id="+cur.id+"");
         ok++;
       } else if(k.startsWith('sku_')){
-        await $sql("update dim_sku_channel_info set sale_status="+cur.status+" where id="+cur.id+" limit 1");
+        await $sql("update dim_sku_channel_info set sale_status="+cur.status+" where id="+cur.id+"");
         ok++;
       } else if(k.startsWith('pv_')){
         var parts=k.split('_'); // pv_{spuId}_autoShelf_{ch}
@@ -270,7 +270,7 @@ async function saveChanges(){
           pv.channelAutoOnShelf[ch]=cur.status;
           // 用双引号包裹 JSON，避免单引号转义问题
           var pvJson=JSON.stringify(pv);
-          await $sql('update poi_spu_online_info set pv="'+pvJson+'" where id='+cur.id+' limit 1');
+          await $sql('update poi_spu_online_info set pv="'+pvJson+'" where id='+cur.id+'');
           ok++;
         }
       }
