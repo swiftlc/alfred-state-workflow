@@ -12,10 +12,6 @@ export const SALE_STATUS_PAGE_HTML = `<!DOCTYPE html>
 body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Segoe UI',sans-serif;background:#f8fafc}
 .spin{display:inline-block;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:9999px;font-size:11px;font-weight:600;white-space:nowrap}
-.badge-up{background:#dcfce7;color:#166534}
-.badge-down{background:#fee2e2;color:#991b1b}
-.badge-sold{background:#fef9c3;color:#854d0e}
 .spu-card{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
 .sku-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-top:8px}
 .tree-line{border-left:2px solid #e2e8f0;margin-left:12px;padding-left:16px;margin-top:12px}
@@ -30,6 +26,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Segoe UI',sans-
 .toast.show{opacity:1}
 button{cursor:pointer;transition:all .1s}
 button:active{transform:scale(.95)}
+/* pill tag switch */
+.sw-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:9999px;font-size:11px;font-weight:600;cursor:pointer;user-select:none;transition:background .15s,color .15s,border-color .15s;border:1px solid transparent}
+.sw-pill.off{background:#f1f5f9;color:#94a3b8;border-color:#e2e8f0}
+.sw-pill.on{background:#ede9fe;color:#6d28d9;border-color:#c4b5fd}
+.sw-pill.changed{border-style:dashed;border-color:#f59e0b;background:#fef9c3;color:#b45309}
+.sw-dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.7}
+/* 换绑 tag */
+.rebind-tag{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;cursor:pointer;position:relative;transition:background .1s}
+.rebind-tag:hover{background:#fecaca}
+.rebind-tip{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:99;background:#1e293b;color:#f8fafc;font-size:11px;font-weight:400;padding:5px 9px;border-radius:6px;white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.rebind-tag:hover .rebind-tip{display:block}
+.rolling{animation:spin .5s linear infinite}
 </style>
 </head>
 <body class="p-5">
@@ -76,9 +84,14 @@ var SKU_DESC = {
   '2064633193247629335': '源sku1:灰色001',
   '2063966223783256069': '目标sku2:黑色xxs'
 };
+// pv 开关字段定义
+var PV_SWITCHES = [
+  {field:'enableSkuSaleStatus', label:'SKU规格上下架'},
+  {field:'sellOutOffShelf',      label:'售罄不允许上架'}
+];
 var originalData = {};
 var currentData  = {};
-var skuRows=[], spuRows=[], onlineRows=[];
+var skuRows=[], spuRows=[], onlineRows=[], skuBindRows=[];
 
 function $ (id){ return document.getElementById(id); }
 function show(id){ $(id).classList.remove('hidden'); }
@@ -93,9 +106,10 @@ async function loadData(){
     var res = await Promise.all([
       $sql("select id,sku_id,channel_id,sale_status from dim_sku_channel_info where merchant_id="+CFG.merchantId+" and dim_id="+CFG.poiId+" and sku_id in ("+skuIn+") and sale_status is not null and valid=1 and channel_id in ("+ch+") order by sku_id asc"),
       $sql("select id,spu_id,channel_id,sale_status from dim_spu_channel_info where merchant_id="+CFG.merchantId+" and dim_id="+CFG.poiId+" and spu_id in ("+spuIn+") and valid=1 and sale_status is not null and channel_id in ("+ch+") order by spu_id asc"),
-      $sql("select id,spu_id,pv from poi_spu_online_info where merchant_id="+CFG.merchantId+" and poi_id="+CFG.poiId+" and spu_id in ("+spuIn+") and valid=1")
+      $sql("select id,spu_id,pv from poi_spu_online_info where merchant_id="+CFG.merchantId+" and poi_id="+CFG.poiId+" and spu_id in ("+spuIn+") and valid=1"),
+      $sql("select sku_id,spu_id from merchant_sku where merchant_id="+CFG.merchantId+" and sku_id in ("+skuIn+")")
     ]);
-    skuRows=res[0]||[]; spuRows=res[1]||[]; onlineRows=res[2]||[];
+    skuRows=res[0]||[]; spuRows=res[1]||[]; onlineRows=res[2]||[]; skuBindRows=res[3]||[];
     buildState();
     renderTree();
     hide('loadingEl'); show('treeEl');
@@ -117,11 +131,12 @@ function buildState(){
   onlineRows.forEach(function(r){
     try{
       var pv=typeof r.pv==='string'?JSON.parse(r.pv):r.pv;
-      if(pv && pv.channelAutoOnShelf){
-        Object.keys(pv.channelAutoOnShelf).forEach(function(ch){
-          originalData['pv_'+r.spu_id+'_autoShelf_'+ch]={id:r.id, status:pv.channelAutoOnShelf[ch], pvKey:'channelAutoOnShelf', ch:ch};
-        });
-      }
+      // 解析 pv 开关字段
+      PV_SWITCHES.forEach(function(sw){
+        if(pv && pv[sw.field]!=null){
+          originalData['pv_'+r.spu_id+'_'+sw.field]={id:r.id, status:+pv[sw.field], pvField:sw.field};
+        }
+      });
     }catch(e){}
   });
   currentData=JSON.parse(JSON.stringify(originalData));
@@ -166,37 +181,56 @@ function renderChannelSelects(prefix, entityId){
   }).join('');
 }
 
+// 渲染 pv 开关区块（pill tag 样式）
+function renderPvSwitches(sid){
+  var items = PV_SWITCHES.map(function(sw){
+    var key='pv_'+sid+'_'+sw.field;
+    var d=currentData[key];
+    if(!d) return null;
+    var isOn=d.status===1;
+    var orig=originalData[key];
+    var changed=orig && d.status!==orig.status;
+    var pillCls='sw-pill '+(changed?'changed':(isOn?'on':'off'));
+    var diffTag=changed?'<span class="diff-tag">'+(orig.status===1?'开':'关')+' → '+(isOn?'开':'关')+'</span>':'';
+    return '<div class="ch-row">'+
+      '<span class="ch-label">'+sw.label+'</span>'+
+      '<span class="'+pillCls+'" data-swkey="'+key+'">'+
+        '<span class="sw-dot"></span>'+(isOn?'开启':'关闭')+
+      '</span>'+
+      diffTag+
+    '</div>';
+  }).filter(function(s){ return s!==null; });
+  if(!items.length) return '';
+  return '<div class="mt-3"><div class="sec-title">SPU 属性</div>'+items.join('')+'</div>';
+}
+
 function renderTree(){
   var el=$('treeEl');
+  // 构建 sku -> 当前实际 spu 映射
+  var skuActualSpu={};
+  skuBindRows.forEach(function(r){ skuActualSpu[String(r.sku_id)]=String(r.spu_id); });
+
   var html=CFG.spuIds.map(function(sid){
     var skus=CFG.skuIds.filter(function(kid){ return CFG.skuToSpu[kid]===sid; });
-    var onlineRow=onlineRows.find(function(r){ return String(r.spu_id)===String(sid); });
-    var pvSection='';
-    if(onlineRow){
-      try{
-        var pv=typeof onlineRow.pv==='string'?JSON.parse(onlineRow.pv):onlineRow.pv;
-        if(pv && pv.channelAutoOnShelf){
-          var pvRows=Object.keys(pv.channelAutoOnShelf).map(function(ch){
-            var key='pv_'+sid+'_autoShelf_'+ch;
-            var cur=currentData[key];
-            var changed=cur && originalData[key] && cur.status!==originalData[key].status;
-            return '<div class="ch-row">'+
-              '<span class="ch-label">ch'+ch+'</span>'+
-              '<select class="ch-select'+(changed?' changed':'')+'" data-key="'+key+'"><'+'/select>'+
-              (changed?'<span class="diff-tag">已改</span>':'')+
-            '</div>';
-          }).join('');
-          pvSection='<div class="mt-3"><div class="sec-title">自动上架 (channelAutoOnShelf)</div>'+pvRows+'</div>';
-        }
-      }catch(e){}
-    }
+    var pvSection=renderPvSwitches(sid);
     var skuSection=skus.map(function(kid){
       var skuDesc=SKU_DESC[kid]||'';
+      var actualSpu=skuActualSpu[kid];
+      var isRebound=actualSpu && actualSpu!==sid;
+      var rebindTag='';
+      if(isRebound){
+        var tipText='已换出，目标SPU: '+actualSpu+'  点击回滚';
+        rebindTag='<span class="rebind-tag" data-rebind-sku="'+kid+'" data-rebind-spu="'+sid+'">'+
+          '⚠ 已换绑'+
+          '<span class="rebind-tip">'+tipText+'</span>'+
+        '</span>';
+      }
       return '<div class="sku-card">'+
         '<div class="flex items-center gap-2 mb-2">'+
           '<span class="text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded font-medium">SKU</span>'+
           (skuDesc?'<span class="text-sm font-semibold text-slate-700">'+skuDesc+'</span>':'')+
           '<span class="font-mono text-xs text-slate-400 ml-1">'+kid+'</span>'+
+          rebindTag+
         '</div>'+
         '<div class="sec-title">上下架状态</div>'+
         renderChannelSelects('sku',kid)+
@@ -222,10 +256,7 @@ function renderTree(){
     var key=sel.getAttribute('data-key');
     var d=currentData[key];
     if(!d) return;
-    // pv autoShelf 用 0/1，其余用 1/2/3
-    var isPv=key.startsWith('pv_');
-    var opts=isPv?[[0,'关'],[1,'开']]:STATUS_OPTS;
-    opts.forEach(function(o){
+    STATUS_OPTS.forEach(function(o){
       var opt=document.createElement('option');
       opt.value=String(o[0]);
       opt.textContent=o[1];
@@ -234,15 +265,13 @@ function renderTree(){
     });
     sel.addEventListener('change', function(){
       currentData[key]=Object.assign({},currentData[key],{status:+sel.value});
-      // 更新样式
       var changed=originalData[key] && currentData[key].status!==originalData[key].status;
       sel.className='ch-select'+(changed?' changed':'');
-      // 更新 diff tag
       var row=sel.parentElement;
       var existTag=row.querySelector('.diff-tag');
       if(changed){
-        var fromLabel=(isPv?[[0,'关'],[1,'开']]:STATUS_OPTS).find(function(s){return s[0]===originalData[key].status;});
-        var toLabel=(isPv?[[0,'关'],[1,'开']]:STATUS_OPTS).find(function(s){return s[0]===currentData[key].status;});
+        var fromLabel=STATUS_OPTS.find(function(s){return s[0]===originalData[key].status;});
+        var toLabel=STATUS_OPTS.find(function(s){return s[0]===currentData[key].status;});
         var tag=existTag||document.createElement('span');
         tag.className='diff-tag';
         tag.textContent=(fromLabel?fromLabel[1]:'?')+' → '+(toLabel?toLabel[1]:'?');
@@ -251,6 +280,58 @@ function renderTree(){
         existTag.remove();
       }
       updateDiffUI();
+    });
+  });
+
+  // 绑定 pill switch 点击事件
+  el.querySelectorAll('span[data-swkey]').forEach(function(pill){
+    var key=pill.getAttribute('data-swkey');
+    pill.style.cursor='pointer';
+    pill.addEventListener('click', function(){
+      var d=currentData[key];
+      if(!d) return;
+      var newVal=d.status===1?0:1;
+      currentData[key]=Object.assign({},d,{status:newVal});
+      var orig=originalData[key];
+      var changed=orig && newVal!==orig.status;
+      var isOn=newVal===1;
+      // 更新 pill 样式和文字
+      pill.className='sw-pill '+(changed?'changed':(isOn?'on':'off'));
+      var dot=pill.querySelector('.sw-dot');
+      pill.textContent=isOn?'开启':'关闭';
+      pill.insertBefore(dot, pill.firstChild);
+      // 更新 diff tag
+      var row=pill.parentElement;
+      var existTag=row.querySelector('.diff-tag');
+      if(changed){
+        var tag=existTag||document.createElement('span');
+        tag.className='diff-tag';
+        tag.textContent=(orig.status===1?'开':'关')+' → '+(isOn?'开':'关');
+        if(!existTag) row.appendChild(tag);
+      } else if(existTag){
+        existTag.remove();
+      }
+      updateDiffUI();
+    });
+  });
+
+  // 绑定换绑回滚点击
+  el.querySelectorAll('span[data-rebind-sku]').forEach(function(tag){
+    var skuId=tag.getAttribute('data-rebind-sku');
+    var spuId=tag.getAttribute('data-rebind-spu');
+    tag.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(tag.classList.contains('rolling')) return;
+      tag.innerHTML='<span class="rolling">↻</span> 回滚中…<span class="rebind-tip">处理中，请稍候</span>';
+      $sql("update merchant_sku set spu_id='"+spuId+"' where sku_id='"+skuId+"' and merchant_id="+CFG.merchantId)
+        .then(function(){
+          showToast('✓ 回滚成功，SKU '+skuId+' 已绑回 '+spuId, 3000);
+          loadData();
+        })
+        .catch(function(err){
+          showToast('⚠ 回滚失败: '+err.message, 4000);
+          tag.innerHTML='⚠ 已换绑<span class="rebind-tip">当前绑定已变更，点击重试</span>';
+        });
     });
   });
 }
@@ -273,18 +354,11 @@ async function saveChanges(){
         await $sql("update dim_sku_channel_info set sale_status="+cur.status+" where id="+cur.id+"");
         ok++;
       } else if(k.startsWith('pv_')){
-        var parts=k.split('_'); // pv_{spuId}_autoShelf_{ch}
-        var sid=parts[1], ch=parts[3];
-        var row=onlineRows.find(function(r){ return String(r.spu_id)===String(sid); });
-        if(row){
-          var pv=typeof row.pv==='string'?JSON.parse(row.pv):JSON.parse(JSON.stringify(row.pv));
-          if(!pv.channelAutoOnShelf) pv.channelAutoOnShelf={};
-          pv.channelAutoOnShelf[ch]=cur.status;
-          // 用双引号包裹 JSON，避免单引号转义问题
-          var pvJson=JSON.stringify(pv);
-          await $sql('update poi_spu_online_info set pv="'+pvJson+'" where id='+cur.id+'');
-          ok++;
-        }
+        // key 格式: pv_{spuId}_{pvField}
+        // 用 JSON_SET 直接更新 pv 中的指定字段，避免整个 JSON 拼接带来的转义问题
+        var pvField=cur.pvField;
+        await $sql('update poi_spu_online_info set pv=JSON_SET(pv, "$.'+pvField+'", '+cur.status+') where id='+cur.id+'');
+        ok++;
       }
     }catch(e){ errs.push(k+': '+e.message); }
   }

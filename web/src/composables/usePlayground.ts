@@ -5,6 +5,9 @@ import { SALE_STATUS_PAGE_HTML, SALE_STATUS_PAGE_NAME, SALE_STATUS_PAGE_PROMPT }
 
 // 每个 page 用独立 key，互不干扰
 const INDEX_KEY = 'pg_index'   // 存 id 列表（有序）
+// 内置页面版本号，修改内置页面内容时递增，强制刷新 localStorage
+const BUILTIN_VERSION = 9
+const BUILTIN_VER_KEY = 'pg_builtin_ver'
 
 function readIndex(): string[] {
   try { return JSON.parse(localStorage.getItem(INDEX_KEY) ?? '[]') } catch { return [] }
@@ -34,14 +37,24 @@ function removePage(id: string) {
 // 模块级响应式列表
 const _stored = readIndex().map(id => readPage(id)).filter((p): p is PlaygroundPage => p !== null)
 
-// 首次无页面时注入内置 demo
-if (_stored.length === 0) {
-  const builtins: PlaygroundPage[] = [
-    { id: 'demo-sale-status', name: SALE_STATUS_PAGE_NAME, html: SALE_STATUS_PAGE_HTML, prompt: SALE_STATUS_PAGE_PROMPT, createdAt: Date.now(), updatedAt: Date.now() },
-    { id: 'demo-sql-query',   name: DEMO_PAGE_NAME,        html: DEMO_PAGE_HTML,        prompt: DEMO_PAGE_PROMPT,        createdAt: Date.now(), updatedAt: Date.now() },
-  ]
-  writeIndex(builtins.map(p => p.id))
-  builtins.forEach(p => { writePage(p); _stored.push(p) })
+// 内置页面定义
+const BUILTINS: PlaygroundPage[] = [
+  { id: 'demo-sale-status', name: SALE_STATUS_PAGE_NAME, html: SALE_STATUS_PAGE_HTML, prompt: SALE_STATUS_PAGE_PROMPT, createdAt: Date.now(), updatedAt: Date.now() },
+  { id: 'demo-sql-query',   name: DEMO_PAGE_NAME,        html: DEMO_PAGE_HTML,        prompt: DEMO_PAGE_PROMPT,        createdAt: Date.now(), updatedAt: Date.now() },
+]
+
+// 首次无页面，或内置版本升级时，重新写入内置页面
+const savedVer = Number(localStorage.getItem(BUILTIN_VER_KEY) ?? 0)
+if (_stored.length === 0 || savedVer < BUILTIN_VERSION) {
+  // 保留用户自建页面（id 不在内置列表中的）
+  const userPages = _stored.filter(p => !BUILTINS.some(b => b.id === p.id))
+  const allPages = [...BUILTINS, ...userPages]
+  writeIndex(allPages.map(p => p.id))
+  BUILTINS.forEach(p => writePage(p))
+  // 同步 _stored
+  _stored.length = 0
+  allPages.forEach(p => _stored.push(p))
+  localStorage.setItem(BUILTIN_VER_KEY, String(BUILTIN_VERSION))
 }
 
 const pages = ref<PlaygroundPage[]>(_stored)
