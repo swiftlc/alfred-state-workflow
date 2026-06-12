@@ -12,7 +12,7 @@ export const SALE_STATUS_PAGE_HTML = `<!DOCTYPE html>
 body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Segoe UI',sans-serif;background:#f8fafc}
 .spin{display:inline-block;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.spu-card{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.spu-card{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05);position:relative}
 .sku-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-top:8px}
 .tree-line{border-left:2px solid #e2e8f0;margin-left:12px;padding-left:16px;margin-top:12px}
 .ch-row{display:flex;align-items:center;gap:8px;padding:3px 0}
@@ -32,23 +32,7 @@ button:active{transform:scale(.95)}
 .sw-pill.on{background:#ede9fe;color:#6d28d9;border-color:#c4b5fd}
 .sw-pill.changed{border-style:dashed;border-color:#f59e0b;background:#fef9c3;color:#b45309}
 .sw-dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.7}
-/* 换绑 tag */
-.rebind-tag{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;cursor:pointer;position:relative;transition:background .1s}
-.rebind-tag:hover{background:#fecaca}
-.rebind-tip{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:99;background:#1e293b;color:#f8fafc;font-size:11px;font-weight:400;padding:5px 9px;border-radius:6px;white-space:nowrap;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
-.rebind-tag:hover .rebind-tip{display:block}
 .rolling{animation:spin .5s linear infinite}
-/* 换绑执行面板 */
-.rebind-panel{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
-.rebind-panel .panel-title{font-size:13px;font-weight:700;color:#1e293b;margin-bottom:12px;display:flex;align-items:center;gap:6px}
-.input-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-.input-label{font-size:11px;color:#64748b;font-weight:500;min-width:72px;flex-shrink:0}
-.ipt{font-size:12px;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;outline:none;background:#fff}
-.ipt:focus{border-color:#818cf8}
-.ipt-wide{width:280px}
-.exec-btn{font-size:12px;font-weight:600;color:#fff;background:#6366f1;border:none;border-radius:7px;padding:5px 14px;cursor:pointer;transition:background .15s}
-.exec-btn:hover{background:#4f46e5}
-.exec-btn:disabled{background:#a5b4fc;cursor:not-allowed}
 /* 任务状态卡片 */
 .task-card{margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#f8fafc;font-size:12px}
 .task-row{display:flex;gap:6px;margin-bottom:4px;align-items:flex-start}
@@ -61,6 +45,12 @@ button:active{transform:scale(.95)}
 .status-pending{background:#f1f5f9;color:#64748b}
 .dl-btn{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;cursor:pointer;text-decoration:none}
 .dl-btn:hover{background:#ddd6fe}
+/* 换绑SKU卡片高亮 */
+.sku-card.rebound{border-color:#fca5a5;background:#fff5f5}
+/* 回滚按钮 */
+.rollback-btn{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;cursor:pointer;user-select:none;transition:background .1s}
+.rollback-btn:hover{background:#fecaca}
+.rollback-btn:disabled{opacity:.5;cursor:not-allowed}
 </style>
 </head>
 <body class="p-5">
@@ -112,7 +102,8 @@ var CFG = {
   }
 };
 var CH_NAME = {100:'外卖(100)',200:'团购(200)',0:'通用(0)'};
-var STATUS_OPTS = [[1,'上架'],[2,'下架'],[3,'售罄下架']];
+// 1:上架  2:自动下架  3:手动下架
+var STATUS_OPTS = [[1,'上架'],[2,'自动下架'],[3,'手动下架']];
 var SPU_DESC = {
   '2064633193184702465': '源spu1:灰色001',
   '2063966223661621332': '目标spu2:测试换绑003'
@@ -129,6 +120,8 @@ var PV_SWITCHES = [
 var originalData = {};
 var currentData  = {};
 var skuRows=[], spuRows=[], onlineRows=[], skuBindRows=[];
+// 换绑关系：{skuId: actualSpuId}，仅记录已换出的
+var reboundMap = {};
 
 function $ (id){ return document.getElementById(id); }
 function show(id){ $(id).classList.remove('hidden'); }
@@ -159,6 +152,7 @@ async function loadData(){
 
 function buildState(){
   originalData={};
+  reboundMap={};
   spuRows.forEach(function(r){
     originalData['spu_'+r.spu_id+'_'+r.channel_id]={id:r.id, status:+r.sale_status};
   });
@@ -168,13 +162,21 @@ function buildState(){
   onlineRows.forEach(function(r){
     try{
       var pv=typeof r.pv==='string'?JSON.parse(r.pv):r.pv;
-      // 解析 pv 开关字段
       PV_SWITCHES.forEach(function(sw){
         if(pv && pv[sw.field]!=null){
           originalData['pv_'+r.spu_id+'_'+sw.field]={id:r.id, status:+pv[sw.field], pvField:sw.field};
         }
       });
     }catch(e){}
+  });
+  // 构建换绑映射
+  skuBindRows.forEach(function(r){
+    var skuId=String(r.sku_id);
+    var actualSpu=String(r.spu_id);
+    var originalSpu=CFG.skuToSpu[skuId];
+    if(originalSpu && actualSpu !== originalSpu){
+      reboundMap[skuId]=actualSpu;
+    }
   });
   currentData=JSON.parse(JSON.stringify(originalData));
 }
@@ -198,27 +200,21 @@ function updateDiffUI(){
   }
 }
 
-// 用 data-key 绑定，避免 inline onchange 的引号问题
 function renderChannelSelects(prefix, entityId){
   return CFG.channels.map(function(ch){
     var key=prefix+'_'+entityId+'_'+ch;
     var d=currentData[key];
     if(!d) return '';
     var changed=originalData[key] && d.status!==originalData[key].status;
-    var opts=STATUS_OPTS.map(function(s){
-      return '<option value="'+s[0]+'"'+(d.status==s[0]?' selected':'')+'>'+s[1]+'</option>';
-    }).join('');
     var diffTag=changed?'<span class="diff-tag">'+STATUS_OPTS.find(function(s){return s[0]===originalData[key].status;})[1]+' → '+STATUS_OPTS.find(function(s){return s[0]===d.status;})[1]+'</span>':'';
     return '<div class="ch-row">'+
       '<span class="ch-label">'+(CH_NAME[ch]||('ch'+ch))+'</span>'+
       '<select class="ch-select'+(changed?' changed':'')+'" data-key="'+key+'"><'+'/select>'+
       diffTag+
     '</div>';
-    // select options 单独通过 JS 填入，避免引号问题
   }).join('');
 }
 
-// 渲染 pv 开关区块（pill tag 样式）
 function renderPvSwitches(sid){
   var items = PV_SWITCHES.map(function(sw){
     var key='pv_'+sid+'_'+sw.field;
@@ -243,39 +239,27 @@ function renderPvSwitches(sid){
 
 function renderTree(){
   var el=$('treeEl');
-  // 构建 sku -> 当前实际 spu 映射
-  var skuActualSpu={};
-  skuBindRows.forEach(function(r){ skuActualSpu[String(r.sku_id)]=String(r.spu_id); });
 
   var html=CFG.spuIds.map(function(sid){
     var skus=CFG.skuIds.filter(function(kid){ return CFG.skuToSpu[kid]===sid; });
     var pvSection=renderPvSwitches(sid);
     var skuSection=skus.map(function(kid){
       var skuDesc=SKU_DESC[kid]||'';
-      var actualSpu=skuActualSpu[kid];
-      var isRebound=actualSpu && actualSpu!==sid;
-      var rebindTag='';
-      if(isRebound){
-        var tipText='已换出，目标SPU: '+actualSpu+'  点击回滚';
-        rebindTag='<span class="rebind-tag" data-rebind-sku="'+kid+'" data-rebind-spu="'+sid+'">'+
-          '⚠ 已换绑'+
-          '<span class="rebind-tip">'+tipText+'</span>'+
-        '</span>';
-      }
-      return '<div class="sku-card">'+
+      var isRebound=!!reboundMap[kid];
+      return '<div class="sku-card'+(isRebound?' rebound':'')+'" id="sku-card-'+kid+'">'+
         '<div class="flex items-center gap-2 mb-2">'+
           '<span class="text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded font-medium">SKU</span>'+
           (skuDesc?'<span class="text-sm font-semibold text-slate-700">'+skuDesc+'</span>':'')+
           '<span class="font-mono text-xs text-slate-400 ml-1">'+kid+'</span>'+
-          rebindTag+
+          (isRebound?'<span class="text-xs text-red-400 font-medium">↗ 已换绑</span><button class="rollback-btn" data-rebind-sku="'+kid+'" data-rebind-spu="'+CFG.skuToSpu[kid]+'">↩ 回滚绑定</button>':'')+
         '</div>'+
         '<div class="sec-title">上下架状态</div>'+
         renderChannelSelects('sku',kid)+
       '</div>';
     }).join('');
     var spuDesc=SPU_DESC[sid]||'';
-    return '<div class="spu-card">'+
-      '<div class="flex items-center gap-2 mb-3">'+
+    return '<div class="spu-card" id="spu-card-'+sid+'">'+
+      '<div class="flex items-center gap-2 mb-3" id="spu-title-'+sid+'">'+
         '<span class="text-xs bg-violet-50 text-violet-600 border border-violet-100 px-2 py-0.5 rounded font-medium">SPU</span>'+
         (spuDesc?'<span class="text-sm font-semibold text-slate-700">'+spuDesc+'</span>':'')+
         '<span class="font-mono text-xs text-slate-400 ml-1">'+sid+'</span>'+
@@ -288,7 +272,7 @@ function renderTree(){
   }).join('');
   el.innerHTML=html;
 
-  // 填充 select options（避免 HTML 拼接时的引号问题）
+  // 填充 select options
   el.querySelectorAll('select[data-key]').forEach(function(sel){
     var key=sel.getAttribute('data-key');
     var d=currentData[key];
@@ -332,12 +316,10 @@ function renderTree(){
       var orig=originalData[key];
       var changed=orig && newVal!==orig.status;
       var isOn=newVal===1;
-      // 更新 pill 样式和文字
       pill.className='sw-pill '+(changed?'changed':(isOn?'on':'off'));
       var dot=pill.querySelector('.sw-dot');
       pill.textContent=isOn?'开启':'关闭';
       pill.insertBefore(dot, pill.firstChild);
-      // 更新 diff tag
       var row=pill.parentElement;
       var existTag=row.querySelector('.diff-tag');
       if(changed){
@@ -352,22 +334,23 @@ function renderTree(){
     });
   });
 
-  // 绑定换绑回滚点击
-  el.querySelectorAll('span[data-rebind-sku]').forEach(function(tag){
-    var skuId=tag.getAttribute('data-rebind-sku');
-    var spuId=tag.getAttribute('data-rebind-spu');
-    tag.addEventListener('click', function(e){
-      e.stopPropagation();
-      if(tag.classList.contains('rolling')) return;
-      tag.innerHTML='<span class="rolling">↻</span> 回滚中…<span class="rebind-tip">处理中，请稍候</span>';
-      $sql("update merchant_sku set spu_id='"+spuId+"' where sku_id='"+skuId+"' and merchant_id="+CFG.merchantId)
+  // 绑定回滚按钮点击事件
+  el.querySelectorAll('button[data-rebind-sku]').forEach(function(btn){
+    var skuId=btn.getAttribute('data-rebind-sku');
+    var origSpu=btn.getAttribute('data-rebind-spu');
+    btn.addEventListener('click',function(){
+      if(btn.disabled) return;
+      btn.disabled=true;
+      btn.textContent='↻ 回滚中…';
+      $sql("update merchant_sku set spu_id='"+origSpu+"' where sku_id='"+skuId+"' and merchant_id="+CFG.merchantId)
         .then(function(){
-          showToast('✓ 回滚成功，SKU '+skuId+' 已绑回 '+spuId, 3000);
+          showToast('✓ 回滚成功，SKU '+skuId+' 已绑回 '+origSpu, 3000);
           loadData();
         })
         .catch(function(err){
+          btn.disabled=false;
+          btn.textContent='↩ 回滚绑定';
           showToast('⚠ 回滚失败: '+err.message, 4000);
-          tag.innerHTML='⚠ 已换绑<span class="rebind-tip">当前绑定已变更，点击重试</span>';
         });
     });
   });
@@ -391,8 +374,6 @@ async function saveChanges(){
         await $sql("update dim_sku_channel_info set sale_status="+cur.status+" where id="+cur.id+"");
         ok++;
       } else if(k.startsWith('pv_')){
-        // key 格式: pv_{spuId}_{pvField}
-        // 用 JSON_SET 直接更新 pv 中的指定字段，避免整个 JSON 拼接带来的转义问题
         var pvField=cur.pvField;
         await $sql('update poi_spu_online_info set pv=JSON_SET(pv, "$.'+pvField+'", '+cur.status+') where id='+cur.id+'');
         ok++;
@@ -458,22 +439,15 @@ async function submitRebindTask(){
         REBIND_CFG.userCtx
       ]
     };
-    // 通过 postMessage 桥接发请求，避免 iframe sandbox 的 null-origin CORS 问题
     var json=await $octo(body);
-    // 外层 code 判断 octo 调用是否成功
     if(json.code!==0) throw new Error('octo 调用失败 code='+json.code+': '+(json.msg||JSON.stringify(json).slice(0,200)));
-    // traceId
     var traceId=(json.data&&json.data.traceId)||'';
-    // data.return 是 JSON 字符串，需二次解析
     var innerStr=(json.data&&json.data['return'])||'';
     var inner={};
     try{ inner=JSON.parse(innerStr); }catch(e2){ throw new Error('return 解析失败: '+innerStr.slice(0,200)); }
-    // inner.status.code 判断业务是否成功
     if(inner.status&&inner.status.code!==0) throw new Error('换绑接口失败: '+(inner.status.msg||JSON.stringify(inner.status)));
-    // 解析 taskId
     var taskId=(inner.data&&inner.data.taskId)||inner.taskId;
     if(!taskId) throw new Error('未获取到 taskId，响应: '+JSON.stringify(inner).slice(0,200));
-    // 展示面板
     show('taskPanel');
     $('taskIdVal').textContent=taskId;
     $('taskTraceVal').textContent=traceId||'-';
@@ -495,7 +469,7 @@ function startPollTask(taskId){
   if(_pollTimer) clearInterval(_pollTimer);
   show('taskPolling');
   var attempts=0;
-  var maxAttempts=60; // 最多轮询 5 分钟（5s×60）
+  var maxAttempts=60;
   function poll(){
     attempts++;
     if(attempts>maxAttempts){ clearInterval(_pollTimer); hide('taskPolling'); return; }
@@ -505,24 +479,19 @@ function startPollTask(taskId){
         if(!row) return;
         var s=+row.task_status;
         var info=TASK_STATUS_MAP[s]||{label:'未知('+s+')',cls:'status-pending'};
-        // 更新 badge
         var badge=$('taskStatusBadge');
         badge.textContent=info.label;
         badge.className='status-badge '+info.cls;
-        // 更新时间
         $('taskBeginVal').textContent=row.begin_time||'-';
         $('taskEndVal').textContent=row.end_time||'-';
-        // 数量统计
         var totalN=row.total_num!=null?row.total_num:'-';
         var succN=row.success_num!=null?row.success_num:'-';
         var failN=row.failed_num!=null?row.failed_num:'-';
         $('taskNumVal').innerHTML='总计 <b>'+totalN+'</b> &nbsp;成功 <b style="color:#166534">'+succN+'</b> &nbsp;失败 <b style="color:#b91c1c">'+failN+'</b>';
-        // 终结状态
         var isDone=(s===30||s===40||s===5);
         if(isDone){
           clearInterval(_pollTimer);
           hide('taskPolling');
-          // 解析 execute_result 中的 resultFileUrl/resultFileName
           try{
             var result=typeof row.execute_result==='string'?JSON.parse(row.execute_result):row.execute_result;
             if(result&&result.resultFileUrl){
