@@ -78,7 +78,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { BookOpen, History, Layers, Zap, BarChart2, Activity, Sliders, Network, Terminal, Radio, ChevronLeft, ChevronRight, LayoutDashboard } from '@lucide/vue'
+import { BookOpen, History, Layers, Zap, BarChart2, Activity, Sliders, Network, Terminal, Radio, ChevronLeft, ChevronRight } from '@lucide/vue'
 import type { Component } from 'vue'
 import {
   NConfigProvider, NMessageProvider, NDialogProvider,
@@ -159,7 +159,6 @@ const navItems: NavItem[] = [
   { key: 'shepherd',   label: 'Shepherd',     icon: Network   },
   { key: 'octo',       label: 'Octo RPC',     icon: Terminal  },
   { key: 'mafka',      label: 'Mafka',        icon: Radio     },
-  { key: 'lowcode',    label: '低代码',       icon: LayoutDashboard },
 ]
 
 const activeMenu = computed(() => {
@@ -174,7 +173,6 @@ const activeMenu = computed(() => {
   if (p.startsWith('/shepherd'))   return 'shepherd'
   if (p.startsWith('/octo'))       return 'octo'
   if (p.startsWith('/mafka'))      return 'mafka'
-  if (p.startsWith('/lowcode'))    return 'lowcode'
   return 'dicts'
 })
 
