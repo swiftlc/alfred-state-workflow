@@ -94,6 +94,49 @@ export async function sendMafkaMessage(p: SendMessageParams): Promise<{ success:
   }
 }
 
+// ── Query messages by timestamp（直接查，无需 audit）─────────────────────
+
+export interface QueryMessageParams {
+  topicId:   number
+  dateTime?: string    // 'YYYY-MM-DD HH:mm:ss'，默认当前时间
+  limit?:    number
+}
+
+export async function queryMafkaMessages(p: QueryMessageParams): Promise<MafkaMessage[]> {
+  const dt = p.dateTime ?? new Date().toLocaleString('sv-SE').replace('T', ' ')
+  const url = `${BASE}/mafka/restful/message/timestamp/query?topicId=${p.topicId}&dateTime=${encodeURIComponent(dt)}&limit=${p.limit ?? 10}`
+  const res = await proxyGet<{ code: number; msg: string; data: Array<{
+    offset: number; timestamp: string; partitionId: number; content: string; msgId?: string
+  }> }>(url, HEADERS)
+  if (res.code !== 0 || !Array.isArray(res.data)) return []
+  return res.data.map(m => ({
+    partition: m.partitionId,
+    offset:    m.offset,
+    timestamp: new Date(m.timestamp).getTime(),
+    value:     m.content,
+    key:       m.msgId,
+  }))
+}
+
+// ── Consumer groups ───────────────────────────────────────────────────────
+
+export interface MafkaConsumer {
+  id:         number
+  name:       string
+  appkey:     string
+  remark?:    string
+  status:     number
+  environment: string
+  addTime:    string
+  tags?:      string[]
+}
+
+export async function fetchConsumersByTopicId(topicId: number): Promise<MafkaConsumer[]> {
+  const url = `${BASE}/mafka/restful/consumer/listByTopicId?topicId=${topicId}&pageNum=1&limit=50&type=3&content=&auth=-1`
+  const res = await proxyGet<{ code: number; data: MafkaConsumer[] }>(url, HEADERS)
+  return Array.isArray(res.data) ? res.data : []
+}
+
 // ── Pull / search messages ────────────────────────────────────────────────
 
 export interface PullMessagesParams {

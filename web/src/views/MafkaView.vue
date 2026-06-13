@@ -164,21 +164,48 @@
         <div class="mafka-compose shrink-0">
           <!-- 工具栏 -->
           <div class="mafka-compose__toolbar">
-            <span class="mafka-compose__label">泳道</span>
-            <input v-model="swimlaneInput" class="mafka-inline-input w-28" placeholder="可选" />
-            <span class="mafka-compose__label ml-3">Partition</span>
+            <!-- 发送目标：主干 / 泳道 -->
+            <div class="flex items-center gap-0.5 flex-shrink-0">
+              <button
+                class="mafka-env-btn"
+                :class="{ 'mafka-env-btn--active': sendToTrunk }"
+                @click="sendToTrunk = true"
+              >主干</button>
+              <button
+                class="mafka-env-btn"
+                :class="{ 'mafka-env-btn--active': !sendToTrunk }"
+                @click="sendToTrunk = false"
+              >泳道</button>
+            </div>
             <input
-              v-model.number="pullPartition"
-              class="mafka-inline-input w-14 text-center"
-              type="number"
-              min="0"
-              placeholder="0"
+              v-if="!sendToTrunk"
+              v-model="swimlaneInput"
+              class="mafka-inline-input w-28"
+              placeholder="泳道名…"
             />
+
             <span class="flex-1" />
+
+            <!-- 查询参数 -->
+            <span class="mafka-compose__label">时间</span>
+            <input
+              v-model="pullDateTime"
+              class="mafka-inline-input w-36"
+              placeholder="留空=当前"
+              title="格式：2026-06-13 09:08:19"
+            />
+            <span class="mafka-compose__label">条数</span>
+            <input
+              v-model.number="pullLimit"
+              class="mafka-inline-input w-10 text-center"
+              type="number"
+              min="1"
+              max="100"
+            />
             <n-button size="tiny" ghost :loading="pulling" :disabled="pulling" @click="doPull">
-              拉取
+              查询
             </n-button>
-            <span class="text-[11px] text-slate-400">⌘↩</span>
+            <span class="w-px h-3 bg-slate-200 mx-1 flex-shrink-0" />
             <n-button
               size="tiny"
               type="primary"
@@ -186,7 +213,7 @@
               :disabled="!composeText.trim() || sending"
               @click="doSend"
             >
-              发送
+              发送{{ sendToTrunk ? '' : '·泳道' }}
             </n-button>
           </div>
 
@@ -239,19 +266,44 @@
           </div>
           <div v-if="!subscription.producerInfos.length" class="sub-empty">暂无</div>
         </div>
-        <!-- 消费组 -->
+        <!-- 消费组（优先用 consumers 详情，fallback subscription） -->
         <div class="sub-section">
-          <div class="sub-section__title">消费组 ({{ subscription.consumerGroups.length }})</div>
-          <div
-            v-for="g in subscription.consumerGroups"
-            :key="g.groupName"
-            class="sub-group-card"
-          >
-            <div class="font-medium text-slate-700 text-[12.5px]">{{ g.groupName }}</div>
-            <div class="text-[11.5px] text-slate-500 font-mono">{{ g.appkey }}</div>
-            <div v-if="g.remark" class="text-[11px] text-slate-400 mt-0.5">{{ g.remark }}</div>
+          <div class="sub-section__title">
+            消费组 ({{ consumers.length || subscription.consumerGroups.length }})
           </div>
-          <div v-if="!subscription.consumerGroups.length" class="sub-empty">暂无</div>
+          <template v-if="consumers.length">
+            <div
+              v-for="c in consumers"
+              :key="c.id"
+              class="sub-group-card"
+            >
+              <div class="flex items-center justify-between">
+                <div class="font-medium text-slate-700 text-[12.5px] truncate flex-1">{{ c.name }}</div>
+                <span
+                  class="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ml-2"
+                  :class="c.status === 1 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'"
+                >{{ c.status === 1 ? '正常' : '停用' }}</span>
+              </div>
+              <div class="text-[11.5px] text-slate-500 font-mono mt-0.5">{{ c.appkey }}</div>
+              <div class="flex items-center gap-2 mt-0.5 text-[10.5px] text-slate-400">
+                <span>{{ c.environment }}</span>
+                <span>{{ c.addTime }}</span>
+              </div>
+              <div v-if="c.remark" class="text-[11px] text-slate-400 mt-0.5 italic">{{ c.remark }}</div>
+            </div>
+          </template>
+          <template v-else>
+            <div
+              v-for="g in subscription.consumerGroups"
+              :key="g.groupName"
+              class="sub-group-card"
+            >
+              <div class="font-medium text-slate-700 text-[12.5px]">{{ g.groupName }}</div>
+              <div class="text-[11.5px] text-slate-500 font-mono">{{ g.appkey }}</div>
+              <div v-if="g.remark" class="text-[11px] text-slate-400 mt-0.5">{{ g.remark }}</div>
+            </div>
+          </template>
+          <div v-if="!consumers.length && !subscription.consumerGroups.length" class="sub-empty">暂无</div>
         </div>
       </template>
       <div v-else class="py-10 text-center text-sm text-slate-400">暂无订阅信息</div>
@@ -267,8 +319,8 @@ import ContextItem from '@/components/ContextItem.vue'
 import ContextGroup from '@/components/ContextGroup.vue'
 import DictPicker from '@/components/DictPicker.vue'
 import type { ContextDataItem } from '@/types'
-import { fetchTopicSubscriptions, sendMafkaMessage, pullMafkaMessages } from '@/api/mafka'
-import type { MafkaSubscription, EnvTag } from '@/api/mafka'
+import { fetchTopicSubscriptions, sendMafkaMessage, queryMafkaMessages, fetchConsumersByTopicId } from '@/api/mafka'
+import type { MafkaSubscription, MafkaConsumer, EnvTag } from '@/api/mafka'
 
 defineOptions({ name: 'MafkaView' })
 
@@ -308,12 +360,16 @@ const selectedTopic = ref<SelectedTopic | null>(null)
 const swimlaneInput = ref('')
 
 const subscription  = ref<MafkaSubscription | null>(null)
+const consumers     = ref<MafkaConsumer[]>([])
 const subLoading    = ref(false)
 const subDrawerShow = ref(false)
 
 const messages      = ref<ChatMsg[]>([])
 const composeText   = ref('{}')
 const pullPartition = ref(0)
+const pullLimit     = ref(10)
+const pullDateTime  = ref('')   // 空=当前时间
+const sendToTrunk   = ref(true) // true=主干默认，false=指定泳道
 const sending       = ref(false)
 const pulling       = ref(false)
 
@@ -370,7 +426,12 @@ async function loadSubscription() {
   if (!t) return
   subLoading.value = true
   try {
-    subscription.value = await fetchTopicSubscriptions(t.topicId)
+    const [sub, cons] = await Promise.all([
+      fetchTopicSubscriptions(t.topicId),
+      fetchConsumersByTopicId(t.topicId),
+    ])
+    subscription.value = sub
+    consumers.value    = cons
   } finally {
     subLoading.value = false
   }
@@ -383,21 +444,18 @@ async function doPull() {
   if (!t) return
   pulling.value = true
   try {
-    const msgs = await pullMafkaMessages({
-      topicId:   t.topicId,
-      taskName:  t.taskName,
-      appkey:    appkeyInput.value ?? '',
-      partition: pullPartition.value,
-      offset:    -1,
-      count:     20,
+    const msgs = await queryMafkaMessages({
+      topicId:  t.topicId,
+      dateTime: pullDateTime.value || undefined,
+      limit:    pullLimit.value,
     })
     if (!msgs.length) {
-      pushSystem('未拉取到消息')
+      pushSystem('未查询到消息')
       return
     }
     for (const m of msgs) {
       messages.value.push({
-        id:        `recv-${m.partition}-${m.offset}`,
+        id:        `recv-${m.partition}-${m.offset}-${Date.now()}`,
         type:      'received',
         content:   m.value,
         timestamp: m.timestamp,
@@ -405,10 +463,10 @@ async function doPull() {
         offset:    m.offset,
       })
     }
-    pushSystem(`已拉取 ${msgs.length} 条`)
+    pushSystem(`已查询 ${msgs.length} 条 · ${pullDateTime.value || '当前时间'}`)
     scrollBottom()
   } catch (e: any) {
-    message.error(`拉取失败: ${e?.message ?? e}`)
+    message.error(`查询失败: ${e?.message ?? e}`)
   } finally {
     pulling.value = false
   }
@@ -436,7 +494,7 @@ async function doSend() {
       taskName: t.taskName,
       appkey:   appkeyInput.value ?? '',
       message:  composeText.value.trim(),
-      swimlane: swimlaneInput.value || undefined,
+      swimlane: sendToTrunk.value ? undefined : (swimlaneInput.value || undefined),
     })
     const idx = messages.value.findIndex(m => m.id === msgId)
     if (idx !== -1) {
