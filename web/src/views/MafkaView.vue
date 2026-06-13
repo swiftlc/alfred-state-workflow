@@ -177,23 +177,36 @@
                 @click="sendToTrunk = false"
               >泳道</button>
             </div>
-            <input
+
+            <!-- 泳道 DictPicker -->
+            <ContextItem
               v-if="!sendToTrunk"
-              v-model="swimlaneInput"
-              class="mafka-inline-input w-28"
-              placeholder="泳道名…"
-            />
+              context-key="swimlane"
+              :value="swimlaneInput"
+              label="泳道"
+              :fetch-items="fetchSwimlaneItems"
+              custom-edit
+              bare
+              @edit="(item) => swimlaneInput = item.value ?? ''"
+            >
+              <span
+                class="mafka-chip flex-shrink-0"
+                :class="swimlaneInput ? 'mafka-chip--indigo' : 'mafka-chip--empty mafka-chip--clickable'"
+              >{{ swimlaneInput || '选择泳道…' }}</span>
+            </ContextItem>
 
             <span class="flex-1" />
 
-            <!-- 查询参数 -->
-            <span class="mafka-compose__label">时间</span>
-            <input
-              v-model="pullDateTime"
-              class="mafka-inline-input w-36"
-              placeholder="留空=当前"
-              title="格式：2026-06-13 09:08:19"
+            <!-- 时间选择 -->
+            <n-date-picker
+              v-model:value="pullDateTs"
+              type="datetime"
+              clearable
+              :placeholder="'留空=当前'"
+              size="small"
+              style="width:180px"
             />
+            <!-- 条数 -->
             <span class="mafka-compose__label">条数</span>
             <input
               v-model.number="pullLimit"
@@ -313,7 +326,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue'
-import { NButton, NSpin, NInput, NDrawer, NDrawerContent, useMessage } from 'naive-ui'
+import { NButton, NSpin, NInput, NDrawer, NDrawerContent, NDatePicker, useMessage } from 'naive-ui'
 import { makeFetchItems } from '@/utils/dict'
 import ContextItem from '@/components/ContextItem.vue'
 import ContextGroup from '@/components/ContextGroup.vue'
@@ -368,7 +381,7 @@ const messages      = ref<ChatMsg[]>([])
 const composeText   = ref('{}')
 const pullPartition = ref(0)
 const pullLimit     = ref(10)
-const pullDateTime  = ref('')   // 空=当前时间
+const pullDateTs    = ref<number | null>(null)  // timestamp，null=当前时间
 const sendToTrunk   = ref(true) // true=主干默认，false=指定泳道
 const sending       = ref(false)
 const pulling       = ref(false)
@@ -378,8 +391,9 @@ const topicPickerShow = ref(false)
 
 // ── Dict fetch fns (复用全局字典) ─────────────────────────────────────────
 
-const fetchAppkeyItems = makeFetchItems('appkey')
-const fetchTopicItems  = makeFetchItems('kafka_topic')
+const fetchAppkeyItems  = makeFetchItems('appkey')
+const fetchTopicItems   = makeFetchItems('kafka_topic')
+const fetchSwimlaneItems = makeFetchItems('swimlane')
 
 // ── Computed ──────────────────────────────────────────────────────────────
 
@@ -444,9 +458,13 @@ async function doPull() {
   if (!t) return
   pulling.value = true
   try {
+    // timestamp → 'YYYY-MM-DD HH:mm:ss'
+    const dt = pullDateTs.value
+      ? new Date(pullDateTs.value).toLocaleString('sv-SE').replace('T', ' ')
+      : undefined
     const msgs = await queryMafkaMessages({
       topicId:  t.topicId,
-      dateTime: pullDateTime.value || undefined,
+      dateTime: dt,
       limit:    pullLimit.value,
     })
     if (!msgs.length) {
@@ -463,7 +481,8 @@ async function doPull() {
         offset:    m.offset,
       })
     }
-    pushSystem(`已查询 ${msgs.length} 条 · ${pullDateTime.value || '当前时间'}`)
+    const dtLabel = pullDateTs.value ? new Date(pullDateTs.value).toLocaleString('zh-CN') : '当前时间'
+    pushSystem(`已查询 ${msgs.length} 条 · ${dtLabel}`)
     scrollBottom()
   } catch (e: any) {
     message.error(`查询失败: ${e?.message ?? e}`)
