@@ -28,13 +28,6 @@
 
       <!-- chip 行 -->
       <div class="flex items-center gap-1.5 flex-wrap">
-        <ContextItem context-key="appkey" :value="appkeyInput ?? ''" label="Appkey"
-          :fetch-items="fetchAppkeyItems" custom-edit @edit="onAppkeyEdit">
-          <span class="mafka-chip" :class="appkeyInput ? 'mafka-chip--slate' : 'mafka-chip--empty'">
-            <span class="font-mono">{{ appkeyInput || 'Appkey…' }}</span>
-          </span>
-        </ContextItem>
-        <span class="mafka-sep">/</span>
         <ContextItem v-if="selectedTopic" context-key="kafka_topic" :value="selectedTopic.taskName"
           :label="selectedTopic.displayName" :fetch-items="fetchTopicItems" custom-edit @edit="onTopicEdit">
           <span class="mafka-chip mafka-chip--indigo">
@@ -60,7 +53,7 @@
     <!-- 无 topic 选中 -->
     <div v-if="!selectedTopic" class="flex-1 flex flex-col items-center justify-center text-slate-300 select-none">
       <div class="text-5xl mb-3">📨</div>
-      <div class="text-sm">选择 Appkey 与 Topic 后开始</div>
+      <div class="text-sm">选择 Topic 后开始</div>
     </div>
 
     <!-- 主体：内部 Tab -->
@@ -149,7 +142,7 @@
               dict-key="mafka-swimlane"
               dict-name="泳道"
               placeholder="搜索泳道…"
-              :items="swimlanePickerItems"
+              :fetch-items="fetchSwimlaneWithTrunk"
               :current-value="currentSwimlaneForPicker"
               :allow-input="false"
               @update:show="swimlanePickerShow = $event"
@@ -303,7 +296,6 @@ const LS_KEY = 'mafka_view'
 
 const msg           = useMessage()
 const envTag        = ref<EnvTag>('test')
-const appkeyInput   = ref<string | null>(null)
 const selectedTopic = ref<SelectedTopic | null>(null)
 const swimlaneInput = ref('')
 
@@ -337,8 +329,8 @@ const topicPickerShow = ref(false)
 
 // ── Dict fetch fns ────────────────────────────────────────────────────────
 
-const fetchAppkeyItems = makeFetchItems('appkey')
-const fetchTopicItems  = makeFetchItems('kafka_topic')
+const fetchTopicItems    = makeFetchItems('kafka_topic')
+const fetchSwimlaneItems = makeFetchItems('swimlane')
 
 // ── Computed ──────────────────────────────────────────────────────────────
 
@@ -346,13 +338,14 @@ const fetchTopicItems  = makeFetchItems('kafka_topic')
 import type { DictItem } from '@/types'
 const TRUNK_ITEM: DictItem = { id: '__trunk__', name: '主干（不指定泳道）', value: '', description: '发送到默认主干', pinned: false, lastUsedAt: 0 }
 
-const swimlanePickerItems = computed((): DictItem[] => {
-  // 从 resultSwimlanes（查询结果里已有的泳道）补充到 picker
-  const fromResults = resultSwimlanes.value.map(sl => ({
-    id: sl, name: sl, value: sl, description: '', pinned: false, lastUsedAt: 0,
-  }))
-  return [TRUNK_ITEM, ...fromResults]
-})
+// 泳道 fetchItems：主干固定首位，其余从字典加载
+async function fetchSwimlaneWithTrunk(): Promise<DictItem[]> {
+  const items = await fetchSwimlaneItems()
+  return [TRUNK_ITEM, ...items]
+}
+if (fetchSwimlaneItems.clearCache) {
+  fetchSwimlaneWithTrunk.clearCache = fetchSwimlaneItems.clearCache
+}
 
 const currentSwimlaneForPicker = computed<ContextDataItem | null>(() => {
   if (!swimlaneInput.value) return { id: '__trunk__', name: '主干（不指定泳道）', value: '' }
@@ -442,10 +435,6 @@ function renderExpand(row: MafkaMessage) {
 
 // ── Handlers ─────────────────────────────────────────────────────────────
 
-function onAppkeyEdit(item: ContextDataItem) {
-  appkeyInput.value = item.value ?? null
-  saveLs()
-}
 
 function onTopicEdit(item: ContextDataItem) {
   selectedTopic.value = {
@@ -530,7 +519,7 @@ async function doSend() {
     const res = await sendMafkaMessage({
       topicId:  t.topicId,
       taskName: t.taskName,
-      appkey:   appkeyInput.value ?? '',
+      appkey:   '',
       message:  record.content,
       swimlane: record.swimlane,
     })
@@ -580,7 +569,7 @@ function formatCompose() {
 // ── Persistence ───────────────────────────────────────────────────────────
 
 function saveLs() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify({ appkey: appkeyInput.value, topic: selectedTopic.value, envTag: envTag.value })) }
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ topic: selectedTopic.value, envTag: envTag.value })) }
   catch { /* ignore */ }
 }
 
@@ -588,8 +577,7 @@ function restoreLs() {
   try {
     const raw = localStorage.getItem(LS_KEY)
     if (!raw) return
-    const { appkey, topic, envTag: env } = JSON.parse(raw)
-    if (appkey) appkeyInput.value   = appkey
+    const { topic, envTag: env } = JSON.parse(raw)
     if (topic)  selectedTopic.value = topic
     if (env)    envTag.value        = env
   } catch { /* ignore */ }
