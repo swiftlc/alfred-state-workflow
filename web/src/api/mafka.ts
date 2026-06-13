@@ -70,8 +70,9 @@ export interface SendMessageParams {
 }
 
 export async function sendMafkaMessage(p: SendMessageParams): Promise<{ success: boolean; msg: string; auditId?: number }> {
+  const sendTopicId = p.topicId + 1
   const content = JSON.stringify({
-    topicId:  p.topicId,
+    topicId:  sendTopicId,
     messages: p.message,
     swimlane: p.swimlane ?? '',
   })
@@ -82,7 +83,7 @@ export async function sendMafkaMessage(p: SendMessageParams): Promise<{ success:
       auditType:  'SEND_MESSAGE',
       content,
       taskName:   p.taskName,
-      topicId:    p.topicId,
+      topicId:    sendTopicId,
       appkey:     p.appkey,
     },
     HEADERS,
@@ -104,7 +105,7 @@ export interface QueryMessageParams {
 
 export async function queryMafkaMessages(p: QueryMessageParams): Promise<MafkaMessage[]> {
   const dt = p.dateTime ?? new Date().toLocaleString('sv-SE').replace('T', ' ')
-  const url = `${BASE}/mafka/restful/message/timestamp/query?topicId=${p.topicId}&dateTime=${encodeURIComponent(dt)}&limit=${p.limit ?? 10}`
+  const url = `${BASE}/mafka/restful/message/timestamp/query?topicId=${p.topicId + 1}&dateTime=${encodeURIComponent(dt)}&limit=${p.limit ?? 10}`
   const res = await proxyGet<{ code: number; msg: string; data: Array<{
     offset: number; timestamp: string; partitionId: number; content: string; msgId?: string
   }> }>(url, HEADERS)

@@ -210,7 +210,7 @@
             <span class="mafka-compose__label">条数</span>
             <input
               v-model.number="pullLimit"
-              class="mafka-inline-input w-10 text-center"
+              class="mafka-inline-input w-14 text-center"
               type="number"
               min="1"
               max="100"
