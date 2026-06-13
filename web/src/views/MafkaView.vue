@@ -64,18 +64,16 @@
     </div>
 
     <!-- 主体：内部 Tab -->
-    <template v-else>
-      <!-- 内部 Tab 头 -->
-      <div class="flex items-center gap-1 mb-4 shrink-0">
-        <button
-          v-for="tab in TABS" :key="tab.key"
-          class="mafka-tab-btn" :class="{ 'mafka-tab-btn--active': activeTab === tab.key }"
-          @click="activeTab = tab.key"
-        >{{ tab.label }}</button>
-      </div>
-
+    <n-tabs
+      v-else
+      v-model:value="activeTab"
+      type="line"
+      size="small"
+      class="flex-1 min-h-0 flex flex-col mafka-tabs"
+      :tab-style="{ paddingLeft: '4px', paddingRight: '4px' }"
+    >
       <!-- ══ Tab: 查询 ══ -->
-      <template v-if="activeTab === 'query'">
+      <n-tab-pane name="query" tab="查询消息" display-directive="show" class="flex-1 min-h-0 flex flex-col pt-3">
         <!-- 查询条件栏 -->
         <div class="flex items-center gap-2 mb-3 shrink-0">
           <n-date-picker
@@ -138,29 +136,32 @@
           :on-update:expanded-row-keys="onExpandChange"
           :render-expand="renderExpand"
         />
-      </template>
+      </n-tab-pane>
 
       <!-- ══ Tab: 发送 ══ -->
-      <template v-if="activeTab === 'send'">
+      <n-tab-pane name="send" tab="发送消息" display-directive="show" class="flex-1 min-h-0 flex flex-col pt-3">
         <div class="flex-1 min-h-0 flex flex-col gap-3">
-          <!-- 发送目标 -->
+          <!-- 发送目标：DictPicker 选泳道（含主干选项） -->
           <div class="flex items-center gap-2 shrink-0">
-            <span class="text-[11px] text-slate-400">发送到</span>
-            <div class="flex items-center gap-0.5">
-              <button class="mafka-env-btn" :class="{ 'mafka-env-btn--active': sendToTrunk }" @click="sendToTrunk = true">主干</button>
-              <button class="mafka-env-btn" :class="{ 'mafka-env-btn--active': !sendToTrunk }" @click="sendToTrunk = false">泳道</button>
-            </div>
-            <ContextItem
-              v-if="!sendToTrunk"
-              context-key="swimlane" :value="swimlaneInput" label="泳道"
-              :fetch-items="fetchSwimlaneItems" custom-edit bare
-              @edit="(item) => swimlaneInput = item.value ?? ''"
+            <span class="text-[11px] text-slate-400 flex-shrink-0">发送到</span>
+            <DictPicker
+              :show="swimlanePickerShow"
+              dict-key="mafka-swimlane"
+              dict-name="泳道"
+              placeholder="搜索泳道…"
+              :items="swimlanePickerItems"
+              :current-value="currentSwimlaneForPicker"
+              :allow-input="false"
+              @update:show="swimlanePickerShow = $event"
+              @select="onSwimlaneSelect"
+            />
+            <span
+              class="mafka-chip cursor-pointer flex-shrink-0"
+              :class="swimlaneInput ? 'mafka-chip--indigo' : 'mafka-chip--slate'"
+              @click="swimlanePickerShow = true"
             >
-              <span class="mafka-chip flex-shrink-0"
-                :class="swimlaneInput ? 'mafka-chip--indigo' : 'mafka-chip--empty mafka-chip--clickable'">
-                {{ swimlaneInput || '选择泳道…' }}
-              </span>
-            </ContextItem>
+              {{ swimlaneInput || '主干（不指定泳道）' }}
+            </span>
           </div>
 
           <!-- Monaco 编辑器 -->
@@ -179,7 +180,7 @@
               :loading="sending"
               :disabled="!composeText.trim() || sending"
               @click="doSend"
-            >发送{{ sendToTrunk ? '' : ' · 泳道' }}</n-button>
+            >发送{{ swimlaneInput ? ` · ${swimlaneInput}` : '' }}</n-button>
           </div>
 
           <!-- 发送历史 -->
@@ -199,8 +200,8 @@
             </div>
           </div>
         </div>
-      </template>
-    </template>
+      </n-tab-pane>
+    </n-tabs>
 
   </div>
   </ContextGroup>
@@ -263,7 +264,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
-import { NButton, NSpin, NInput, NDrawer, NDrawerContent, NDatePicker, NDataTable, useMessage } from 'naive-ui'
+import { NButton, NSpin, NInput, NDrawer, NDrawerContent, NDatePicker, NDataTable, NTabs, NTabPane, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { makeFetchItems } from '@/utils/dict'
 import ContextItem from '@/components/ContextItem.vue'
@@ -296,10 +297,6 @@ interface SendRecord {
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const ENV_TAGS: EnvTag[] = ['test', 'staging', 'prod']
-const TABS = [
-  { key: 'query', label: '查询消息' },
-  { key: 'send',  label: '发送消息' },
-] as const
 const LS_KEY = 'mafka_view'
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -331,20 +328,40 @@ function onExpandChange(keys: Array<string | number>) {
 }
 
 // 发送 tab
-const sending       = ref(false)
-const composeText   = ref('{}')
-const sendToTrunk   = ref(true)
-const sendHistory   = ref<SendRecord[]>([])
+const sending             = ref(false)
+const composeText         = ref('{}')
+const sendHistory         = ref<SendRecord[]>([])
+const swimlanePickerShow  = ref(false)
 
 const topicPickerShow = ref(false)
 
 // ── Dict fetch fns ────────────────────────────────────────────────────────
 
-const fetchAppkeyItems   = makeFetchItems('appkey')
-const fetchTopicItems    = makeFetchItems('kafka_topic')
-const fetchSwimlaneItems = makeFetchItems('swimlane')
+const fetchAppkeyItems = makeFetchItems('appkey')
+const fetchTopicItems  = makeFetchItems('kafka_topic')
 
 // ── Computed ──────────────────────────────────────────────────────────────
+
+// 泳道 DictPicker items：「主干」固定在首位，后跟从字典加载的泳道
+import type { DictItem } from '@/types'
+const TRUNK_ITEM: DictItem = { id: '__trunk__', name: '主干（不指定泳道）', value: '', description: '发送到默认主干', pinned: false, lastUsedAt: 0 }
+
+const swimlanePickerItems = computed((): DictItem[] => {
+  // 从 resultSwimlanes（查询结果里已有的泳道）补充到 picker
+  const fromResults = resultSwimlanes.value.map(sl => ({
+    id: sl, name: sl, value: sl, description: '', pinned: false, lastUsedAt: 0,
+  }))
+  return [TRUNK_ITEM, ...fromResults]
+})
+
+const currentSwimlaneForPicker = computed<ContextDataItem | null>(() => {
+  if (!swimlaneInput.value) return { id: '__trunk__', name: '主干（不指定泳道）', value: '' }
+  return { id: swimlaneInput.value, name: swimlaneInput.value, value: swimlaneInput.value }
+})
+
+function onSwimlaneSelect(item: ContextDataItem) {
+  swimlaneInput.value = item.value ?? ''
+}
 
 const currentTopicForPicker = computed<ContextDataItem | null>(() => {
   const t = selectedTopic.value
@@ -502,7 +519,7 @@ async function doSend() {
     id:        crypto.randomUUID(),
     content:   composeText.value.trim(),
     timestamp: Date.now(),
-    swimlane:  sendToTrunk.value ? undefined : (swimlaneInput.value || undefined),
+    swimlane:  swimlaneInput.value || undefined,
     status:    'sending',
   }
   sendHistory.value.unshift(record)
@@ -612,15 +629,6 @@ onMounted(() => {
 .mafka-swim-badge__dot { width:5px; height:5px; border-radius:50%; background:#818cf8; flex-shrink:0; }
 
 /* ── 内部 tab ── */
-.mafka-tab-btn {
-  font-size:12px; font-weight:500; padding:4px 14px;
-  border-radius:7px; border:1px solid #e2e8f0;
-  background:transparent; color:#94a3b8; cursor:pointer;
-  transition:all .1s;
-}
-.mafka-tab-btn:hover { background:#f8fafc; color:#475569; }
-.mafka-tab-btn--active { background:#eef2ff; border-color:#c7d2fe; color:#4338ca; }
-
 
 /* ── 泳道 tag ── */
 .mafka-sl-tag {
@@ -676,4 +684,9 @@ onMounted(() => {
   border-radius:8px; padding:8px 12px; margin-bottom:6px;
 }
 .sub-empty { font-size:12px; color:#94a3b8; padding:6px 0; }
+
+/* n-tabs 撑满高度 */
+:deep(.mafka-tabs.n-tabs) { display:flex; flex-direction:column; overflow:hidden; }
+:deep(.mafka-tabs .n-tabs-pane-wrapper) { flex:1; min-height:0; overflow:hidden; }
+:deep(.mafka-tabs .n-tab-pane) { height:100%; display:flex; flex-direction:column; }
 </style>
