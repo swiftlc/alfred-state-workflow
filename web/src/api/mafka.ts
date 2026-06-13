@@ -35,6 +35,7 @@ export interface MafkaMessage {
   timestamp:  number
   key?:       string
   value:      string
+  tag?:       string   // 泳道标签，来自 API 响应的 tag 字段
 }
 
 // ── Topic list ─────────────────────────────────────────────────────────────
@@ -107,7 +108,7 @@ export async function queryMafkaMessages(p: QueryMessageParams): Promise<MafkaMe
   const dt = p.dateTime ?? new Date().toLocaleString('sv-SE').replace('T', ' ')
   const url = `${BASE}/mafka/restful/message/timestamp/query?topicId=${p.topicId + 1}&dateTime=${encodeURIComponent(dt)}&limit=${p.limit ?? 10}`
   const res = await proxyGet<{ code: number; msg: string; data: Array<{
-    offset: number; timestamp: string; partitionId: number; content: string; msgId?: string
+    offset: number; timestamp: string; partitionId: number; content: string; msgId?: string; tag?: string | null
   }> }>(url, HEADERS)
   if (res.code !== 0 || !Array.isArray(res.data)) return []
   return res.data.map(m => ({
@@ -116,6 +117,7 @@ export async function queryMafkaMessages(p: QueryMessageParams): Promise<MafkaMe
     timestamp: new Date(m.timestamp).getTime(),
     value:     m.content,
     key:       m.msgId,
+    tag:       m.tag ?? undefined,
   }))
 }
 

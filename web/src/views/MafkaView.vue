@@ -97,7 +97,7 @@
         </div>
 
         <!-- 过滤栏（有结果后显示） -->
-        <div v-if="queryResult.length" class="flex items-center gap-2 mb-3 shrink-0flex-wrap">
+        <div v-if="queryResult.length" class="flex items-center gap-2 mb-3 shrink-0 flex-wrap">
           <n-input
             v-model:value="filterKeyword"
             size="small"
@@ -119,43 +119,25 @@
           </span>
         </div>
 
-        <!-- 消息列表 -->
-        <div class="flex-1 min-h-0 overflow-y-auto space-y-1.5">
-          <div v-if="!queryResult.length && !pulling" class="flex-1 flex items-center justify-center pt-16">
-            <span class="text-sm text-slate-300">点击「查询」获取最近消息</span>
-          </div>
-
-          <div
-            v-for="msg in filteredResult"
-            :key="`${msg.partition}-${msg.offset}`"
-            class="mafka-msg-card"
-            :class="{ 'mafka-msg-card--expanded': expandedMsgKey === msgKey(msg) }"
-            @click="toggleExpand(msg)"
-          >
-            <!-- 头部元信息行 -->
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-[10px] font-mono text-slate-400 flex-shrink-0">
-                p{{ msg.partition }} @{{ msg.offset }}
-              </span>
-              <span class="text-[10px] text-slate-400 flex-shrink-0">{{ formatTs(msg.timestamp) }}</span>
-              <!-- 泳道 tags（从 msg tags 字段或内容解析） -->
-              <template v-if="parseMsgMeta(msg).swimlanes.length">
-                <span
-                  v-for="sl in parseMsgMeta(msg).swimlanes" :key="sl"
-                  class="mafka-sl-tag"
-                >{{ sl }}</span>
-              </template>
-              <span class="flex-1" />
-              <span class="text-[10px] text-slate-300">{{ expandedMsgKey === msgKey(msg) ? '收起 ▲' : '展开 ▼' }}</span>
-            </div>
-
-            <!-- 内容预览 / 展开 -->
-            <div v-if="expandedMsgKey !== msgKey(msg)" class="mafka-msg-preview">
-              {{ msgPreview(msg.value) }}
-            </div>
-            <pre v-else class="mafka-msg-full">{{ formatJson(msg.value) }}</pre>
-          </div>
+        <!-- 消息表格：固定表头，内容滚动 -->
+        <div v-if="!queryResult.length && !pulling" class="flex-1 flex items-center justify-center">
+          <span class="text-sm text-slate-300">点击「查询」获取最近消息</span>
         </div>
+        <n-data-table
+          v-else
+          :columns="msgColumns"
+          :data="filteredResult"
+          :loading="pulling"
+          :bordered="false"
+          :single-line="false"
+          size="small"
+          flex-height
+          class="flex-1"
+          :row-key="(row: MafkaMessage) => `${row.partition}-${row.offset}`"
+          :expanded-row-keys="expandedKeys"
+          :on-update:expanded-row-keys="onExpandChange"
+          :render-expand="renderExpand"
+        />
       </template>
 
       <!-- ══ Tab: 发送 ══ -->
@@ -280,8 +262,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { NButton, NSpin, NInput, NDrawer, NDrawerContent, NDatePicker, useMessage } from 'naive-ui'
+import { ref, computed, onMounted, h } from 'vue'
+import { NButton, NSpin, NInput, NDrawer, NDrawerContent, NDatePicker, NDataTable, useMessage } from 'naive-ui'
+import type { DataTableColumns } from 'naive-ui'
 import { makeFetchItems } from '@/utils/dict'
 import ContextItem from '@/components/ContextItem.vue'
 import ContextGroup from '@/components/ContextGroup.vue'
@@ -339,9 +322,13 @@ const pulling       = ref(false)
 const pullDateTs    = ref<number | null>(null)
 const pullLimit     = ref(10)
 const queryResult   = ref<MafkaMessage[]>([])
-const filterKeyword = ref('')
+const filterKeyword  = ref('')
 const filterSwimlane = ref('')
-const expandedMsgKey = ref('')
+const expandedKeys   = ref<Array<string | number>>([])
+
+function onExpandChange(keys: Array<string | number>) {
+  expandedKeys.value = keys
+}
 
 // 发送 tab
 const sending       = ref(false)
@@ -365,12 +352,15 @@ const currentTopicForPicker = computed<ContextDataItem | null>(() => {
   return { id: String(t.topicId), name: t.displayName, value: t.taskName }
 })
 
-/** 从查询结果里提取唯一泳道列表 */
+/** tag 字段直接是泳道标签字符串 */
+function getMsgTag(m: MafkaMessage): string {
+  return m.tag ?? ''
+}
+
+/** 从查询结果里提取唯一泳道列表（来自 tag 字段） */
 const resultSwimlanes = computed<string[]>(() => {
   const set = new Set<string>()
-  queryResult.value.forEach(m => {
-    parseMsgMeta(m).swimlanes.forEach(sl => set.add(sl))
-  })
+  queryResult.value.forEach(m => { if (m.tag) set.add(m.tag) })
   return Array.from(set).sort()
 })
 
@@ -382,10 +372,56 @@ const filteredResult = computed<MafkaMessage[]>(() => {
     list = list.filter(m => m.value.toLowerCase().includes(kw))
   }
   if (filterSwimlane.value) {
-    list = list.filter(m => parseMsgMeta(m).swimlanes.includes(filterSwimlane.value))
+    list = list.filter(m => m.tag === filterSwimlane.value)
   }
   return list
 })
+
+/** 表格列定义 */
+const msgColumns: DataTableColumns<MafkaMessage> = [
+  {
+    title: '时间',
+    key: 'timestamp',
+    width: 86,
+    render: (row) => h('span', { style: 'font-size:11px;color:#94a3b8;white-space:nowrap' }, formatTs(row.timestamp)),
+  },
+  {
+    title: '泳道',
+    key: 'tag',
+    width: 140,
+    render: (row) => {
+      const tag = getMsgTag(row)
+      if (!tag) return h('span', { style: 'color:#d1d5db;font-size:11px' }, '—')
+      return h('span', {
+        style: 'display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:1px 7px;border-radius:4px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px',
+        title: tag,
+      }, tag)
+    },
+  },
+  {
+    title: '内容',
+    key: 'value',
+    render: (row) => h('span', {
+      style: 'font-family:Menlo,Monaco,monospace;font-size:11.5px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:100%',
+      title: row.value,
+    }, msgPreview(row.value)),
+  },
+  {
+    title: 'p/offset',
+    key: 'offset',
+    width: 90,
+    render: (row) => h('span', {
+      style: 'font-family:monospace;font-size:10px;color:#94a3b8;white-space:nowrap',
+    }, `p${row.partition}@${row.offset}`),
+  },
+]
+
+/** 展开行：显示格式化 JSON */
+function renderExpand(row: MafkaMessage) {
+  return h('pre', {
+    style: 'font-family:Menlo,Monaco,monospace;font-size:11.5px;color:#334155;line-height:1.6;white-space:pre-wrap;word-break:break-all;margin:0;padding:10px 14px;background:#f8fafc;border-radius:6px;max-height:300px;overflow-y:auto',
+  }, formatJson(row.value))
+}
 
 // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -441,7 +477,7 @@ async function doPull() {
   pulling.value = true
   filterKeyword.value  = ''
   filterSwimlane.value = ''
-  expandedMsgKey.value = ''
+  expandedKeys.value   = []
   try {
     const dt = pullDateTs.value
       ? new Date(pullDateTs.value).toLocaleString('sv-SE').replace('T', ' ')
@@ -501,30 +537,6 @@ async function doSend() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function msgKey(m: MafkaMessage) { return `${m.partition}-${m.offset}` }
-
-function toggleExpand(m: MafkaMessage) {
-  const k = msgKey(m)
-  expandedMsgKey.value = expandedMsgKey.value === k ? '' : k
-}
-
-/**
- * 从消息内容里解析元信息：泳道标签
- * Mafka 泳道标签通常在 header 或 content 里，
- * 这里尝试从 JSON content 的 tag / swimlane / __swimlane 字段提取
- */
-function parseMsgMeta(m: MafkaMessage): { swimlanes: string[] } {
-  const swimlanes: string[] = []
-  try {
-    const obj = JSON.parse(m.value) as Record<string, unknown>
-    const candidates = [obj.tag, obj.swimlane, obj.__swimlane, obj.swimlaneName]
-    candidates.forEach(v => {
-      if (typeof v === 'string' && v.trim()) swimlanes.push(v.trim())
-      else if (Array.isArray(v)) v.forEach(x => typeof x === 'string' && swimlanes.push(x))
-    })
-  } catch { /* 非 JSON，忽略 */ }
-  return { swimlanes: [...new Set(swimlanes)] }
-}
 
 function msgPreview(v: string): string {
   try {
@@ -609,27 +621,6 @@ onMounted(() => {
 .mafka-tab-btn:hover { background:#f8fafc; color:#475569; }
 .mafka-tab-btn--active { background:#eef2ff; border-color:#c7d2fe; color:#4338ca; }
 
-/* ── 消息卡片 ── */
-.mafka-msg-card {
-  border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px;
-  background:#fff; cursor:pointer; transition:border-color .1s, box-shadow .1s;
-}
-.mafka-msg-card:hover { border-color:#c7d2fe; box-shadow:0 1px 4px rgba(99,102,241,.08); }
-.mafka-msg-card--expanded { border-color:#a5b4fc; }
-
-.mafka-msg-preview {
-  font-family: 'Menlo','Monaco',monospace;
-  font-size:11.5px; color:#475569; line-height:1.5;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-
-.mafka-msg-full {
-  font-family: 'Menlo','Monaco',monospace;
-  font-size:11.5px; color:#334155; line-height:1.6;
-  white-space:pre-wrap; word-break:break-all;
-  margin:0; max-height:320px; overflow-y:auto;
-  background:#f8fafc; border-radius:6px; padding:8px 10px; margin-top:6px;
-}
 
 /* ── 泳道 tag ── */
 .mafka-sl-tag {
