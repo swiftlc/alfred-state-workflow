@@ -225,14 +225,14 @@
               v-if="schemaOpen[i] && hasSchema(i)"
               class="text-[10px] font-mono bg-slate-50 border border-slate-100 rounded p-2 overflow-auto max-h-44 mb-1.5 leading-relaxed"
             >{{ formatSchema(i) }}</pre>
-            <n-input
-              v-model:value="paramValues[i]"
-              type="textarea"
-              :autosize="{ minRows: 4, maxRows: 14 }"
-              placeholder="{}"
-              class="font-mono text-xs"
-              @blur="prettyParam(i)"
-            />
+            <!-- ✦ Monaco JSON 编辑器（语法高亮 + 格式化） -->
+            <div class="border border-slate-200 rounded-lg overflow-hidden">
+              <LcMonacoEditor
+                v-model="paramValues[i]"
+                language="json"
+                height="140px"
+              />
+            </div>
           </template>
         </div>
 
@@ -242,7 +242,10 @@
 
         <!-- 调用按钮 -->
         <div class="flex items-center gap-2 mb-4">
-          <n-button type="primary" :loading="invoking" @click="doInvoke">调用</n-button>
+          <n-button type="primary" :loading="invoking" title="⌘↵" @click="doInvoke">
+            调用
+            <span class="octo-kbd" style="margin-left:6px">⌘↵</span>
+          </n-button>
           <span v-if="invokeMs != null" class="text-xs text-slate-400">{{ invokeMs }}ms</span>
         </div>
 
@@ -291,8 +294,18 @@
                 <button class="invoke-save-btn invoke-save-btn--confirm" title="保存 (Enter)" @click="doSave">↵</button>
                 <button class="invoke-save-btn invoke-save-btn--cancel" title="取消 (Esc)" @click="cancelSaveDraft">✕</button>
               </template>
+              <!-- ✦ 复制 JSON（有返回数据时可见） -->
               <button
-                v-else
+                v-if="parsedResult?.returnStr && !saveDraft.active"
+                class="invoke-save-btn"
+                :class="{ 'invoke-save-btn--saved': copyResultDone }"
+                title="复制返回 JSON"
+                @click="copyResult"
+              >{{ copyResultDone ? '✓ 已复制' : '复制 JSON' }}</button>
+
+              <!-- 收藏区 -->
+              <button
+                v-if="!saveDraft.active"
                 class="invoke-save-btn"
                 :class="{ 'invoke-save-btn--saved': saveDraft.saved }"
                 :disabled="saveDraft.saved"
@@ -314,10 +327,11 @@
 
       </template>
 
-      <!-- 空状态 -->
-      <div v-else class="flex flex-col items-center justify-center h-full text-slate-300 select-none">
-        <div class="text-5xl mb-3">🔌</div>
-        <div class="text-sm">查询节点后选择方法进行调用</div>
+      <!-- ✦ 空状态 -->
+      <div v-else class="flex flex-col items-center justify-center h-full select-none">
+        <component :is="Plug" :size="44" class="text-slate-200 mb-4" />
+        <p class="text-[13.5px] font-medium text-slate-400 mb-1">选择服务方法开始调用</p>
+        <p class="text-xs text-slate-300">输入 Appkey → 选节点 → 选方法 → 调用</p>
       </div>
     </div><!-- 结束参数区 -->
 
@@ -342,8 +356,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, onDeactivated, reactive, watch, nextTick } from 'vue'
-import { NInput, NButton, NSpin, NModal, useMessage } from 'naive-ui'
-import { Search, Zap, Check, CornerDownLeft } from '@lucide/vue'
+import { NButton, NSpin, NModal, useMessage } from 'naive-ui'
+import { Search, Zap, Check, CornerDownLeft, Plug } from '@lucide/vue'
+import LcMonacoEditor from '@/components/lowcode/LcMonacoEditor.vue'
 import { makeFetchItems } from '@/utils/dict'
 import { matchQuery, shortName } from '@/utils/search'
 import ContextItem from '@/components/ContextItem.vue'
@@ -408,6 +423,10 @@ const templateLoading  = ref(false)
 const invokeResult     = ref<unknown>(undefined)
 const invokeError      = ref('')
 const invokeMs         = ref<number | null>(null)
+const copyResultDone   = ref(false)
+
+// ✦ methods 缓存：key = `${appkey}:${ip}:${port}`
+const methodsCache = ref(new Map<string, Map<string, OctoMethodItem[]>>())
 
 // ─── 调用历史 ──────────────────────────────────────────────────────────────────
 
@@ -605,6 +624,17 @@ function clearResult() {
   invokeResult.value = undefined
   invokeError.value  = ''
   invokeMs.value     = null
+  copyResultDone.value = false
+}
+
+// ✦ 复制结果 JSON
+let copyTimer: ReturnType<typeof setTimeout> | null = null
+function copyResult() {
+  if (!parsedResult.value?.returnStr) return
+  navigator.clipboard.writeText(parsedResult.value.returnStr)
+  copyResultDone.value = true
+  if (copyTimer) clearTimeout(copyTimer)
+  copyTimer = setTimeout(() => { copyResultDone.value = false }, 1500)
 }
 
 // ─── 方法选择器 ────────────────────────────────────────────────────────────────
@@ -730,10 +760,11 @@ async function doQueryNodes(): Promise<boolean> {
   const appkey = appkeyInput.value?.trim()
   if (!appkey) return false
 
-  nodesLoading.value  = true
-  currentNode.value   = null
-  methodGroups.value  = new Map()
+  nodesLoading.value   = true
+  currentNode.value    = null
+  methodGroups.value   = new Map()
   selectedMethod.value = null
+  methodsCache.value   = new Map()   // ✦ 刷新节点时清空 methods 缓存
   clearResult()
 
   try {
@@ -764,9 +795,17 @@ async function doQueryNodes(): Promise<boolean> {
 
 async function loadMethods() {
   if (!currentNode.value || !appkeyInput.value) return
+  const { ip, port } = currentNode.value
+  const cacheKey = `${appkeyInput.value}:${ip}:${port}`
+
+  // ✦ 缓存命中：直接复用，不重复 fetch
+  if (methodsCache.value.has(cacheKey)) {
+    methodGroups.value = methodsCache.value.get(cacheKey)!
+    return
+  }
+
   methodsLoading.value = true
   try {
-    const { ip, port } = currentNode.value
     const qs  = new URLSearchParams({ appkey: appkeyInput.value, host: ip, port: String(port) })
     const res  = await fetch(`/api/octo-invoke/methods?${qs}`)
     const json = await res.json() as { success: boolean; data?: Record<string, Record<string, unknown>>; msg?: string }
@@ -781,6 +820,7 @@ async function loadMethods() {
       groups.set(svcName, items)
     }
     methodGroups.value = groups
+    methodsCache.value.set(cacheKey, groups)  // ✦ 写入缓存
   } catch (e) {
     message.error(`加载方法失败: ${(e as Error).message}`)
   } finally {
@@ -972,6 +1012,13 @@ function onKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault()
     openFavoritesModal()
+  }
+  // ✦ Cmd+Enter：快速触发调用
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if (selectedMethod.value && !invoking.value) {
+      e.preventDefault()
+      doInvoke()
+    }
   }
 }
 
