@@ -63,25 +63,6 @@
           </button>
         </nav>
 
-        <!-- ✦ 搜索触发按钮 -->
-        <button
-          class="flex items-center gap-2 mx-2 mb-1.5 px-3 py-2 rounded-lg text-slate-400
-                 hover:bg-slate-50 hover:text-slate-600 transition-all duration-150 shrink-0 cursor-pointer
-                 outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 appearance-none bg-transparent border-0"
-          :class="collapsed ? 'justify-center px-0 mx-1' : ''"
-          :title="collapsed ? '搜索 (⌘K)' : ''"
-          @click="globalSearchShow = true"
-        >
-          <component :is="Search" :size="14" class="shrink-0 text-slate-400" />
-          <span
-            class="flex items-center justify-between flex-1 transition-all duration-200 overflow-hidden"
-            :style="collapsed ? 'opacity:0;max-width:0' : 'opacity:1;max-width:180px'"
-          >
-            <span class="text-[12.5px]">搜索</span>
-            <kbd class="text-[10px] bg-slate-100 border border-slate-200 rounded px-1 py-0.5 text-slate-400">⌘K</kbd>
-          </span>
-        </button>
-
         <!-- ✦ 折叠按钮：图标旋转动画 -->
         <button
           class="flex items-center justify-center w-full h-10 text-slate-400 hover:bg-slate-50
@@ -113,25 +94,21 @@
 
     </div>
 
-    <!-- ✦ 全局搜索弹窗（Cmd+K） -->
-    <GlobalSearch v-model:show="globalSearchShow" />
-
     </n-dialog-provider>
     </n-message-provider>
   </n-config-provider>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { BookOpen, History, Layers, Zap, BarChart2, Activity, Sliders, Network, Terminal, Radio, ChevronLeft, Gamepad2, Search } from '@lucide/vue'
+import { BookOpen, History, Layers, Zap, BarChart2, Activity, Sliders, Network, Terminal, Radio, ChevronLeft, Gamepad2 } from '@lucide/vue'
 import type { Component } from 'vue'
 import {
   NConfigProvider, NMessageProvider, NDialogProvider,
   zhCN, dateZhCN,
 } from 'naive-ui'
 import type { GlobalThemeOverrides } from 'naive-ui'
-import GlobalSearch from '@/components/GlobalSearch.vue'
 
 const router = useRouter()
 const route  = useRoute()
@@ -139,17 +116,6 @@ const route  = useRoute()
 // ✦ 折叠状态持久化到 localStorage
 const collapsed = ref(localStorage.getItem('sidebar_collapsed') === 'true')
 watch(collapsed, v => localStorage.setItem('sidebar_collapsed', String(v)))
-
-// ✦ 全局搜索（Cmd+K）
-const globalSearchShow = ref(false)
-function onGlobalKeydown(e: KeyboardEvent) {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-    e.preventDefault()
-    globalSearchShow.value = !globalSearchShow.value
-  }
-}
-onMounted(()   => window.addEventListener('keydown', onGlobalKeydown))
-onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown))
 
 const keepAliveComponents = computed(() =>
   router.getRoutes()
