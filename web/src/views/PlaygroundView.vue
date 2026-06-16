@@ -5,15 +5,6 @@
     <div class="flex items-center mb-4 shrink-0 gap-2">
       <h1 class="text-lg font-semibold text-slate-800 tracking-tight">Playground</h1>
 
-      <!-- ✦ 排序选择 -->
-      <n-select
-        v-model:value="sortBy"
-        :options="sortOptions"
-        size="small"
-        style="width:110px"
-        :consistent-menu-width="false"
-      />
-
       <div class="flex-1" />
 
       <!-- ✦ 搜索触发按钮 -->
@@ -58,7 +49,7 @@
     <div v-else class="flex-1 overflow-y-auto pr-1">
       <div class="grid grid-cols-3 gap-3">
         <div
-          v-for="page in sortedPages"
+          v-for="page in pages"
           :key="page.id"
           class="group relative border border-slate-200 rounded-xl bg-white
                  hover:border-indigo-300 hover:shadow-md
@@ -235,7 +226,7 @@ defineOptions({ name: 'PlaygroundView' })
 
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NModal, NInput, NTooltip, NSelect, useDialog, useMessage } from 'naive-ui'
+import { NButton, NModal, NInput, NTooltip, useDialog, useMessage } from 'naive-ui'
 import { Play, Code2, Download, Trash2, RotateCcw, ChevronLeft, Gamepad2, Search, CornerDownLeft, Copy, PackageOpen } from '@lucide/vue'
 import { usePlayground } from '@/composables/usePlayground'
 import { formatTime } from '@/utils/search'
@@ -249,16 +240,6 @@ const router = useRouter()
 const { pages, createPage, deletePage, renamePage, importPage, duplicatePage, exportAll, clearAll } = usePlayground()
 const dialog  = useDialog()
 const message = useMessage()
-
-// ── 排序 ──────────────────────────────────────────────────────────────────────
-const sortBy = ref<'updatedAt' | 'createdAt'>('updatedAt')
-const sortOptions = [
-  { label: '最近修改', value: 'updatedAt' },
-  { label: '最近创建', value: 'createdAt' },
-]
-const sortedPages = computed(() =>
-  [...pages.value].sort((a, b) => b[sortBy.value] - a[sortBy.value])
-)
 
 // ── Cmd+K 搜索 ────────────────────────────────────────────────────────────────
 const searchShow = ref(false)
