@@ -23,8 +23,8 @@ if (!self.MonacoEnvironment) {
 // 挂到 monaco 对象本身而非模块变量，HMR 热重载后 monaco 单例依旧持有标记，不重复注册
 function ensureCompletions() {
   const KEY = '__lc_completions_v1__'
-  if ((monaco as any)[KEY]) return
-  ;(monaco as any)[KEY] = true
+  if ((window as any)[KEY]) return
+  ;(window as any)[KEY] = true
   monaco.languages.registerCompletionItemProvider('javascript', {
     triggerCharacters: ['$', '.'],
     provideCompletionItems(model, position) {
@@ -47,8 +47,8 @@ function ensureCompletions() {
 // 标记挂在 monaco 单例上，HMR 热重载后不会重复注册
 function ensurePlaygroundCompletions() {
   const KEY = '__pg_completions_v1__'
-  if ((monaco as any)[KEY]) return
-  ;(monaco as any)[KEY] = true
+  if ((window as any)[KEY]) return
+  ;(window as any)[KEY] = true
 
   const mk = monaco.languages.CompletionItemKind
   const IR = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
