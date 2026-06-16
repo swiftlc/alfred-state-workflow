@@ -118,6 +118,14 @@ export function usePlayground() {
     return createPage(original.name + '（副本）', original.html, original.prompt)
   }
 
+  /** 清空所有页面（含内置页） */
+  function clearAll(): void {
+    pages.value.forEach(p => removePage(p.id))
+    pages.value = []
+    writeIndex([])
+    localStorage.removeItem(BUILTIN_VER_KEY) // 下次进入重新写入内置页
+  }
+
   /** 导出全部页面为 JSON 文件 */
   function exportAll(): void {
     const all = pages.value.map(p => readPage(p.id)).filter((p): p is PlaygroundPage => p !== null)

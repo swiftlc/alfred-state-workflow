@@ -36,6 +36,11 @@
         导出全部
       </n-button>
 
+      <!-- ✦ 清空全部 -->
+      <n-button size="small" type="error" ghost title="删除全部页面" @click="handleClearAll">
+        <template #icon><component :is="Trash2" :size="13" /></template>
+      </n-button>
+
       <n-button size="small" @click="handleImport">导入</n-button>
       <input ref="importInputRef" type="file" accept=".json" class="hidden" @change="onImportFile" />
       <n-button type="primary" size="small" @click="handleCreate">+ 新建页面</n-button>
@@ -241,7 +246,7 @@ import InlineEdit       from '@/components/InlineEdit.vue'
 import DictPicker       from '@/components/DictPicker.vue'
 
 const router = useRouter()
-const { pages, createPage, deletePage, renamePage, importPage, duplicatePage, exportAll } = usePlayground()
+const { pages, createPage, deletePage, renamePage, importPage, duplicatePage, exportAll, clearAll } = usePlayground()
 const dialog  = useDialog()
 const message = useMessage()
 
@@ -330,6 +335,17 @@ function confirmCreate() {
   const name = createModal.name.trim() || `页面 ${pages.value.length + 1}`
   handleEdit(createPage(name, EMPTY_HTML(name)))
   createModal.show = false
+}
+
+// ── 清空全部 ──────────────────────────────────────────────────────────────────
+function handleClearAll() {
+  dialog.warning({
+    title:        '清空全部页面',
+    content:      `将删除全部 ${pages.value.length} 个页面，此操作不可撤销。`,
+    positiveText: '确认清空',
+    negativeText: '取消',
+    onPositiveClick: () => { clearAll(); message.success('已清空全部页面') },
+  })
 }
 
 // ── 复制 ──────────────────────────────────────────────────────────────────────
