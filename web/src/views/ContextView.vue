@@ -233,8 +233,8 @@ async function onPickerSelect(item: ContextDataItem) {
   try {
     await setContext(context.value)
     message.success(`已更新 ${dictNameOf(picker.key)}`)
-  } catch {
-    message.error('保存失败')
+  } catch (e) {
+    message.error((e as Error).message || '保存失败')
   }
 }
 
