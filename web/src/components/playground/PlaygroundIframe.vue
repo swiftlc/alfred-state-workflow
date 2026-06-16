@@ -78,7 +78,8 @@ const BRIDGE_SCRIPT = `
   window.$http    = function(url, options) { return _call('http', { url, options: options || {} }) }
   window.$octo    = function(body)         { return _call('octo', { body }) }
   window.$openUrl = function(url)          { return _call('openUrl', { url }) }
-  window.$pg      = { sql: window.$sql, http: window.$http, octo: window.$octo, openUrl: window.$openUrl }
+  window.$ctx     = function() { return _call('ctx', {}) }
+  window.$pg      = { sql: window.$sql, http: window.$http, octo: window.$octo, openUrl: window.$openUrl, ctx: window.$ctx }
 })()
 <\/script>
 `
@@ -138,6 +139,11 @@ async function handleMessage(e: MessageEvent) {
         body:    JSON.stringify(d.body),
       })
       result = await res.json()
+
+    } else if (type === 'ctx') {
+      const res  = await fetch('/internal/context')
+      const json = await res.json() as { code: number; data: unknown }
+      result = json.code === 0 ? json.data : null
 
     } else if (type === 'openUrl') {
       window.open(d.url, '_blank')
