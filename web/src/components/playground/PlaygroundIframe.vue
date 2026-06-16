@@ -8,15 +8,27 @@
       <n-spin size="medium" />
     </div>
 
-    <!-- 错误提示 -->
-    <div
-      v-if="lastError"
-      class="absolute bottom-3 left-3 right-3 z-20 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600 font-mono flex items-start gap-2"
-    >
-      <span class="flex-shrink-0 font-bold">错误</span>
-      <span class="flex-1 break-all">{{ lastError }}</span>
-      <button class="flex-shrink-0 text-red-400 hover:text-red-600" @click="lastError = ''">✕</button>
-    </div>
+    <!-- ✦ 错误提示（顶部居中，醒目，5s 自动消失） -->
+    <transition name="err-slide">
+      <div
+        v-if="lastError"
+        class="absolute top-3 left-4 right-4 z-30 flex items-start gap-2.5
+               bg-red-600 text-white rounded-xl px-4 py-3 shadow-lg"
+        style="font-size:12.5px;line-height:1.5"
+      >
+        <!-- 警告图标 -->
+        <svg class="shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <!-- 内容 -->
+        <span class="flex-1 font-mono break-all opacity-95">{{ lastError }}</span>
+        <!-- 倒计时 + 关闭 -->
+        <div class="flex items-center gap-2 shrink-0">
+          <span v-if="errorCountdown > 0" class="text-red-200 text-[11px] font-mono">{{ errorCountdown }}s</span>
+          <button class="text-red-200 hover:text-white transition-colors leading-none" @click="dismissError">✕</button>
+        </div>
+      </div>
+    </transition>
 
     <iframe
       ref="iframeRef"
@@ -35,9 +47,31 @@ import { NSpin } from 'naive-ui'
 const props = defineProps<{ html: string }>()
 const emit  = defineEmits<{ error: [msg: string] }>()
 
-const iframeRef = ref<HTMLIFrameElement | null>(null)
-const loading   = ref(true)
-const lastError = ref('')
+const iframeRef       = ref<HTMLIFrameElement | null>(null)
+const loading         = ref(true)
+const lastError       = ref('')
+const errorCountdown  = ref(0)
+let errorDismissTimer: ReturnType<typeof setTimeout>  | null = null
+let errorCountTimer:   ReturnType<typeof setInterval> | null = null
+
+function showError(msg: string) {
+  lastError.value      = msg
+  errorCountdown.value = 5
+  if (errorDismissTimer) clearTimeout(errorDismissTimer)
+  if (errorCountTimer)   clearInterval(errorCountTimer)
+  errorDismissTimer = setTimeout(() => { lastError.value = ''; errorCountdown.value = 0 }, 5000)
+  errorCountTimer   = setInterval(() => {
+    errorCountdown.value = Math.max(0, errorCountdown.value - 1)
+    if (errorCountdown.value === 0) { clearInterval(errorCountTimer!); errorCountTimer = null }
+  }, 1000)
+}
+
+function dismissError() {
+  lastError.value = ''
+  errorCountdown.value = 0
+  if (errorDismissTimer) { clearTimeout(errorDismissTimer);   errorDismissTimer = null }
+  if (errorCountTimer)   { clearInterval(errorCountTimer);    errorCountTimer   = null }
+}
 
 // ─── 注入桥接脚本 ──────────────────────────────────────────────────────────────
 
@@ -157,7 +191,7 @@ async function handleMessage(e: MessageEvent) {
 
   } catch (err) {
     const msg = (err as Error).message
-    lastError.value = msg
+    showError(msg)
     emit('error', msg)
     iframeRef.value?.contentWindow?.postMessage({ __pg_resp: true, id, error: msg }, '*')
   }
@@ -165,9 +199,21 @@ async function handleMessage(e: MessageEvent) {
 
 function onLoad() { loading.value = false }
 
-// HTML 变化时重置 loading
-watch(() => props.html, () => { loading.value = true; lastError.value = '' })
+// HTML 变化时重置 loading 和错误
+watch(() => props.html, () => { loading.value = true; dismissError() })
 
 onMounted(()   => window.addEventListener('message', handleMessage))
-onUnmounted(() => window.removeEventListener('message', handleMessage))
+onUnmounted(() => {
+  window.removeEventListener('message', handleMessage)
+  if (errorDismissTimer) clearTimeout(errorDismissTimer)
+  if (errorCountTimer)   clearInterval(errorCountTimer)
+})
 </script>
+
+
+<style scoped>
+.err-slide-enter-active { transition: all 0.2s ease-out }
+.err-slide-leave-active { transition: all 0.15s ease-in }
+.err-slide-enter-from   { opacity: 0; transform: translateY(-8px) }
+.err-slide-leave-to     { opacity: 0; transform: translateY(-8px) }
+</style>
