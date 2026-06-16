@@ -26,7 +26,7 @@ if (!self.MonacoEnvironment) {
 // ─── 低代码 API 补全（javascript 语言，全局只注册一次） ─────────────────────────
 // 挂到 monaco 对象本身而非模块变量，HMR 热重载后 monaco 单例依旧持有标记，不重复注册
 function ensureCompletions() {
-  const KEY = '__lc_completions_v1__'
+  const KEY = '__lc_completions_v2__'
   if ((window as any)[KEY]) return
   ;(window as any)[KEY] = true
   monaco.languages.registerCompletionItemProvider('javascript', {
@@ -50,7 +50,7 @@ function ensureCompletions() {
 // 只注册 'html'：避免与 Monaco 对 html 内嵌 <script> 的 javascript 提供方叠加产生重复项
 // 标记挂在 monaco 单例上，HMR 热重载后不会重复注册
 function ensurePlaygroundCompletions() {
-  const KEY = '__pg_completions_v1__'
+  const KEY = '__pg_completions_v2__'
   if ((window as any)[KEY]) return
   ;(window as any)[KEY] = true
 
