@@ -2,6 +2,8 @@ import type { DictMeta, DictItem, HistoryItem, Workspace, Alias, Task, Context, 
 
 const BASE = '/api/alfred'
 
+interface ApiResponse<T> { code: number; data: T; msg?: string }
+
 async function internalRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 15_000)
@@ -20,12 +22,10 @@ async function internalRequest<T>(method: string, path: string, body?: unknown):
     clearTimeout(timer)
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const json = await res.json() as { code: number; data: T; msg?: string }
+  const json: ApiResponse<T> = await res.json()
   if (json.code !== 0) throw new Error(json.msg ?? `API error ${json.code}`)
   return json.data
 }
-
-interface ApiResponse<T> { code: number; data: T; msg?: string }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const controller = new AbortController()
