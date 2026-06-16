@@ -20,10 +20,12 @@ if (!self.MonacoEnvironment) {
 }
 
 // ─── 低代码 API 补全（javascript 语言，全局只注册一次） ─────────────────────────
-let _lcCompletionDispose: { dispose(): void } | null = null
+// 挂到 monaco 对象本身而非模块变量，HMR 热重载后 monaco 单例依旧持有标记，不重复注册
 function ensureCompletions() {
-  if (_lcCompletionDispose) return
-  _lcCompletionDispose = monaco.languages.registerCompletionItemProvider('javascript', {
+  const KEY = '__lc_completions_v1__'
+  if ((monaco as any)[KEY]) return
+  ;(monaco as any)[KEY] = true
+  monaco.languages.registerCompletionItemProvider('javascript', {
     triggerCharacters: ['$', '.'],
     provideCompletionItems(model, position) {
       const word  = model.getWordUntilPosition(position)
@@ -40,83 +42,34 @@ function ensureCompletions() {
   })
 }
 
-// ─── Playground API 补全（html + javascript 语言，全局只注册一次） ──────────────
-let _pgCompletionDisposed = false
+// ─── Playground API 补全（仅 html 语言，全局只注册一次） ─────────────────────────
+// 只注册 'html'：避免与 Monaco 对 html 内嵌 <script> 的 javascript 提供方叠加产生重复项
+// 标记挂在 monaco 单例上，HMR 热重载后不会重复注册
 function ensurePlaygroundCompletions() {
-  if (_pgCompletionDisposed) return
-  _pgCompletionDisposed = true
+  const KEY = '__pg_completions_v1__'
+  if ((monaco as any)[KEY]) return
+  ;(monaco as any)[KEY] = true
 
   const mk = monaco.languages.CompletionItemKind
   const IR = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
 
-  function pgItems(range: monaco.IRange): monaco.languages.CompletionItem[] {
-    return [
-      {
-        label: '$sql',
-        kind:  mk.Function,
-        insertText: "await $sql('${1:SELECT * FROM table}')",
-        insertTextRules: IR,
-        documentation: '执行 SQL 查询，返回结果行数组\n返回: Row[]',
-        detail: '(query: string) => Promise<Row[]>',
-        range,
-      },
-      {
-        label: '$http',
-        kind:  mk.Function,
-        insertText: "await $http('${1:/api/path}', { method: '${2:GET}' })",
-        insertTextRules: IR,
-        documentation: 'HTTP 请求\n• /api/* → 本地直连\n• 外部 URL → 走代理转发',
-        detail: '(url: string, options?: { method, body, headers }) => Promise<any>',
-        range,
-      },
-      {
-        label: '$octo',
-        kind:  mk.Function,
-        insertText: "await $octo({\n  appKey: '${1:com.xxx}',\n  serviceName: '${2:ServiceName}',\n  methodName: '${3:methodName}',\n  methodParams: [${4}]\n})",
-        insertTextRules: IR,
-        documentation: '调用 Octo RPC 服务',
-        detail: '(body: OctoRequest) => Promise<any>',
-        range,
-      },
-      {
-        label: '$ctx',
-        kind:  mk.Function,
-        insertText: 'await $ctx()',
-        insertTextRules: IR,
-        documentation: '获取当前 Alfred 上下文\n返回 { state, data: { tenant, swimlane, appkey, ... } }',
-        detail: '() => Promise<AlfredContext | null>',
-        range,
-      },
-      {
-        label: '$openUrl',
-        kind:  mk.Function,
-        insertText: "$openUrl('${1:https://}')",
-        insertTextRules: IR,
-        documentation: '在新标签页打开 URL',
-        detail: '(url: string) => void',
-        range,
-      },
-      {
-        label: '$pg',
-        kind:  mk.Variable,
-        insertText: '$pg',
-        documentation: 'Playground 全局 API 集合\n{ sql, http, octo, ctx, openUrl }',
-        detail: '{ sql, http, octo, ctx, openUrl }',
-        range,
-      },
-    ]
-  }
-
-  for (const lang of ['javascript', 'html'] as const) {
-    monaco.languages.registerCompletionItemProvider(lang, {
-      triggerCharacters: ['$', '.'],
-      provideCompletionItems(model, position) {
-        const word  = model.getWordUntilPosition(position)
-        const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn }
-        return { suggestions: pgItems(range) }
-      },
-    })
-  }
+  monaco.languages.registerCompletionItemProvider('html', {
+    triggerCharacters: ['$', '.'],
+    provideCompletionItems(model, position) {
+      const word  = model.getWordUntilPosition(position)
+      const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn }
+      return {
+        suggestions: [
+          { label: '$sql',     kind: mk.Function, insertText: "await $sql('${1:SELECT * FROM table}')",                                                                                          insertTextRules: IR, documentation: '执行 SQL 查询，返回结果行数组\n返回: Row[]',                                              detail: '(query: string) => Promise<Row[]>',                               range },
+          { label: '$http',    kind: mk.Function, insertText: "await $http('${1:/api/path}', { method: '${2:GET}' })",                                                                           insertTextRules: IR, documentation: 'HTTP 请求\n• /api/* 本地直连\n• 外部 URL 走代理',                                      detail: '(url: string, options?: { method, body, headers }) => Promise<any>', range },
+          { label: '$octo',    kind: mk.Function, insertText: "await $octo({\n  appKey: '${1:com.xxx}',\n  serviceName: '${2:ServiceName}',\n  methodName: '${3:method}',\n  methodParams: [${4}]\n})", insertTextRules: IR, documentation: '调用 Octo RPC 服务',                                                             detail: '(body: OctoRequest) => Promise<any>',                             range },
+          { label: '$ctx',     kind: mk.Function, insertText: 'await $ctx()',                                                                                                                    insertTextRules: IR, documentation: '获取当前 Alfred 上下文\n{ state, data: { tenant, swimlane, appkey } }',               detail: '() => Promise<AlfredContext | null>',                             range },
+          { label: '$openUrl', kind: mk.Function, insertText: "$openUrl('${1:https://}')",                                                                                                       insertTextRules: IR, documentation: '在新标签页打开 URL',                                                                  detail: '(url: string) => void',                                           range },
+          { label: '$pg',      kind: mk.Variable, insertText: '$pg',                                                                                                                                                  documentation: 'Playground 全局 API 集合\n{ sql, http, octo, ctx, openUrl }',                              detail: '{ sql, http, octo, ctx, openUrl }',                               range },
+        ],
+      }
+    },
+  })
 }
 
 const props = defineProps<{
