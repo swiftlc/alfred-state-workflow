@@ -3,11 +3,23 @@ import type { DictMeta, DictItem, HistoryItem, Workspace, Alias, Task, Context, 
 const BASE = '/api/alfred'
 
 async function internalRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/internal${path}`, {
-    method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15_000)
+  let res: Response
+  try {
+    res = await fetch(`/internal${path}`, {
+      method,
+      signal: controller.signal,
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw new Error('请求超时，请稍后重试')
+    throw new Error(`网络错误：${(e as Error).message}`)
+  } finally {
+    clearTimeout(timer)
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const json = await res.json() as { code: number; data: T; msg?: string }
   if (json.code !== 0) throw new Error(json.msg ?? `API error ${json.code}`)
   return json.data
@@ -16,11 +28,23 @@ async function internalRequest<T>(method: string, path: string, body?: unknown):
 interface ApiResponse<T> { code: number; data: T; msg?: string }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15_000)
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method,
+      signal: controller.signal,
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw new Error('请求超时，请稍后重试')
+    throw new Error(`网络错误：${(e as Error).message}`)
+  } finally {
+    clearTimeout(timer)
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const json: ApiResponse<T> = await res.json()
   if (json.code !== 0) throw new Error(json.msg ?? `API error ${json.code}`)
   return json.data
