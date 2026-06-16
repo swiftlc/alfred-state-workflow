@@ -29,7 +29,10 @@
     />
 
     <!-- 编辑描述 Modal -->
-    <n-modal v-model:show="editModal.show" preset="dialog" title="修改描述" positive-text="保存" negative-text="取消" @positive-click="submitEdit">
+    <n-modal v-model:show="editModal.show" preset="dialog" title="修改描述"
+             positive-text="保存" negative-text="取消"
+             :positive-loading="editModal.loading"
+             @positive-click="submitEdit">
       <n-form style="margin-top: 12px">
         <n-form-item label="Name">
           <n-input v-model:value="editModal.name" :disabled="isReadonly" />
@@ -44,7 +47,10 @@
     </n-modal>
 
     <!-- 新增条目 Modal -->
-    <n-modal v-model:show="addModal.show" preset="dialog" title="新增条目" positive-text="添加" negative-text="取消" @positive-click="submitAdd">
+    <n-modal v-model:show="addModal.show" preset="dialog" title="新增条目"
+             positive-text="添加" negative-text="取消"
+             :positive-loading="addModal.loading"
+             @positive-click="submitAdd">
       <n-form style="margin-top: 12px">
         <n-form-item label="Name *">
           <n-input v-model:value="addModal.name" placeholder="显示名称" />
@@ -114,6 +120,7 @@ async function doTogglePin(item: DictItem) {
 // ─── 编辑 Modal ───────────────────────────────────────────────────────────────
 const editModal = reactive({
   show: false,
+  loading: false,
   id: '',
   name: '',
   value: '',
@@ -125,39 +132,54 @@ function openEditModal(item: DictItem) {
 }
 
 async function submitEdit() {
-  const item = items.value.find(i => i.id === editModal.id)
-  if (isReadonly.value) {
-    await updateDictItemDescription(`${key.value}:${editModal.id}`, editModal.description)
-    if (item) item.description = editModal.description
-  } else {
-    await updateDictItem(key.value, editModal.id, {
-      name: editModal.name,
-      value: editModal.value,
-      description: editModal.description,
-    })
-    if (item) Object.assign(item, { name: editModal.name, value: editModal.value, description: editModal.description })
+  editModal.loading = true
+  try {
+    if (isReadonly.value) {
+      await updateDictItemDescription(`${key.value}:${editModal.id}`, editModal.description)
+      const item = items.value.find(i => i.id === editModal.id)
+      if (item) item.description = editModal.description
+    } else {
+      await updateDictItem(key.value, editModal.id, {
+        name: editModal.name,
+        value: editModal.value,
+        description: editModal.description,
+      })
+      const item = items.value.find(i => i.id === editModal.id)
+      if (item) Object.assign(item, { name: editModal.name, value: editModal.value, description: editModal.description })
+    }
+    message.success('已保存')
+  } catch (e) {
+    message.error((e as Error).message || '保存失败')
+    return false
+  } finally {
+    editModal.loading = false
   }
-  message.success('已保存')
-  return true
 }
 
 // ─── 新增 Modal ───────────────────────────────────────────────────────────────
-const addModal = reactive({ show: false, name: '', value: '', description: '' })
+const addModal = reactive({ show: false, loading: false, name: '', value: '', description: '' })
 
 function openAddModal() {
   Object.assign(addModal, { show: true, name: '', value: '', description: '' })
 }
 
 async function submitAdd() {
-  if (!addModal.name) { message.error('Name 不能为空'); return false }
-  await createDictItem(key.value, {
-    name: addModal.name,
-    value: addModal.value || addModal.name,
-    description: addModal.description,
-  })
-  message.success('已添加')
-  await loadItems()
-  return true
+  if (!addModal.name.trim()) { message.error('Name 不能为空'); return false }
+  addModal.loading = true
+  try {
+    await createDictItem(key.value, {
+      name: addModal.name.trim(),
+      value: addModal.value.trim() || addModal.name.trim(),
+      description: addModal.description,
+    })
+    message.success('已添加')
+    await loadItems()
+  } catch (e) {
+    message.error((e as Error).message || '添加失败')
+    return false
+  } finally {
+    addModal.loading = false
+  }
 }
 
 // ─── 删除 ──────────────────────────────────────────────────────────────────────
