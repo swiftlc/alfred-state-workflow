@@ -50,17 +50,17 @@
           全屏
         </n-button>
 
-        <!-- ✦ 保存按钮：saved 状态变绿色 -->
+        <!-- ✦ 保存按钮：autosaving 静默灰色，saved 变绿 -->
         <n-button
           size="small"
-          :type="saveState === 'saved' ? 'default' : isDirty && saveState === 'idle' ? 'primary' : 'default'"
+          :type="saveState === 'saved' || saveState === 'autosaving' ? 'default' : isDirty && saveState === 'idle' ? 'primary' : 'default'"
           :loading="saveState === 'saving'"
           style="min-width:72px;transition:color 0.2s,border-color 0.2s"
-          :style="saveState === 'saved' ? 'color:#10b981;border-color:#6ee7b7' : ''"
+          :style="saveState === 'saved' || saveState === 'autosaving' ? 'color:#10b981;border-color:#6ee7b7' : ''"
           title="⌘S"
-          @click="doSave"
+          @click="doSave(false)"
         >
-          {{ saveState === 'saved' ? '✓ 已保存' : '保存' }}
+          {{ saveState === 'saved' || saveState === 'autosaving' ? '✓ 已保存' : '保存' }}
         </n-button>
       </div>
     </div>
@@ -136,6 +136,13 @@
       <span class="w-px h-3 bg-slate-200" />
       <!-- 语言 -->
       <span>HTML</span>
+      <!-- ✦ $ctx 摘要 -->
+      <template v-if="ctxSummary">
+        <span class="w-px h-3 bg-slate-200" />
+        <span class="font-mono truncate max-w-xs opacity-70" title="当前 Alfred 上下文（$ctx() 可获取）">
+          {{ ctxSummary }}
+        </span>
+      </template>
       <div class="flex-1" />
       <!-- 快捷键提示 -->
       <span class="opacity-60">⌘S 保存 &nbsp;·&nbsp; 双击把手重置比例</span>
@@ -178,9 +185,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton } from 'naive-ui'
+import { NButton, useDialog } from 'naive-ui'
 import { ChevronLeft, RotateCcw, Maximize2 } from '@lucide/vue'
 import { usePlayground } from '@/composables/usePlayground'
+import { getContext } from '@/api/alfred'
 import PlaygroundIframe  from '@/components/playground/PlaygroundIframe.vue'
 import LcMonacoEditor    from '@/components/lowcode/LcMonacoEditor.vue'
 import InlineEdit        from '@/components/InlineEdit.vue'
@@ -190,6 +198,7 @@ defineOptions({ name: 'PlaygroundEditorView' })
 const route  = useRoute()
 const router = useRouter()
 
+const dialog = useDialog()
 const { pages, getPage, savePage, renamePage } = usePlayground()
 
 // ── 页面数据 ────────────────────────────────────────────────────────────────────
@@ -205,21 +214,23 @@ onMounted(() => {
   editorCode.value  = p.html
   savedHtml.value   = p.html
   previewHtml.value = p.html
+  loadCtxSummary()
 })
 
 // ── 未保存状态 ─────────────────────────────────────────────────────────────────
 const isDirty = computed(() => editorCode.value !== savedHtml.value)
 
-// ── 保存 ───────────────────────────────────────────────────────────────────────
-type SaveState = 'idle' | 'saving' | 'saved'
+// ── 保存（手动 + 自动） ────────────────────────────────────────────────────────
+type SaveState = 'idle' | 'autosaving' | 'saving' | 'saved'
 const saveState = ref<SaveState>('idle')
-let saveTimer: ReturnType<typeof setTimeout> | null = null
+let saveTimer:     ReturnType<typeof setTimeout> | null = null
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 
-function doSave() {
+function doSave(silent = false) {
   if (saveState.value === 'saving') return
   const p = pages.value.find(pg => pg.id === pageId.value)
   if (!p) return
-  saveState.value = 'saving'
+  saveState.value = silent ? 'autosaving' : 'saving'
   savePage({ ...p, html: editorCode.value })
   savedHtml.value = editorCode.value
   saveState.value = 'saved'
@@ -231,9 +242,31 @@ function doRename(name: string) {
   if (name.trim()) renamePage(pageId.value, name.trim())
 }
 
+// ── 离开确认（Naive UI dialog） ────────────────────────────────────────────────
 function goBack() {
-  if (isDirty.value && !confirm('有未保存的修改，确认离开？')) return
-  router.push('/playground')
+  if (!isDirty.value) { router.push('/playground'); return }
+  dialog.warning({
+    title:        '有未保存的修改',
+    content:      '离开将丢失当前编辑内容，确认离开？',
+    positiveText: '不保存，直接离开',
+    negativeText: '取消',
+    onPositiveClick: () => router.push('/playground'),
+  })
+}
+
+// ── $ctx 摘要（status bar 显示当前上下文变量） ────────────────────────────────
+const ctxSummary = ref('')
+async function loadCtxSummary() {
+  try {
+    const ctx = await getContext()
+    if (!ctx?.data) return
+    const d = ctx.data as Record<string, { id?: string; name?: string }>
+    const parts: string[] = []
+    if (d.tenant)   parts.push(`租户 ${d.tenant.name ?? d.tenant.id ?? ''}`)
+    if (d.swimlane) parts.push(`泳道 ${d.swimlane.id ?? ''}`)
+    if (d.appkey)   parts.push(`${d.appkey.id ?? ''}`)
+    ctxSummary.value = parts.join(' · ')
+  } catch { /* 无上下文时静默 */ }
 }
 
 // ── Cmd+S ──────────────────────────────────────────────────────────────────────
@@ -245,9 +278,10 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(()   => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
-  if (saveTimer)    clearTimeout(saveTimer)
-  if (previewTimer) clearTimeout(previewTimer)
-  if (refreshTimer) clearTimeout(refreshTimer)
+  if (saveTimer)     clearTimeout(saveTimer)
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  if (previewTimer)  clearTimeout(previewTimer)
+  if (refreshTimer)  clearTimeout(refreshTimer)
 })
 
 // ── 实时预览 + loading bar ─────────────────────────────────────────────────────
@@ -258,11 +292,11 @@ let previewTimer: ReturnType<typeof setTimeout> | null = null
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(editorCode, (val) => {
+  // 500ms 实时预览
   if (previewTimer) clearTimeout(previewTimer)
   previewTimer = setTimeout(() => {
     previewHtml.value = val
     reloadKey.value++
-    // 触发 loading bar 动画
     previewRefreshing.value = false
     requestAnimationFrame(() => {
       previewRefreshing.value = true
@@ -270,6 +304,10 @@ watch(editorCode, (val) => {
       refreshTimer = setTimeout(() => { previewRefreshing.value = false }, 700)
     })
   }, 500)
+
+  // ✦ 2s 自动保存（停止输入后静默保存）
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(() => { if (isDirty.value) doSave(true) }, 2000)
 })
 
 // ── 拖拽调宽 ──────────────────────────────────────────────────────────────────
