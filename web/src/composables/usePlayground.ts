@@ -106,7 +106,9 @@ export function usePlayground() {
 
   /** 导入外部 JSON（重新分配 id） */
   function importPage(raw: PlaygroundPage): PlaygroundPage {
-    return createPage(raw.name + '（导入）', raw.html, raw.prompt)
+    const suffix = '（导入）'
+    const name = raw.name.endsWith(suffix) ? raw.name : raw.name + suffix
+    return createPage(name, raw.html, raw.prompt)
   }
 
   return { pages, createPage, savePage, deletePage, renamePage, getPage, importPage }

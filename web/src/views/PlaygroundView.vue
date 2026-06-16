@@ -101,36 +101,6 @@
       </div>
     </teleport>
 
-    <!-- ── 编辑源码弹窗 ── -->
-    <n-modal
-      v-model:show="editModal.show"
-      preset="dialog"
-      :title="`编辑源码：${editModal.page?.name ?? ''}`"
-      style="width:900px"
-      positive-text="保存"
-      negative-text="取消"
-      @positive-click="confirmEdit"
-      @negative-click="editModal.show = false"
-    >
-      <div class="pt-2 flex flex-col gap-2">
-        <!-- 提示 -->
-        <p class="text-xs text-slate-400">
-          可用全局函数：
-          <code class="bg-slate-100 px-1 rounded font-mono">await $sql(query)</code>
-          <code class="bg-slate-100 px-1 rounded font-mono ml-1">await $http(url, options)</code>
-        </p>
-        <!-- Monaco 编辑器 -->
-        <div class="border border-slate-200 rounded-lg overflow-hidden">
-          <LcMonacoEditor
-            v-if="editModal.show"
-            v-model="editModal.code"
-            language="html"
-            height="520px"
-          />
-        </div>
-      </div>
-    </n-modal>
-
     <!-- ── 新建弹窗 ── -->
     <n-modal
       v-model:show="createModal.show"
@@ -160,16 +130,17 @@
 defineOptions({ name: 'PlaygroundView' })
 
 import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import { NButton, NModal, NInput, useDialog, useMessage } from 'naive-ui'
 import { Play, Code2, Download, Trash2, RotateCcw } from '@lucide/vue'
 import { usePlayground } from '@/composables/usePlayground'
 import { formatTime } from '@/utils/search'
 import type { PlaygroundPage } from '@/types/playground'
 import PlaygroundIframe from '@/components/playground/PlaygroundIframe.vue'
-import LcMonacoEditor   from '@/components/lowcode/LcMonacoEditor.vue'
 import InlineEdit       from '@/components/InlineEdit.vue'
 
-const { pages, createPage, savePage, deletePage, renamePage, importPage } = usePlayground()
+const router = useRouter()
+const { pages, createPage, deletePage, renamePage, importPage } = usePlayground()
 const dialog  = useDialog()
 const message = useMessage()
 
@@ -183,29 +154,8 @@ function handlePlay(page: PlaygroundPage) {
 }
 
 // ── 编辑源码 ───────────────────────────────────────────────────────────────────
-const editModal = reactive<{ show: boolean; page: PlaygroundPage | null; code: string }>({
-  show: false, page: null, code: '',
-})
-
 function handleEdit(page: PlaygroundPage) {
-  editModal.page = page
-  editModal.code = page.html
-  editModal.show = true
-  // 如果当前在 play 模式，关闭 play
-  if (playing.value?.id === page.id) playing.value = null
-}
-
-function confirmEdit() {
-  if (!editModal.page) return
-  const updated = savePage({ ...editModal.page, html: editModal.code })
-  // 同步 playing（如果 play 的就是这个 page）
-  if (playing.value?.id === updated.id) {
-    playing.value = updated
-    reloadKey.value++
-  }
-  editModal.show = false
-  message.success('已保存')
-  return false // 阻止 modal 自动关闭（手动控制）
+  router.push(`/playground/${page.id}`)
 }
 
 // ── 新建 ───────────────────────────────────────────────────────────────────────
