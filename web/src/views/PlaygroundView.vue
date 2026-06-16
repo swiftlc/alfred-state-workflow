@@ -289,15 +289,13 @@ onMounted(()   => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 // ── 渐变色 ────────────────────────────────────────────────────────────────────
+// 专业配色：深色系，统一在 slate/indigo/blue 家族，不超过 5 个色组
 const PALETTES = [
-  ['#6366f1', '#8b5cf6'],
-  ['#3b82f6', '#06b6d4'],
-  ['#10b981', '#6366f1'],
-  ['#f59e0b', '#ef4444'],
-  ['#8b5cf6', '#ec4899'],
-  ['#06b6d4', '#10b981'],
-  ['#ef4444', '#f97316'],
-  ['#ec4899', '#8b5cf6'],
+  ['#1e293b', '#334155'], // slate 深灰
+  ['#1e3a5f', '#1d4ed8'], // 深海蓝
+  ['#312e81', '#4338ca'], // 深靛蓝
+  ['#0f172a', '#1e3a5f'], // 极深蓝黑
+  ['#1e1b4b', '#3730a3'], // 深紫蓝
 ]
 function cardGradient(name: string) {
   let h = 0
