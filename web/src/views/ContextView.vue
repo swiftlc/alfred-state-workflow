@@ -126,6 +126,7 @@
     <!-- ── 保存工作区 Modal ── -->
     <n-modal v-model:show="workspaceModal.show" preset="dialog" title="保存为工作区"
              positive-text="保存" negative-text="取消"
+             :positive-loading="workspaceModal.loading"
              @positive-click="submitSaveWorkspace">
       <n-form style="margin-top:12px">
         <n-form-item label="工作区名称">
@@ -172,7 +173,7 @@ function dictNameOf(key: string) {
 async function loadContext() {
   loading.value = true
   try { context.value = await getContext() }
-  catch { message.error('获取上下文失败') }
+  catch (e) { message.error((e as Error).message || '获取上下文失败') }
   finally { loading.value = false }
 }
 
@@ -251,9 +252,13 @@ function removeKey(key: string) {
     positiveText:  '移除',
     negativeText:  '取消',
     onPositiveClick: async () => {
-      await setContext(next)
-      context.value = next
-      message.success('已移除')
+      try {
+        await setContext(next)
+        context.value = next
+        message.success('已移除')
+      } catch (e) {
+        message.error((e as Error).message || '移除失败')
+      }
     },
   })
 }
@@ -273,9 +278,13 @@ function doClear() {
     positiveText:  '清空',
     negativeText:  '取消',
     onPositiveClick: async () => {
-      await setContext({ state: 'home', data: {} })
-      context.value = { state: 'home', data: {} }
-      message.success('已清空')
+      try {
+        await setContext({ state: 'home', data: {} })
+        context.value = { state: 'home', data: {} }
+        message.success('已清空')
+      } catch (e) {
+        message.error((e as Error).message || '清空失败')
+      }
     },
   })
 }
@@ -303,7 +312,7 @@ async function submitEdit() {
 }
 
 // ─── 保存工作区 Modal ─────────────────────────────────────────────────────────
-const workspaceModal = reactive({ show: false, name: '' })
+const workspaceModal = reactive({ show: false, loading: false, name: '' })
 
 function openSaveWorkspace() {
   workspaceModal.name = ''
@@ -313,9 +322,16 @@ function openSaveWorkspace() {
 async function submitSaveWorkspace() {
   if (!workspaceModal.name.trim()) { message.error('请输入工作区名称'); return false }
   if (!context.value) return false
-  await createWorkspace(workspaceModal.name.trim(), context.value.data as Record<string, unknown>)
-  message.success('已保存为工作区')
-  return true
+  workspaceModal.loading = true
+  try {
+    await createWorkspace(workspaceModal.name.trim(), context.value.data as Record<string, unknown>)
+    message.success('已保存为工作区')
+  } catch (e) {
+    message.error((e as Error).message || '保存失败')
+    return false
+  } finally {
+    workspaceModal.loading = false
+  }
 }
 
 onMounted(loadContext)
