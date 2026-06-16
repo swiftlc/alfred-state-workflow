@@ -102,7 +102,7 @@ export async function resolveOptions(
   if (!input.fetchOptions) return [];
 
   const cacheKey = input.cacheKey?.(contextData);
-  const ttl = input.cacheTtl ?? 60 * 1000;
+  const ttl = input.cacheTtl ?? 0; // 默认永不过期，用户主动刷新
 
   if (cacheKey) {
     return (await CacheManager.get<DictItem[]>(

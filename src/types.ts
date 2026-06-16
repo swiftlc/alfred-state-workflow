@@ -4,7 +4,7 @@
 export interface DictCategory {
   key: string;
   name: string;
-  /** 字典列表缓存有效期（毫秒），不填默认 5 分钟 */
+  /** 字典列表缓存有效期（毫秒），不填默认 0（永不过期），用户主动刷新 */
   cacheTtl?: number;
   /** 只读字典：禁止删除条目（仍可置顶/修改描述），默认 false */
   readonly?: boolean;
@@ -145,7 +145,7 @@ export interface RequiredInput {
   cacheKey?: (contextData: ContextData) => string;
   /**
    * 缓存有效期（毫秒）。与 cacheKey 配合使用，框架自动对 fetchOptions 结果应用缓存。
-   * 不填默认 60 秒。
+   * 不填默认 0（永不过期），用户主动刷新。
    */
   cacheTtl?: number;
   /**

@@ -6,7 +6,7 @@
  * 2. GET /api/v1/dicts/:key/items → 返回指定字典下的所有选项
  *
  * 扩展点（均在 DICTS 配置）：
- * - cacheTtl：缓存有效期，不填默认 5 分钟
+ * - cacheTtl：缓存有效期，不填默认 0（永不过期），用户主动刷新
  * - fetchItems：自定义条目获取函数，配置后不走默认 REST 接口；抛出异常表示请求失败（不缓存）
  * - fallbackItems：接口不可用时的兜底数据
  * - copyValue：复制模式，'value' / 'json' / function
@@ -19,7 +19,7 @@ import type {DictCategory, DictItem, ContextData} from '../types';
 import {PROXY_BASE_URL} from '../config/features';
 import {MIS_USERNAME, OCTO_BASE_URL, FIELD_TOPIC_ID, MAFKA_BASE_URL, MAFKA_HEADERS} from '../config/constants';
 
-const DEFAULT_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
+const DEFAULT_CACHE_TTL = 0; // 永不过期，用户主动刷新
 
 // ─── appkey 专用类型（仅此文件使用） ────────────────────────────────────────────
 
@@ -82,7 +82,6 @@ const DICTS: DictCategory[] = [
   {
     key: 'appkey',
     name: 'appkey',
-    cacheTtl: 7 * 24 * 60 * 60 * 1000,
     copyValue: 'value',
     readonly: true,
     allowDescriptionEdit: false,
@@ -98,7 +97,6 @@ const DICTS: DictCategory[] = [
   {
     key: 'kafka_topic',
     name: 'mafka',
-    cacheTtl: 5 * 60 * 1000,
     readonly: true,
     allowDescriptionEdit: false,
     getCacheKey: (contextData?: ContextData) => {
