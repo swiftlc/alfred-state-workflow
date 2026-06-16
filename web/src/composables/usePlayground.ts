@@ -136,5 +136,5 @@ export function usePlayground() {
     URL.revokeObjectURL(url)
   }
 
-  return { pages, createPage, savePage, deletePage, renamePage, getPage, importPage, duplicatePage, exportAll }
+  return { pages, createPage, savePage, deletePage, renamePage, getPage, importPage, duplicatePage, exportAll, clearAll }
 }
