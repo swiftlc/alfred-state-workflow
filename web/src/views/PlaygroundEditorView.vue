@@ -67,6 +67,7 @@
           v-model="editorCode"
           language="html"
           height="100%"
+          context="playground"
         />
       </div>
 
