@@ -85,9 +85,13 @@ function doDelete(item: HistoryItem) {
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: async () => {
-      await deleteHistory(item.id)
-      items.value = items.value.filter(i => i.id !== item.id)
-      message.success('已删除')
+      try {
+        await deleteHistory(item.id)
+        items.value = items.value.filter(i => i.id !== item.id)
+        message.success('已删除')
+      } catch (e) {
+        message.error((e as Error).message || '删除失败')
+      }
     },
   })
 }
@@ -147,9 +151,13 @@ function doClear() {
     positiveText: '清空',
     negativeText: '取消',
     onPositiveClick: async () => {
-      await clearHistory()
-      items.value = items.value.filter(i => i.isPinned)
-      message.success('已清空')
+      try {
+        await clearHistory()
+        items.value = items.value.filter(i => i.isPinned)
+        message.success('已清空')
+      } catch (e) {
+        message.error((e as Error).message || '清空失败')
+      }
     },
   })
 }

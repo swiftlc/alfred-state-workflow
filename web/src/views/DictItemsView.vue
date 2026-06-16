@@ -190,9 +190,13 @@ function doDelete(item: DictItem) {
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: async () => {
-      await deleteDictItem(key.value, item.id)
-      items.value = items.value.filter(i => i.id !== item.id)
-      message.success('已删除')
+      try {
+        await deleteDictItem(key.value, item.id)
+        items.value = items.value.filter(i => i.id !== item.id)
+        message.success('已删除')
+      } catch (e) {
+        message.error((e as Error).message || '删除失败')
+      }
     },
   })
 }
