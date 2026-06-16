@@ -2,27 +2,27 @@
   <div class="flex flex-col overflow-hidden" style="height:100%">
 
     <!-- 顶栏 -->
-    <div class="flex items-center justify-between mb-4 shrink-0 gap-3">
-      <h1 class="text-lg font-semibold text-slate-800 tracking-tight shrink-0">Playground</h1>
+    <div class="flex items-center mb-4 shrink-0 gap-2">
+      <h1 class="text-lg font-semibold text-slate-800 tracking-tight">Playground</h1>
+      <div class="flex-1" />
 
-      <!-- ✦ 搜索触发按钮（Cmd+K 风格） -->
+      <!-- ✦ 搜索触发按钮（Cmd+K 风格，紧贴操作区） -->
       <button
-        class="flex items-center gap-2 flex-1 max-w-[220px] px-3 py-1.5 rounded-lg
+        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
                border border-slate-200 bg-slate-50 hover:bg-white hover:border-indigo-300
-               text-slate-400 text-[12.5px] transition-all cursor-pointer outline-none
+               text-slate-400 text-[12px] transition-all cursor-pointer outline-none
                focus-visible:ring-2 focus-visible:ring-indigo-400"
+        style="min-width:130px"
         @click="searchShow = true"
       >
-        <component :is="Search" :size="13" class="shrink-0" />
+        <component :is="Search" :size="12" class="shrink-0" />
         <span class="flex-1 text-left">搜索页面…</span>
-        <kbd class="text-[10px] bg-white border border-slate-200 rounded px-1 py-0.5 text-slate-300 shrink-0">⌘K</kbd>
+        <kbd class="text-[10px] bg-white border border-slate-200 rounded px-1 py-0.5 leading-none text-slate-300 shrink-0">⌘K</kbd>
       </button>
 
-      <div class="flex items-center gap-2 shrink-0">
-        <n-button size="small" @click="handleImport">导入</n-button>
-        <input ref="importInputRef" type="file" accept=".json" class="hidden" @change="onImportFile" />
-        <n-button type="primary" size="small" @click="handleCreate">+ 新建页面</n-button>
-      </div>
+      <n-button size="small" @click="handleImport">导入</n-button>
+      <input ref="importInputRef" type="file" accept=".json" class="hidden" @change="onImportFile" />
+      <n-button type="primary" size="small" @click="handleCreate">+ 新建页面</n-button>
     </div>
 
     <!-- ✦ 空状态：Lucide 图标 + 引导按钮 -->
@@ -158,20 +158,28 @@
       @select="onSearchSelect"
     >
       <template #item="{ item, isActive }">
-        <!-- 渐变缩略图 -->
+        <!-- ✦ 渐变缩略图（inline styles，不依赖 DictPicker scoped CSS） -->
         <span
-          class="alfred-item__icon"
-          :style="{ background: cardGradient(item.name), flexShrink: 0, borderRadius: '8px' }"
-        >
-          <span style="color:rgba(255,255,255,0.7);font-size:13px;font-weight:700;letter-spacing:-0.5px">
-            {{ item.name.slice(0, 2) }}
+          :style="{
+            width: '32px', height: '32px', borderRadius: '8px', flexShrink: '0',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: cardGradient(item.name),
+            fontSize: '12px', fontWeight: '700', letterSpacing: '-0.5px',
+            color: 'rgba(255,255,255,0.85)',
+          }"
+        >{{ item.name.slice(0, 2) }}</span>
+
+        <!-- ✦ 文字区（flex-col，name + time 各占一行） -->
+        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;">
+          <span style="font-size:14px;font-weight:500;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            {{ item.name }}
+          </span>
+          <span v-if="item.description" style="font-size:11.5px;color:#94a3b8;white-space:nowrap;">
+            {{ item.description }}
           </span>
         </span>
-        <span class="alfred-item__body">
-          <span class="alfred-item__name">{{ item.name }}</span>
-          <span v-if="item.description" class="alfred-item__sub">{{ item.description }}</span>
-        </span>
-        <component :is="CornerDownLeft" v-if="isActive" :size="13" class="alfred-item__enter" />
+
+        <component :is="CornerDownLeft" v-if="isActive" :size="13" style="color:#c7d2fe;flex-shrink:0" />
       </template>
     </DictPicker>
 
