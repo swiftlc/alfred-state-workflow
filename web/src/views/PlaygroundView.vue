@@ -23,26 +23,44 @@
         <div
           v-for="page in pages"
           :key="page.id"
-          class="group relative border border-slate-100 rounded-xl bg-white hover:border-indigo-200 hover:shadow-sm transition-all overflow-hidden"
+          class="group relative border border-slate-100 rounded-xl bg-white hover:border-indigo-200 hover:shadow-md transition-all overflow-hidden cursor-pointer"
+          @click="handleEdit(page)"
         >
-          <!-- 预览区：点击进入 Play -->
+          <!-- 渐变缩略图（静态，不加载 iframe） -->
           <div
-            class="h-36 bg-slate-50 border-b border-slate-100 overflow-hidden cursor-pointer relative"
-            @click="handlePlay(page)"
+            class="h-32 relative overflow-hidden"
+            :style="{ background: cardGradient(page.name) }"
           >
-            <PlaygroundIframe :html="page.html" class="pointer-events-none scale-50 origin-top-left" style="width:200%;height:200%" />
-            <!-- 悬浮播放提示 -->
-            <div class="absolute inset-0 bg-indigo-500/0 group-hover:bg-indigo-500/10 flex items-center justify-center transition-colors">
-              <div class="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full px-4 py-1.5 text-xs font-medium text-indigo-600 shadow-sm flex items-center gap-1.5">
-                <Play :size="12" />
-                演示
+            <!-- 首字母装饰 -->
+            <span
+              class="absolute inset-0 flex items-center justify-center text-5xl font-black text-white select-none"
+              style="opacity:0.15;letter-spacing:-2px"
+            >{{ page.name.slice(0, 2) }}</span>
+
+            <!-- Hover 遮罩 + CTA -->
+            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors
+                        flex items-center justify-center gap-2">
+              <div class="opacity-0 group-hover:opacity-100 transition-all duration-150 flex items-center gap-2">
+                <span class="bg-white/95 text-slate-700 rounded-full px-3 py-1.5 text-xs font-semibold
+                             shadow-sm flex items-center gap-1.5">
+                  <component :is="Code2" :size="11" />
+                  编辑
+                </span>
+                <span
+                  class="bg-white/95 text-slate-700 rounded-full px-3 py-1.5 text-xs font-semibold
+                         shadow-sm flex items-center gap-1.5"
+                  @click.stop="handlePlay(page)"
+                >
+                  <component :is="Play" :size="11" />
+                  演示
+                </span>
               </div>
             </div>
           </div>
 
-          <!-- 信息区 -->
-          <div class="px-3 py-2.5">
-            <div style="height:20px;line-height:20px;overflow:hidden" @click.stop>
+          <!-- 信息 + 操作行 -->
+          <div class="px-3 py-2 flex items-center justify-between gap-2">
+            <div class="min-w-0 flex-1" @click.stop>
               <InlineEdit
                 :value="page.name"
                 placeholder="页面名称"
@@ -50,24 +68,18 @@
                 input-style="font-size:13px;font-weight:500;color:#374151"
                 @confirm="(name) => renamePage(page.id, name)"
               />
+              <div class="text-[10px] text-slate-300 mt-0.5">{{ formatTime(page.updatedAt) }}</div>
             </div>
-            <div class="text-[10px] text-slate-300 mt-1">{{ formatTime(page.updatedAt) }}</div>
-          </div>
 
-          <!-- 操作按钮 -->
-          <div class="absolute top-2 right-2 hidden group-hover:flex gap-1 z-10">
-            <n-button size="tiny" ghost @click.stop="handlePlay(page)" title="全屏演示">
-              <template #icon><Play :size="11" /></template>
-            </n-button>
-            <n-button size="tiny" ghost @click.stop="handleEdit(page)" title="编辑源码">
-              <template #icon><Code2 :size="11" /></template>
-            </n-button>
-            <n-button size="tiny" ghost @click.stop="handleExport(page)" title="导出 JSON">
-              <template #icon><Download :size="11" /></template>
-            </n-button>
-            <n-button size="tiny" ghost @click.stop="handleDelete(page.id)" title="删除">
-              <template #icon><Trash2 :size="11" /></template>
-            </n-button>
+            <!-- 固定操作按钮 -->
+            <div class="flex items-center gap-0.5 shrink-0" @click.stop>
+              <n-button size="tiny" ghost title="导出 JSON" @click="handleExport(page)">
+                <template #icon><component :is="Download" :size="11" /></template>
+              </n-button>
+              <n-button size="tiny" ghost type="error" title="删除" @click="handleDelete(page.id)">
+                <template #icon><component :is="Trash2" :size="11" /></template>
+              </n-button>
+            </div>
           </div>
         </div>
       </div>
@@ -75,52 +87,59 @@
 
     <!-- ── 全屏 Play 模式 ── -->
     <teleport to="body">
-      <div
-        v-if="playing"
-        class="fixed inset-0 z-50 bg-white flex flex-col"
-      >
-        <!-- Play 顶栏 -->
-        <div class="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-white shrink-0">
-          <n-button size="small" ghost @click="playing = null">← 退出</n-button>
-          <span class="text-sm font-medium text-slate-700">{{ playing.name }}</span>
-          <div class="ml-auto flex items-center gap-2">
+      <div v-if="playing" class="fixed inset-0 z-50 bg-white flex flex-col">
+        <!-- Play 顶栏（与 EditorView 统一风格） -->
+        <div
+          class="flex items-center px-3 shrink-0 bg-white border-b border-slate-100"
+          style="height:44px;gap:8px;box-shadow:0 1px 4px rgba(30,41,80,0.06)"
+        >
+          <button
+            class="flex items-center gap-1 shrink-0 px-2 py-1 rounded-lg text-slate-400
+                   hover:text-indigo-500 hover:bg-indigo-50 text-[12.5px] font-medium
+                   transition-all cursor-pointer outline-none bg-transparent border-0"
+            @click="playing = null"
+          >
+            <component :is="ChevronLeft" :size="14" />
+            返回
+          </button>
+          <div class="w-px h-4 bg-slate-100 shrink-0" />
+          <span class="text-[13px] font-semibold text-slate-700 truncate">{{ playing.name }}</span>
+          <div class="flex-1" />
+          <div class="flex items-center gap-1.5">
             <n-button size="small" ghost @click="handleEdit(playing)">
-              <template #icon><Code2 :size="13" /></template>
-              源码
+              <template #icon><component :is="Code2" :size="13" /></template>
+              编辑
             </n-button>
-            <n-button size="small" ghost @click="reloadKey++">
-              <template #icon><RotateCcw :size="13" /></template>
-              重载
+            <n-button size="small" ghost title="重载" @click="reloadKey++">
+              <template #icon><component :is="RotateCcw" :size="13" /></template>
             </n-button>
           </div>
         </div>
-        <!-- iframe 占满剩余空间 -->
+        <!-- iframe 全屏 -->
         <div class="flex-1 min-h-0">
           <PlaygroundIframe :key="reloadKey" :html="playing.html" class="w-full h-full" />
         </div>
       </div>
     </teleport>
 
-    <!-- ── 新建弹窗 ── -->
+    <!-- ── 新建弹窗（极简，只需名称） ── -->
     <n-modal
       v-model:show="createModal.show"
       preset="dialog"
       title="新建页面"
-      style="width:480px"
-      positive-text="创建空页面"
+      style="width:400px"
+      positive-text="创建"
       negative-text="取消"
       @positive-click="confirmCreate"
       @negative-click="createModal.show = false"
     >
-      <div class="pt-3 flex flex-col gap-3">
-        <n-input v-model:value="createModal.name" placeholder="页面名称…" @keydown.enter="confirmCreate" />
-        <n-input
-          v-model:value="createModal.prompt"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 5 }"
-          placeholder="需求描述（可选，用于后续 AI 生成）…"
-        />
-      </div>
+      <n-input
+        ref="createNameRef"
+        v-model:value="createModal.name"
+        placeholder="页面名称…"
+        style="margin-top:12px"
+        @keydown.enter="confirmCreate"
+      />
     </n-modal>
 
   </div>
@@ -129,10 +148,10 @@
 <script setup lang="ts">
 defineOptions({ name: 'PlaygroundView' })
 
-import { ref, reactive } from 'vue'
+import { ref, reactive, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NModal, NInput, useDialog, useMessage } from 'naive-ui'
-import { Play, Code2, Download, Trash2, RotateCcw } from '@lucide/vue'
+import { Play, Code2, Download, Trash2, RotateCcw, ChevronLeft } from '@lucide/vue'
 import { usePlayground } from '@/composables/usePlayground'
 import { formatTime } from '@/utils/search'
 import type { PlaygroundPage } from '@/types/playground'
@@ -144,6 +163,25 @@ const { pages, createPage, deletePage, renamePage, importPage } = usePlayground(
 const dialog  = useDialog()
 const message = useMessage()
 
+// ── 卡片渐变色（根据页面名 hash 生成，稳定不变） ──────────────────────────────
+const PALETTES = [
+  ['#6366f1', '#8b5cf6'],
+  ['#3b82f6', '#06b6d4'],
+  ['#10b981', '#6366f1'],
+  ['#f59e0b', '#ef4444'],
+  ['#8b5cf6', '#ec4899'],
+  ['#06b6d4', '#10b981'],
+  ['#ef4444', '#f97316'],
+  ['#ec4899', '#8b5cf6'],
+]
+
+function cardGradient(name: string) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  const [a, b] = PALETTES[h % PALETTES.length]
+  return `linear-gradient(135deg, ${a} 0%, ${b} 100%)`
+}
+
 // ── 全屏 Play ──────────────────────────────────────────────────────────────────
 const playing   = ref<PlaygroundPage | null>(null)
 const reloadKey = ref(0)
@@ -153,33 +191,33 @@ function handlePlay(page: PlaygroundPage) {
   reloadKey.value++
 }
 
-// ── 编辑源码 ───────────────────────────────────────────────────────────────────
+// ── 进编辑器 ──────────────────────────────────────────────────────────────────
 function handleEdit(page: PlaygroundPage) {
   router.push(`/playground/${page.id}`)
 }
 
-// ── 新建 ───────────────────────────────────────────────────────────────────────
-const createModal = reactive({ show: false, name: '', prompt: '' })
+// ── 新建 ──────────────────────────────────────────────────────────────────────
+const createModal    = reactive({ show: false, name: '' })
+const createNameRef  = ref<InstanceType<typeof NInput> | null>(null)
 
 function handleCreate() {
-  createModal.name   = ''
-  createModal.prompt = ''
-  createModal.show   = true
+  createModal.name = ''
+  createModal.show = true
+  nextTick(() => (createNameRef.value as any)?.focus?.())
 }
 
 function confirmCreate() {
   const name = createModal.name.trim() || `页面 ${pages.value.length + 1}`
-  const page = createPage(name, EMPTY_HTML(name), createModal.prompt)
+  const page = createPage(name, EMPTY_HTML(name))
   createModal.show = false
-  // 新建后直接进编辑
   handleEdit(page)
 }
 
-// ── 删除 ───────────────────────────────────────────────────────────────────────
+// ── 删除 ──────────────────────────────────────────────────────────────────────
 function handleDelete(id: string) {
   dialog.warning({
-    title: '删除页面',
-    content: '确认删除？此操作不可撤销。',
+    title:        '删除页面',
+    content:      '确认删除？此操作不可撤销。',
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: () => {
@@ -189,16 +227,15 @@ function handleDelete(id: string) {
   })
 }
 
-// ── 导出 ───────────────────────────────────────────────────────────────────────
+// ── 导出 ──────────────────────────────────────────────────────────────────────
 function handleExport(page: PlaygroundPage) {
   const blob = new Blob([JSON.stringify(page, null, 2)], { type: 'application/json' })
   const url  = URL.createObjectURL(blob)
-  const a    = Object.assign(document.createElement('a'), { href: url, download: `${page.name}.playground.json` })
-  a.click()
+  Object.assign(document.createElement('a'), { href: url, download: `${page.name}.playground.json` }).click()
   URL.revokeObjectURL(url)
 }
 
-// ── 导入 ───────────────────────────────────────────────────────────────────────
+// ── 导入 ──────────────────────────────────────────────────────────────────────
 const importInputRef = ref<HTMLInputElement | null>(null)
 function handleImport() { importInputRef.value?.click() }
 
@@ -210,15 +247,14 @@ function onImportFile(e: Event) {
     try {
       const raw = JSON.parse(ev.target?.result as string) as PlaygroundPage
       if (!raw.name || typeof raw.html !== 'string') { message.error('无效的 Playground 文件'); return }
-      const p = importPage(raw)
-      message.success(`已导入「${p.name}」`)
+      message.success(`已导入「${importPage(raw).name}」`)
     } catch { message.error('文件解析失败') }
     finally { if (importInputRef.value) importInputRef.value.value = '' }
   }
   reader.readAsText(file)
 }
 
-// ── 空页面模板 ─────────────────────────────────────────────────────────────────
+// ── 空页面模板 ────────────────────────────────────────────────────────────────
 function EMPTY_HTML(name: string) {
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -228,17 +264,18 @@ function EMPTY_HTML(name: string) {
   <title>${name}</title>
   <script src="https://cdn.tailwindcss.com"><\/script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif; }
   </style>
 </head>
-<body class="p-6 bg-gray-50 min-h-screen">
-  <h1 class="text-2xl font-bold text-slate-800 mb-4">${name}</h1>
-  <p class="text-slate-500">在编辑器中修改此页面，可通过 <code class="bg-slate-100 px-1 rounded">$sql(query)</code> 查询数据库。</p>
+<body class="bg-gray-50 min-h-screen p-6">
+  <h1 class="text-xl font-bold text-slate-800 mb-4">${name}</h1>
+  <p class="text-slate-400 text-sm">在编辑器中修改此页面。可通过 <code class="bg-slate-100 px-1 rounded font-mono">await $sql(query)</code> 查询数据库。</p>
 
   <script>
-    // 示例：查询数据
+  (async () => {
     // const rows = await $sql('SELECT 1 as id, "hello" as name')
-    // document.getElementById('result').textContent = JSON.stringify(rows)
+    // console.log(rows)
+  })()
   <\/script>
 </body>
 </html>`

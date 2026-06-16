@@ -85,7 +85,10 @@ const props = defineProps<{
   context?: 'lowcode' | 'playground'
 }>()
 
-const emit = defineEmits<{ 'update:modelValue': [val: string] }>()
+const emit = defineEmits<{
+  'update:modelValue': [val: string]
+  'cursor-change':     [pos: { line: number; col: number }]
+}>()
 
 const container = ref<HTMLElement | null>(null)
 let editor: monaco.editor.IStandaloneCodeEditor | null = null
@@ -119,6 +122,10 @@ onMounted(() => {
   editor.onDidChangeModelContent(() => {
     const val = editor?.getValue() ?? ''
     if (val !== props.modelValue) emit('update:modelValue', val)
+  })
+
+  editor.onDidChangeCursorPosition((e) => {
+    emit('cursor-change', { line: e.position.lineNumber, col: e.position.column })
   })
 })
 
