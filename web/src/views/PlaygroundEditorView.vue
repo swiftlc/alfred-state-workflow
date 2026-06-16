@@ -44,17 +44,19 @@
           <template #icon><component :is="RotateCcw" :size="13" /></template>
         </n-button>
 
-        <!-- 全屏预览 -->
-        <n-button size="small" ghost @click="playing = true" title="全屏演示">
-          <template #icon><component :is="Play" :size="13" /></template>
-          预览
+        <!-- ✦ 全屏预览 -->
+        <n-button size="small" ghost @click="playing = true" title="全屏演示 (⌘P)">
+          <template #icon><component :is="Maximize2" :size="13" /></template>
+          全屏
         </n-button>
 
+        <!-- ✦ 保存按钮：saved 状态变绿色 -->
         <n-button
           size="small"
-          :type="isDirty && saveState === 'idle' ? 'primary' : 'default'"
+          :type="saveState === 'saved' ? 'default' : isDirty && saveState === 'idle' ? 'primary' : 'default'"
           :loading="saveState === 'saving'"
-          style="min-width:72px"
+          style="min-width:72px;transition:color 0.2s,border-color 0.2s"
+          :style="saveState === 'saved' ? 'color:#10b981;border-color:#6ee7b7' : ''"
           title="⌘S"
           @click="doSave"
         >
@@ -117,7 +119,10 @@
           />
         </div>
 
-        <PlaygroundIframe :key="reloadKey" :html="previewHtml" class="w-full h-full" />
+        <!-- ✦ 预览内容：轻微淡入避免白屏感 -->
+        <transition name="preview-fade">
+          <PlaygroundIframe :key="reloadKey" :html="previewHtml" class="w-full h-full" />
+        </transition>
       </div>
     </div>
 
@@ -126,8 +131,8 @@
       class="flex items-center px-3 shrink-0 border-t border-slate-100 text-[11px] text-slate-400 select-none"
       style="height:22px;background:#f8fafc;gap:12px"
     >
-      <!-- 光标位置 -->
-      <span>行 {{ cursorPos.line }}，列 {{ cursorPos.col }}</span>
+      <!-- ✦ 光标位置：等宽字体 -->
+      <span class="font-mono">Ln {{ cursorPos.line }}, Col {{ cursorPos.col }}</span>
       <span class="w-px h-3 bg-slate-200" />
       <!-- 语言 -->
       <span>HTML</span>
@@ -174,7 +179,7 @@
 import { ref, computed, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton } from 'naive-ui'
-import { ChevronLeft, RotateCcw, Play } from '@lucide/vue'
+import { ChevronLeft, RotateCcw, Maximize2 } from '@lucide/vue'
 import { usePlayground } from '@/composables/usePlayground'
 import PlaygroundIframe  from '@/components/playground/PlaygroundIframe.vue'
 import LcMonacoEditor    from '@/components/lowcode/LcMonacoEditor.vue'
@@ -234,6 +239,7 @@ function goBack() {
 // ── Cmd+S ──────────────────────────────────────────────────────────────────────
 function onKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); doSave() }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'p') { e.preventDefault(); playing.value = !playing.value }
   if (e.key === 'Escape' && playing.value) playing.value = false
 }
 onMounted(()   => window.addEventListener('keydown', onKeydown))
@@ -311,4 +317,10 @@ const playReloadKey = ref(0)
   70%  { width: 85%;  opacity: 1 }
   100% { width: 100%; opacity: 0 }
 }
+
+/* ✦ 预览内容切换：淡入，避免白屏感 */
+.preview-fade-enter-active { transition: opacity 0.18s ease }
+.preview-fade-enter-from   { opacity: 0 }
+/* leave 不需要动画（直接切换 key） */
+.preview-fade-leave-active { display: none }
 </style>

@@ -17,7 +17,12 @@
                style="background: linear-gradient(135deg,#5b6af0 0%,#9b72f0 100%); box-shadow:0 4px 10px rgba(91,106,240,.35)">
             A
           </div>
-          <span v-if="!collapsed" class="text-[13.5px] font-semibold text-slate-800 tracking-tight whitespace-nowrap">
+          <!-- ✦ 文字淡入淡出（不再用 v-if 直接切断） -->
+          <span
+            class="text-[13.5px] font-semibold text-slate-800 tracking-tight whitespace-nowrap
+                   transition-all duration-200 overflow-hidden"
+            :style="collapsed ? 'opacity:0;max-width:0' : 'opacity:1;max-width:180px'"
+          >
             Alfred Console
           </span>
         </div>
@@ -26,7 +31,9 @@
         <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
           <button
             v-for="item in navItems" :key="item.key"
-            class="flex items-center w-full gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 cursor-pointer outline-none appearance-none bg-transparent border-0"
+            class="relative flex items-center w-full gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium
+                   transition-all duration-150 cursor-pointer appearance-none bg-transparent border-0
+                   outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1"
             :class="[
               activeMenu === item.key
                 ? 'bg-indigo-50 text-indigo-600'
@@ -36,23 +43,40 @@
             :title="collapsed ? item.label : ''"
             @click="navigate(item.key)"
           >
+            <!-- ✦ 左侧高亮条 -->
+            <span
+              v-if="activeMenu === item.key && !collapsed"
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
+              style="background:#5b6af0"
+            />
             <component
               :is="item.icon"
               class="shrink-0 transition-colors duration-150"
               :size="16"
               :class="activeMenu === item.key ? 'text-indigo-500' : 'text-slate-400'"
             />
-            <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+            <!-- ✦ 标签也用 opacity 过渡 -->
+            <span
+              class="truncate transition-all duration-200 overflow-hidden"
+              :style="collapsed ? 'opacity:0;max-width:0' : 'opacity:1;max-width:180px'"
+            >{{ item.label }}</span>
           </button>
         </nav>
 
-        <!-- 折叠按钮 -->
+        <!-- ✦ 折叠按钮：图标旋转动画 -->
         <button
-          class="flex items-center justify-center w-full h-10 text-slate-400 hover:bg-slate-50 hover:text-indigo-500 transition-all duration-150 shrink-0 cursor-pointer outline-none appearance-none bg-transparent border-0"
+          class="flex items-center justify-center w-full h-10 text-slate-400 hover:bg-slate-50
+                 hover:text-indigo-500 transition-all duration-150 shrink-0 cursor-pointer
+                 outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 appearance-none bg-transparent border-0"
           style="border-top: 1px solid var(--color-slate-100, #f1f5f9)"
           @click="collapsed = !collapsed"
         >
-          <component :is="collapsed ? ChevronRight : ChevronLeft" :size="15" />
+          <component
+            :is="ChevronLeft"
+            :size="15"
+            class="transition-transform duration-200"
+            :class="collapsed ? 'rotate-180' : ''"
+          />
         </button>
       </aside>
 
@@ -76,9 +100,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { BookOpen, History, Layers, Zap, BarChart2, Activity, Sliders, Network, Terminal, Radio, ChevronLeft, ChevronRight, Gamepad2 } from '@lucide/vue'
+import { BookOpen, History, Layers, Zap, BarChart2, Activity, Sliders, Network, Terminal, Radio, ChevronLeft, Gamepad2 } from '@lucide/vue'
 import type { Component } from 'vue'
 import {
   NConfigProvider, NMessageProvider, NDialogProvider,
@@ -86,9 +110,12 @@ import {
 } from 'naive-ui'
 import type { GlobalThemeOverrides } from 'naive-ui'
 
-const router    = useRouter()
-const route     = useRoute()
-const collapsed = ref(false)
+const router = useRouter()
+const route  = useRoute()
+
+// ✦ 折叠状态持久化到 localStorage
+const collapsed = ref(localStorage.getItem('sidebar_collapsed') === 'true')
+watch(collapsed, v => localStorage.setItem('sidebar_collapsed', String(v)))
 
 const keepAliveComponents = computed(() =>
   router.getRoutes()
