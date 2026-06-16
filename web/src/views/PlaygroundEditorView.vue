@@ -3,51 +3,57 @@
 
     <!-- ── 顶栏 ── -->
     <div
-      class="flex items-center gap-2 px-4 shrink-0 bg-white border-b border-slate-100"
-      style="height:44px;box-shadow:0 1px 4px rgba(30,41,80,0.06)"
+      class="flex items-center px-3 shrink-0 bg-white border-b border-slate-100"
+      style="height:44px;gap:8px;box-shadow:0 1px 4px rgba(30,41,80,0.06)"
     >
+      <!-- 返回 -->
       <button
-        class="flex items-center gap-1 text-slate-400 hover:text-slate-700 text-[13px] font-medium
-               transition-colors cursor-pointer outline-none bg-transparent border-0 p-0 mr-1"
+        class="flex items-center gap-1 shrink-0 px-2 py-1 rounded-lg text-slate-400
+               hover:text-indigo-500 hover:bg-indigo-50 text-[12.5px] font-medium
+               transition-all cursor-pointer outline-none bg-transparent border-0"
         @click="goBack"
       >
-        <component :is="ChevronLeft" :size="15" />
+        <component :is="ChevronLeft" :size="14" />
         返回
       </button>
 
-      <div class="w-px h-4 bg-slate-200 shrink-0" />
+      <div class="w-px h-4 bg-slate-100 shrink-0" />
 
-      <InlineEdit
-        :value="pageName"
-        display-style="font-size:13.5px;font-weight:600;color:#1e293b;max-width:200px"
-        input-style="font-size:13.5px;font-weight:600;color:#1e293b;max-width:200px"
-        @confirm="doRename"
-      />
-
-      <transition name="dot-fade">
-        <span
-          v-if="isDirty"
-          class="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0"
-          title="有未保存的修改"
+      <!-- 页面名称 + 未保存圆点 -->
+      <div class="flex items-center gap-1.5 min-w-0">
+        <InlineEdit
+          :value="pageName"
+          display-style="font-size:13px;font-weight:600;color:#374151;max-width:220px"
+          input-style="font-size:13px;font-weight:600;color:#374151;max-width:220px"
+          @confirm="doRename"
         />
-      </transition>
+        <transition name="dot-fade">
+          <span
+            v-if="isDirty"
+            class="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0"
+            title="有未保存的修改"
+          />
+        </transition>
+      </div>
 
       <div class="flex-1" />
 
-      <n-button size="small" ghost @click="reloadKey++" title="重载预览">
-        <template #icon><component :is="RotateCcw" :size="13" /></template>
-      </n-button>
+      <!-- 操作按钮 -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <n-button size="small" ghost @click="reloadKey++" title="重载预览">
+          <template #icon><component :is="RotateCcw" :size="13" /></template>
+        </n-button>
 
-      <n-button
-        size="small"
-        :type="isDirty && saveState === 'idle' ? 'primary' : 'default'"
-        :loading="saveState === 'saving'"
-        style="min-width:76px"
-        @click="doSave"
-      >
-        {{ saveState === 'saved' ? '✓ 已保存' : '保存' }}
-      </n-button>
-
+        <n-button
+          size="small"
+          :type="isDirty && saveState === 'idle' ? 'primary' : 'default'"
+          :loading="saveState === 'saving'"
+          style="min-width:72px"
+          @click="doSave"
+        >
+          {{ saveState === 'saved' ? '✓ 已保存' : '保存' }}
+        </n-button>
+      </div>
     </div>
 
     <!-- ── 主编辑区 ── -->
@@ -121,8 +127,10 @@ const savedHtml  = ref('')
 onMounted(() => {
   const p = getPage(pageId.value)
   if (!p) { router.replace('/playground'); return }
-  editorCode.value = p.html
-  savedHtml.value  = p.html
+  editorCode.value  = p.html
+  savedHtml.value   = p.html
+  // 立即渲染预览，不等 debounce
+  previewHtml.value = p.html
 })
 
 // ── 未保存状态 ─────────────────────────────────────────────────────────────────
