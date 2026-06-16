@@ -5,16 +5,18 @@
     <div class="flex items-center justify-between mb-4 shrink-0 gap-3">
       <h1 class="text-lg font-semibold text-slate-800 tracking-tight shrink-0">Playground</h1>
 
-      <!-- ✦ 搜索框 -->
-      <n-input
-        v-model:value="searchQuery"
-        placeholder="搜索页面…"
-        clearable
-        size="small"
-        style="max-width:220px"
+      <!-- ✦ 搜索触发按钮（Cmd+K 风格） -->
+      <button
+        class="flex items-center gap-2 flex-1 max-w-[220px] px-3 py-1.5 rounded-lg
+               border border-slate-200 bg-slate-50 hover:bg-white hover:border-indigo-300
+               text-slate-400 text-[12.5px] transition-all cursor-pointer outline-none
+               focus-visible:ring-2 focus-visible:ring-indigo-400"
+        @click="searchShow = true"
       >
-        <template #prefix><component :is="Search" :size="13" style="color:#9ca3af" /></template>
-      </n-input>
+        <component :is="Search" :size="13" class="shrink-0" />
+        <span class="flex-1 text-left">搜索页面…</span>
+        <kbd class="text-[10px] bg-white border border-slate-200 rounded px-1 py-0.5 text-slate-300 shrink-0">⌘K</kbd>
+      </button>
 
       <div class="flex items-center gap-2 shrink-0">
         <n-button size="small" @click="handleImport">导入</n-button>
@@ -31,17 +33,11 @@
       <n-button type="primary" size="small" @click="handleCreate">创建第一个页面</n-button>
     </div>
 
-    <!-- ✦ 搜索无结果 -->
-    <div v-else-if="filteredPages.length === 0" class="flex-1 flex flex-col items-center justify-center select-none">
-      <component :is="Search" :size="36" class="text-slate-200 mb-3" />
-      <p class="text-sm text-slate-400">未找到「{{ searchQuery }}」</p>
-    </div>
-
     <!-- 页面列表 -->
     <div v-else class="flex-1 overflow-y-auto pr-1">
       <div class="grid grid-cols-3 gap-3">
         <div
-          v-for="page in filteredPages"
+          v-for="page in pages"
           :key="page.id"
           class="group relative border border-slate-200 rounded-xl bg-white
                  hover:border-indigo-300 hover:shadow-md
@@ -151,6 +147,34 @@
       </div>
     </teleport>
 
+    <!-- ── Cmd+K 搜索弹窗 ── -->
+    <DictPicker
+      v-model:show="searchShow"
+      dict-key="playground"
+      dict-name="Playground 页面"
+      :items="pageItems"
+      :allow-input="false"
+      placeholder="搜索页面名称…"
+      @select="onSearchSelect"
+    >
+      <template #item="{ item, isActive }">
+        <!-- 渐变缩略图 -->
+        <span
+          class="alfred-item__icon"
+          :style="{ background: cardGradient(item.name), flexShrink: 0, borderRadius: '8px' }"
+        >
+          <span style="color:rgba(255,255,255,0.7);font-size:13px;font-weight:700;letter-spacing:-0.5px">
+            {{ item.name.slice(0, 2) }}
+          </span>
+        </span>
+        <span class="alfred-item__body">
+          <span class="alfred-item__name">{{ item.name }}</span>
+          <span v-if="item.description" class="alfred-item__sub">{{ item.description }}</span>
+        </span>
+        <component :is="CornerDownLeft" v-if="isActive" :size="13" class="alfred-item__enter" />
+      </template>
+    </DictPicker>
+
     <!-- 新建弹窗 -->
     <n-modal
       v-model:show="createModal.show"
@@ -177,28 +201,50 @@
 <script setup lang="ts">
 defineOptions({ name: 'PlaygroundView' })
 
-import { ref, reactive, computed, nextTick } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NModal, NInput, NTooltip, useDialog, useMessage } from 'naive-ui'
-import { Play, Code2, Download, Trash2, RotateCcw, ChevronLeft, Gamepad2, Search } from '@lucide/vue'
+import { Play, Code2, Download, Trash2, RotateCcw, ChevronLeft, Gamepad2, Search, CornerDownLeft } from '@lucide/vue'
 import { usePlayground } from '@/composables/usePlayground'
 import { formatTime } from '@/utils/search'
 import type { PlaygroundPage } from '@/types/playground'
+import type { DictItem, ContextDataItem } from '@/types'
 import PlaygroundIframe from '@/components/playground/PlaygroundIframe.vue'
 import InlineEdit       from '@/components/InlineEdit.vue'
+import DictPicker       from '@/components/DictPicker.vue'
 
 const router = useRouter()
 const { pages, createPage, deletePage, renamePage, importPage } = usePlayground()
 const dialog  = useDialog()
 const message = useMessage()
 
-// ── 搜索 ──────────────────────────────────────────────────────────────────────
-const searchQuery   = ref('')
-const filteredPages = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return pages.value
-  return pages.value.filter(p => p.name.toLowerCase().includes(q))
-})
+// ── Cmd+K 搜索 ────────────────────────────────────────────────────────────────
+const searchShow = ref(false)
+
+const pageItems = computed((): DictItem[] =>
+  pages.value.map(p => ({
+    id:          p.id,
+    name:        p.name,
+    value:       p.id,
+    description: formatTime(p.updatedAt),
+    pinned:      false,
+    lastUsedAt:  p.updatedAt,
+  }))
+)
+
+function onSearchSelect(item: ContextDataItem) {
+  const page = pages.value.find(p => p.id === item.id || p.id === item.value)
+  if (page) handleEdit(page)
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault()
+    searchShow.value = true
+  }
+}
+onMounted(()   => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 // ── 渐变色 ────────────────────────────────────────────────────────────────────
 const PALETTES = [
