@@ -27,7 +27,9 @@
 
     <!-- 创建别名 Modal -->
     <n-modal v-model:show="aliasModal.show" preset="dialog" title="创建别名"
-             positive-text="创建" negative-text="取消" @positive-click="submitAlias">
+             positive-text="创建" negative-text="取消"
+             :positive-loading="aliasModal.loading"
+             @positive-click="submitAlias">
       <n-form style="margin-top:12px">
         <n-form-item label="别名">
           <n-input v-model:value="aliasModal.alias" placeholder="输入快捷别名，如 dep-prod" />
@@ -109,7 +111,7 @@ async function updateHistoryContext(item: HistoryItem, key: string, val: Context
   message.success(`已更新上下文「${key}」`)
 }
 
-const aliasModal = reactive({ show: false, alias: '', item: null as HistoryItem | null })
+const aliasModal = reactive({ show: false, loading: false, alias: '', item: null as HistoryItem | null })
 
 function openAliasModal(item: HistoryItem) {
   aliasModal.alias = ''
@@ -120,15 +122,22 @@ function openAliasModal(item: HistoryItem) {
 async function submitAlias() {
   if (!aliasModal.alias.trim()) { message.error('别名不能为空'); return false }
   const item = aliasModal.item!
-  await createAlias({
-    alias:    aliasModal.alias.trim(),
-    action:   item.action,
-    data:     item.data as Record<string, unknown>,
-    title:    item.title,
-    subtitle: item.subtitle,
-  })
-  message.success('别名已创建')
-  return true
+  aliasModal.loading = true
+  try {
+    await createAlias({
+      alias:    aliasModal.alias.trim(),
+      action:   item.action,
+      data:     item.data as Record<string, unknown>,
+      title:    item.title,
+      subtitle: item.subtitle,
+    })
+    message.success('别名已创建')
+  } catch (e) {
+    message.error((e as Error).message || '创建别名失败')
+    return false
+  } finally {
+    aliasModal.loading = false
+  }
 }
 
 function doClear() {
