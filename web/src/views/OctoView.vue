@@ -7,9 +7,12 @@
       <div class="flex items-center justify-between mb-3">
         <h1 class="text-lg font-semibold text-slate-800 tracking-tight">Octo RPC</h1>
         <div class="flex items-center gap-2">
-          <span v-if="nodesLoading || methodsLoading" class="flex items-center gap-1.5 text-xs text-slate-400">
-            <n-spin :size="12" />
-            {{ nodesLoading ? '查询节点…' : '加载方法…' }}
+          <!-- ✦ 加载进度：两个步骤明确展示 -->
+          <span v-if="nodesLoading || methodsLoading"
+                class="flex items-center gap-1.5 text-[11.5px] font-medium px-2.5 py-1 rounded-full"
+                style="background:#f1f5f9;color:#64748b">
+            <n-spin :size="11" />
+            <span>{{ nodesLoading ? '1/2 查询节点' : '2/2 加载方法' }}</span>
           </span>
           <n-button size="tiny" ghost @click="openFavoritesModal">
             收藏{{ historyEntries.length ? ` (${historyEntries.length})` : '' }}

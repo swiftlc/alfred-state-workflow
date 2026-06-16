@@ -36,9 +36,21 @@ async function doToggleDefault(item: Workspace) {
   message.success(isDefault ? `「${item.name}」已设为默认工作区` : '已取消默认工作区')
 }
 
-async function doApplyContext(item: Workspace) {
-  await setContext({ state: 'home', data: item.data as never })
-  message.success(`已将工作区「${item.name}」应用到上下文`)
+function doApplyContext(item: Workspace) {
+  dialog.warning({
+    title:        '应用工作区',
+    content:      `将用「${item.name}」的快照覆盖当前上下文，确认？`,
+    positiveText: '确认应用',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await setContext({ state: 'home', data: item.data as never })
+        message.success(`已将工作区「${item.name}」应用到上下文`)
+      } catch (e) {
+        message.error((e as Error).message || '应用失败')
+      }
+    },
+  })
 }
 
 async function doRenameWorkspace(item: Workspace, name: string) {

@@ -2,7 +2,17 @@
   <div class="flex flex-col overflow-hidden" style="height: 100%">
     <div class="flex items-center justify-between mb-5 shrink-0">
       <h1 class="text-lg font-semibold text-slate-800 tracking-tight">历史记录</h1>
-      <n-button size="small" :disabled="!hasUnpinned" @click="doClear">清空未置顶</n-button>
+      <div class="flex items-center gap-2">
+        <!-- 批量删除（有勾选时显示） -->
+        <n-button
+          v-if="selectedKeys.length"
+          size="small"
+          type="error"
+          ghost
+          @click="doBatchDelete"
+        >删除选中 ({{ selectedKeys.length }})</n-button>
+        <n-button size="small" :disabled="!hasUnpinned" @click="doClear">清空未置顶</n-button>
+      </div>
     </div>
 
     <n-input
@@ -14,11 +24,13 @@
     />
 
     <n-data-table
+      v-model:checked-row-keys="selectedKeys"
       :columns="columns"
       :data="filteredItems"
       :loading="loading"
       :bordered="false"
       :single-line="false"
+      :row-key="(row: HistoryItem) => row.id"
       size="small"
       flex-height
       class="flex-1"
@@ -56,9 +68,10 @@ import type { HistoryItem, ContextDataItem } from '@/types'
 const message = useMessage()
 const dialog  = useDialog()
 
-const loading    = ref(false)
-const items      = ref<HistoryItem[]>([])
-const searchText = ref('')
+const loading      = ref(false)
+const items        = ref<HistoryItem[]>([])
+const searchText   = ref('')
+const selectedKeys = ref<string[]>([])
 
 const hasUnpinned = computed(() => items.value.some(i => !i.isPinned))
 
@@ -144,6 +157,27 @@ async function submitAlias() {
   }
 }
 
+function doBatchDelete() {
+  const count = selectedKeys.value.length
+  if (!count) return
+  dialog.warning({
+    title:        `删除 ${count} 条历史`,
+    content:      '删除后不可恢复，确认？',
+    positiveText: '确认删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await Promise.all(selectedKeys.value.map(id => deleteHistory(id)))
+        items.value   = items.value.filter(i => !selectedKeys.value.includes(i.id))
+        selectedKeys.value = []
+        message.success(`已删除 ${count} 条`)
+      } catch (e) {
+        message.error((e as Error).message || '删除失败')
+      }
+    },
+  })
+}
+
 function doClear() {
   dialog.warning({
     title: '清空历史',
@@ -163,6 +197,7 @@ function doClear() {
 }
 
 const columns: DataTableColumns<HistoryItem> = [
+  { type: 'selection' },
   {
     title: '', key: 'pin', width: 40,
     render: (row) => h('span', {

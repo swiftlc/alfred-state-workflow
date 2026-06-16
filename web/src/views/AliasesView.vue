@@ -65,6 +65,12 @@ async function updateAliasContext(item: Alias, key: string, val: ContextDataItem
 }
 
 async function doRenameAlias(item: Alias, fields: { alias?: string; title?: string; subtitle?: string }) {
+  // 唯一性校验：别名不能与其他条目重复
+  if (fields.alias !== undefined) {
+    const newAlias = fields.alias.trim()
+    const dup = items.value.find(i => i.id !== item.id && i.alias === newAlias)
+    if (dup) { message.error(`别名「${newAlias}」已存在`); return }
+  }
   await renameAlias(item.id, fields)
   if (fields.alias    !== undefined) item.alias    = fields.alias
   if (fields.title    !== undefined) item.title    = fields.title
