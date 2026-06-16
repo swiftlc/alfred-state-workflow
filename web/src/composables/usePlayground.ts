@@ -111,5 +111,22 @@ export function usePlayground() {
     return createPage(name, raw.html, raw.prompt)
   }
 
-  return { pages, createPage, savePage, deletePage, renamePage, getPage, importPage }
+  /** 复制页面（新 id，名称加「副本」） */
+  function duplicatePage(id: string): PlaygroundPage | null {
+    const original = readPage(id)
+    if (!original) return null
+    return createPage(original.name + '（副本）', original.html, original.prompt)
+  }
+
+  /** 导出全部页面为 JSON 文件 */
+  function exportAll(): void {
+    const all = pages.value.map(p => readPage(p.id)).filter((p): p is PlaygroundPage => p !== null)
+    const json = JSON.stringify(all, null, 2)
+    const url  = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+    const date = new Date().toISOString().slice(0, 10)
+    Object.assign(document.createElement('a'), { href: url, download: `playground-backup-${date}.json` }).click()
+    URL.revokeObjectURL(url)
+  }
+
+  return { pages, createPage, savePage, deletePage, renamePage, getPage, importPage, duplicatePage, exportAll }
 }
