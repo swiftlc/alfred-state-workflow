@@ -136,16 +136,31 @@
                 </div>
               </div>
 
-              <!-- 路由规则 只读 -->
+              <!-- 路由规则 只读（泳道支持交互点选） -->
               <div v-if="parsedRouteRules.length">
                 <div class="cran-label mb-2">路由规则</div>
                 <div v-if="parsedRouteRules.length === 1" class="cran-route-card">
                   <div class="cran-route-row">
                     <span class="cran-route-key">泳道</span>
-                    <span v-if="parsedRouteRules[0].swimlane" class="cran-swim-tag">
-                      {{ parsedRouteRules[0].swimlane }}
-                    </span>
-                    <span v-else class="text-xs text-slate-400">主干</span>
+                    <ContextItem
+                      context-key="swimlane"
+                      :value="parsedRouteRules[0].swimlane ?? ''"
+                      label="泳道"
+                      :fetch-items="fetchSwimlaneItems"
+                      custom-edit
+                      bare
+                      @edit="item => onInfoSwimlaneEdit(item)"
+                    >
+                      <span v-if="parsedRouteRules[0].swimlane"
+                            class="cran-swim-tag cran-swim-tag--clickable"
+                            title="点击切换泳道（同步到触发表单）">
+                        {{ parsedRouteRules[0].swimlane }}
+                      </span>
+                      <span v-else class="text-xs text-slate-400 cursor-pointer hover:text-slate-600 transition-colors"
+                            title="点击选择泳道（同步到触发表单）">
+                        主干（点击选择）
+                      </span>
+                    </ContextItem>
                   </div>
                   <div class="cran-route-row">
                     <span class="cran-route-key">cell</span>
@@ -238,8 +253,8 @@
               </div>
 
               <!-- 触发按钮 -->
-              <div class="flex items-center gap-3">
-                <n-button size="small" :loading="executing" :disabled="executing" @click="doExecute">
+              <div class="flex items-center gap-3 pt-1">
+                <n-button type="primary" size="small" :loading="executing" :disabled="executing" @click="doExecute">
                   触发执行
                 </n-button>
                 <span class="text-[11px] text-slate-400">成功后自动跳转历史记录</span>
@@ -262,7 +277,9 @@
               </div>
 
               <div v-else class="space-y-2">
-                <div v-for="item in historyList" :key="item.id" class="cran-attempt">
+                <div v-for="item in historyList" :key="item.id"
+                     class="cran-attempt"
+                     :class="expandedAttempts.has(item.id) && 'cran-attempt--expanded'">
                   <!-- 左侧状态色条 -->
                   <div class="cran-attempt__bar"
                        :class="item.status === 7 ? 'bg-emerald-400'
@@ -271,76 +288,96 @@
                               : 'bg-slate-300'" />
 
                   <div class="flex-1 min-w-0">
-                    <!-- 主行 -->
-                    <div class="flex items-center gap-2">
-                      <!-- attempt ID，点击展开 -->
-                      <button
-                        class="flex items-center gap-1 font-mono text-[11.5px] text-slate-600 hover:text-indigo-500 transition-colors min-w-0 flex-1 text-left"
-                        @click="toggleAttempt(item.id)"
-                      >
-                        <span class="truncate">{{ item.attemptid }}</span>
-                        <span class="text-[10px] text-slate-300 flex-shrink-0">
-                          {{ expandedAttempts.has(item.id) ? '▾' : '▸' }}
-                        </span>
-                      </button>
-                      <!-- 状态 + 重执行 -->
-                      <span class="text-[11.5px] font-semibold flex-shrink-0"
-                            :class="item.status === 7 ? 'text-emerald-500'
-                                   : item.status === 8 ? 'text-amber-500'
-                                   : item.status >= 5 ? 'text-red-500'
-                                   : 'text-slate-500'">
+
+                    <!-- ① 主行：状态 + attemptid ContextItem + 展开 + 重执行 -->
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="cran-status-pill flex-shrink-0"
+                            :class="item.status === 7 ? 'cran-status-pill--ok'
+                                   : item.status === 8 ? 'cran-status-pill--warn'
+                                   : item.status >= 5 ? 'cran-status-pill--err'
+                                   : 'cran-status-pill--idle'">
                         {{ STATUS_MAP[item.status] ?? `状态${item.status}` }}
                       </span>
-                      <n-button size="tiny" ghost @click.stop="rerunAttempt(item)">重执行</n-button>
+                      <!-- attemptid：ContextItem（复制 + 在 Raptor 查看） -->
+                      <ContextItem
+                        context-key="attemptid"
+                        :value="item.attemptid"
+                        label="attemptid"
+                        :editable="false"
+                        :extra-actions="RAPTOR_ACTION"
+                        bare
+                        class="flex-1 min-w-0"
+                        @action="key => handleAttemptAction(key, item)"
+                      >
+                        <span class="cran-chip-mono">{{ item.attemptid }}</span>
+                      </ContextItem>
+                      <!-- 展开 toggle -->
+                      <button class="cran-expand-btn" @click.stop="toggleAttempt(item.id)">
+                        {{ expandedAttempts.has(item.id) ? '▾' : '▸' }}
+                      </button>
+                      <n-button size="tiny" ghost class="flex-shrink-0" @click.stop="rerunAttempt(item)">
+                        重执行
+                      </n-button>
                     </div>
 
-                    <!-- 次行：时间 + 耗时 + 机器 -->
-                    <div class="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
+                    <!-- ② 路由信息：泳道 ContextItem + cell + grouptags -->
+                    <template v-if="parseRouteRules(item.routeRules)?.[0]">
+                      <div class="flex items-center gap-2 flex-wrap mt-2">
+                        <ContextItem
+                          context-key="swimlane"
+                          :value="parseRouteRules(item.routeRules)![0].swimlane || ''"
+                          label="泳道"
+                          :fetch-items="fetchSwimlaneItems"
+                          bare
+                          @edit="i => execRule.swimlane = i.value ?? ''"
+                        >
+                          <span class="cran-swim-chip"
+                                :class="parseRouteRules(item.routeRules)![0].swimlane
+                                  ? 'cran-swim-chip--active' : 'cran-swim-chip--empty'">
+                            <span class="cran-swim-chip__dot" />
+                            {{ parseRouteRules(item.routeRules)![0].swimlane || '主干' }}
+                          </span>
+                        </ContextItem>
+                        <span class="text-[11px] font-mono text-slate-400">
+                          {{ parseRouteRules(item.routeRules)![0].cell }}
+                        </span>
+                        <span v-if="parseRouteRules(item.routeRules)![0].grouptags"
+                              class="text-[11px] font-mono text-slate-300">
+                          {{ parseRouteRules(item.routeRules)![0].grouptags }}
+                        </span>
+                      </div>
+                    </template>
+
+                    <!-- ③ 时间行：时间 · 耗时 · 机器 ContextItem -->
+                    <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-1.5">
                       <span>{{ formatTs(item.starttime) }}</span>
                       <template v-if="item.endtime && item.starttime && item.endtime > item.starttime">
                         <span class="text-slate-200">·</span>
                         <span>{{ ((item.endtime - item.starttime) / 1000).toFixed(1) }}s</span>
                       </template>
                       <span class="text-slate-200">·</span>
-                      <span class="font-mono hover:text-indigo-500 transition-colors cursor-pointer"
-                            title="登录机器（待实现）"
-                            @click.stop="onExecHost(item.exechost)">
-                        {{ item.exechost }}
-                      </span>
+                      <ContextItem
+                        context-key="exechost"
+                        :value="item.exechost"
+                        label="执行机器"
+                        :editable="false"
+                        bare
+                      >
+                        <span class="cran-chip-host">{{ item.exechost }}</span>
+                      </ContextItem>
                     </div>
 
-                    <!-- 展开：执行参数详情 -->
+                    <!-- ④ 展开区：执行参数 taskItem -->
                     <template v-if="expandedAttempts.has(item.id)">
-                      <div class="mt-3 space-y-3 border-t border-slate-100 pt-3">
-                        <!-- 执行路由规则 -->
-                        <div v-if="parseRouteRules(item.routeRuleOrList)" >
-                          <div class="cran-label mb-1.5">执行路由规则</div>
-                          <div v-if="parseRouteRules(item.routeRuleOrList)!.length === 1"
-                               class="cran-route-card cran-route-card--compact">
-                            <div class="cran-route-row">
-                              <span class="cran-route-key">泳道</span>
-                              <span v-if="parseRouteRules(item.routeRuleOrList)![0].swimlane"
-                                    class="cran-swim-tag">
-                                {{ parseRouteRules(item.routeRuleOrList)![0].swimlane }}
-                              </span>
-                              <span v-else class="text-xs text-slate-400">主干</span>
-                            </div>
-                            <div class="cran-route-row">
-                              <span class="cran-route-key">cell</span>
-                              <span class="text-xs font-mono text-slate-500">
-                                {{ parseRouteRules(item.routeRuleOrList)![0].cell }}
-                              </span>
-                            </div>
-                          </div>
-                          <pre v-else class="text-[10px] font-mono text-slate-500 bg-slate-50 rounded-lg px-3 py-2 overflow-x-auto">{{ formatJson(item.routeRuleOrList!) }}</pre>
-                        </div>
-                        <!-- 执行参数 -->
+                      <div class="border-t border-slate-100 pt-2.5">
                         <div v-if="item.taskItem">
                           <div class="cran-label mb-1.5">执行参数（taskItem）</div>
-                          <pre class="text-[10px] font-mono text-slate-500 bg-slate-50 rounded-lg px-3 py-2 overflow-x-auto max-h-28">{{ formatJson(item.taskItem) }}</pre>
+                          <pre class="text-[10px] font-mono text-slate-500 bg-slate-50 rounded-lg px-3 py-2.5 overflow-x-auto max-h-48 leading-relaxed">{{ formatJson(item.taskItem) }}</pre>
                         </div>
+                        <div v-else class="text-[11px] text-slate-400 py-1">无执行参数</div>
                       </div>
                     </template>
+
                   </div>
                 </div>
 
@@ -401,7 +438,7 @@ interface CranAttempt {
   id: number; attemptid: string; taskid: string
   starttime: number; endtime: number; status: number
   exechost: string; taskItem: string
-  routeRuleOrList?: string
+  routeRules?: string   // API 返回字段名
 }
 
 // ─── 状态 ─────────────────────────────────────────────────────────────────────
@@ -436,6 +473,12 @@ const execResult   = ref<{ ok: boolean; attemptId?: string; msg?: string } | nul
 
 // ─── 泳道 ContextItem ─────────────────────────────────────────────────────────
 const fetchSwimlaneItems = makeFetchItems('swimlane')
+
+// 任务信息 tab 的泳道点选 → 同步到触发表单
+function onInfoSwimlaneEdit(item: ContextDataItem) {
+  execRule.swimlane = item.value ?? ''
+  message.info(item.value ? `泳道已同步：${item.value}` : '已清空泳道（主干）')
+}
 
 // ─── localStorage 持久化 ──────────────────────────────────────────────────────
 const LS_KEY = 'cran_appkey'
@@ -521,6 +564,18 @@ function rowProps(row: CranTask) {
 // ─── Crane 请求 ───────────────────────────────────────────────────────────────
 const CRANE_BASE    = 'https://crane.mws-test.sankuai.com'
 const CRANE_HEADERS = { 'x-requested-with': 'XMLHttpRequest' }
+
+// Raptor 执行详情链接（以 attemptId 作为查询条件）
+// TODO: 若 Raptor 是独立系统，请替换为实际 URL，如 https://raptor.sankuai.com/trace?q=xxx
+function raptorUrl(attemptid: string) {
+  return `${CRANE_BASE}/attempt/detail?attemptId=${encodeURIComponent(attemptid)}`
+}
+
+// attemptid ContextItem 的扩展操作
+const RAPTOR_ACTION = [{ key: 'raptor', label: '在 Raptor 查看' }]
+function handleAttemptAction(key: string, item: CranAttempt) {
+  if (key === 'raptor') window.open(raptorUrl(item.attemptid), '_blank')
+}
 
 // ─── 全量拉取（翻页 + 缓存） ──────────────────────────────────────────────────
 async function fetchAllTasks(forceRefresh = false) {
@@ -623,7 +678,7 @@ function toggleAttempt(id: number) {
 // ─── 基于历史重执行 ───────────────────────────────────────────────────────────
 function rerunAttempt(item: CranAttempt) {
   execTaskItem.value = formatJson(item.taskItem || '{}')
-  const rules = parseRouteRules(item.routeRuleOrList)
+  const rules = parseRouteRules(item.routeRules)
   if (rules?.length) {
     execRule.swimlane  = rules[0].swimlane  ?? ''
     execRule.cell      = rules[0].cell      ?? 'default'
@@ -705,6 +760,27 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
 .cran-chip--slate:hover { background: #e8ecf2; border-color: #c8d0db; }
 .cran-chip--empty  { background: transparent; border-style: dashed; border-color: #cbd5e1; color: #94a3b8; cursor: default; }
 
+/* ── attemptid chip ── */
+.cran-chip-mono {
+  display: inline-flex; align-items: center;
+  font-family: monospace; font-size: 11.5px; color: #475569;
+  background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px;
+  padding: 2px 8px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: background 0.1s, border-color 0.1s;
+}
+.cran-chip-mono:hover { background: #e8ecf4; border-color: #c8d2de; }
+
+/* ── exechost chip ── */
+.cran-chip-host {
+  display: inline-flex; align-items: center;
+  font-family: monospace; font-size: 11px; color: #64748b;
+  background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 5px;
+  padding: 1px 7px;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.cran-chip-host:hover { background: #eef2ff; border-color: #c7d2fe; color: #4f46e5; }
+
 /* ── 泳道 chip（触发表单内） ── */
 .cran-swim-chip {
   display: inline-flex; align-items: center; gap: 5px;
@@ -724,6 +800,10 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
   color: #4f46e5; background: #eef2ff; border: 1px solid #c7d2fe;
   padding: 1px 7px; border-radius: 5px;
 }
+.cran-swim-tag--clickable {
+  cursor: pointer; transition: background 0.12s, border-color 0.12s;
+}
+.cran-swim-tag--clickable:hover { background: #e0e7ff; border-color: #a5b4fc; }
 
 /* ── 键值对 ── */
 .cran-kv { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 8px; padding: 8px 12px; }
@@ -740,6 +820,27 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
 .cran-route-row:last-child { border-bottom: none; }
 .cran-route-key { width: 60px; flex-shrink: 0; font-size: 11px; color: #94a3b8; font-weight: 500; font-family: monospace; }
 
+/* ── 状态徽章 ── */
+.cran-status-pill {
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 600;
+  padding: 1px 7px; border-radius: 999px;
+}
+.cran-status-pill--ok   { color: #059669; background: #d1fae5; }
+.cran-status-pill--warn { color: #d97706; background: #fef3c7; }
+.cran-status-pill--err  { color: #dc2626; background: #fee2e2; }
+.cran-status-pill--idle { color: #64748b; background: #f1f5f9; }
+
+/* ── 展开 toggle ── */
+.cran-expand-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 2px 4px; border-radius: 4px; flex-shrink: 0;
+  font-size: 11px; color: #cbd5e1; line-height: 1;
+  border: none; outline: none; background: transparent; cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+}
+.cran-expand-btn:hover { color: #5b6af0; background: #eef2ff; }
+
 /* ── 执行历史条目 ── */
 .cran-attempt {
   display: flex; align-items: flex-start; gap: 10px;
@@ -748,5 +849,9 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
   transition: border-color 0.12s, background 0.12s;
 }
 .cran-attempt:hover { background: #f1f5f9; border-color: #e2e8f0; }
-.cran-attempt__bar { width: 3px; border-radius: 2px; flex-shrink: 0; align-self: stretch; min-height: 20px; margin-top: 2px; }
+.cran-attempt--expanded { border-color: #e0e7ff; background: #fafbff; }
+.cran-attempt__bar {
+  width: 3px; border-radius: 2px; flex-shrink: 0;
+  align-self: stretch; min-height: 20px; margin-top: 1px;
+}
 </style>
