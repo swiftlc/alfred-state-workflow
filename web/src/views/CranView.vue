@@ -322,20 +322,20 @@
                 </div>
                 <div class="cran-kpi-card">
                   <div class="cran-kpi-val"
-                       :class="historyStats.total - historyStats.ok > 0 ? 'text-amber-500' : 'text-slate-700'">
-                    {{ historyStats.total - historyStats.ok }}
+                       :class="historyStats.err > 0 ? 'text-red-500' : 'text-slate-700'">
+                    {{ historyStats.err }}
                   </div>
-                  <div class="cran-kpi-label">非成功次数</div>
+                  <div class="cran-kpi-label">失败次数</div>
                 </div>
               </div>
 
               <!-- 状态筛选 + 刷新 -->
               <div class="flex items-center gap-1.5 mb-3 flex-wrap">
                 <button v-for="f in [
-                  { key: 'all',  label: '全部' },
-                  { key: 'ok',   label: '成功' },
-                  { key: 'warn', label: '超时' },
-                  { key: 'err',  label: '失败' },
+                  { key: 'all', label: '全部' },
+                  { key: 'ok',  label: '成功' },
+                  { key: 'run', label: '运行中' },
+                  { key: 'err', label: '失败' },
                 ]" :key="f.key"
                   class="cran-filter-chip"
                   :class="historyFilter === f.key && 'cran-filter-chip--active'"
@@ -362,22 +362,14 @@
                      class="cran-attempt"
                      :class="expandedAttempts.has(item.id) && 'cran-attempt--expanded'">
                   <!-- 左侧状态色条 -->
-                  <div class="cran-attempt__bar"
-                       :class="item.status === 7 ? 'bg-emerald-400'
-                              : item.status === 8 ? 'bg-amber-400'
-                              : item.status >= 5 ? 'bg-red-400'
-                              : 'bg-slate-300'" />
+                  <div class="cran-attempt__bar" :class="statusBarClass(item.status)" />
 
                   <div class="flex-1 min-w-0">
 
                     <!-- ① 主行：状态 + attemptid(自适应宽) + 弹性空白 + 重执行 + ▸ -->
                     <div class="flex items-center gap-2 min-w-0">
-                      <span class="cran-status-pill flex-shrink-0"
-                            :class="item.status === 7 ? 'cran-status-pill--ok'
-                                   : item.status === 8 ? 'cran-status-pill--warn'
-                                   : item.status >= 5 ? 'cran-status-pill--err'
-                                   : 'cran-status-pill--idle'">
-                        {{ STATUS_MAP[item.status] ?? `状态${item.status}` }}
+                      <span class="cran-status-pill flex-shrink-0" :class="statusPillClass(item.status)">
+                        {{ statusLabel(item.status) }}
                       </span>
                       <!-- attemptid：内容自适应宽，不再 flex-1 撑满 -->
                       <ContextItem
@@ -452,12 +444,23 @@
                       </ContextItem>
                     </div>
 
-                    <!-- ④ 展开区：执行参数 taskItem -->
+                    <!-- ④ 展开区：执行参数 taskItem（Monaco + 复制） -->
                     <template v-if="expandedAttempts.has(item.id)">
                       <div class="border-t border-slate-100 pt-2.5">
                         <div v-if="item.taskItem">
-                          <div class="cran-label mb-1.5">执行参数（taskItem）</div>
-                          <pre class="text-[10px] font-mono text-slate-500 bg-slate-50 rounded-lg px-3 py-2.5 overflow-x-auto max-h-48 leading-relaxed">{{ formatJson(item.taskItem) }}</pre>
+                          <div class="flex items-center justify-between mb-1.5">
+                            <div class="cran-section-label">执行参数（taskItem）</div>
+                            <button
+                              class="flex items-center gap-1 text-[11px] text-slate-400
+                                     hover:text-indigo-500 transition-colors border-0
+                                     bg-transparent outline-none cursor-pointer p-0"
+                              @click.stop="copyText(formatJson(item.taskItem))">
+                              <Copy :size="11" />复制
+                            </button>
+                          </div>
+                          <div class="rounded-lg overflow-hidden border border-slate-100">
+                            <MonacoPreview :content="formatJson(item.taskItem)" height="200px" compact />
+                          </div>
                         </div>
                         <div v-else class="text-[11px] text-slate-400 py-1">无执行参数</div>
                       </div>
@@ -490,7 +493,7 @@
 
 <script setup lang="ts">
 import { ref, computed, h, watch, reactive } from 'vue'
-import { Clock, User, Timer, CheckCircle2, XCircle, Code2, TrendingUp } from '@lucide/vue'
+import { Clock, User, Timer, CheckCircle2, XCircle, Code2, Copy } from '@lucide/vue'
 import {
   NDataTable, NInput, NPagination, NButton, NSpin,
   NDrawer, NDrawerContent, NTabs, NTabPane, useMessage,
@@ -509,8 +512,25 @@ const message = useMessage()
 
 // ─── 执行状态映射 ────────────────────────────────────────────────────────────
 const STATUS_MAP: Record<number, string> = {
-  1: '等待中', 2: '运行中', 3: '取消中', 4: '已取消',
-  5: '失败',   6: '执行失败', 7: '成功',  8: '超时', 9: '系统失败',
+  6: '运行中',
+  7: '成功',
+  8: '失败',
+}
+function statusLabel(status: number) {
+  return STATUS_MAP[status] ?? '未知'
+}
+// 状态颜色辅助
+function statusPillClass(status: number) {
+  if (status === 7) return 'cran-status-pill--ok'
+  if (status === 8) return 'cran-status-pill--err'
+  if (status === 6) return 'cran-status-pill--warn'
+  return 'cran-status-pill--idle'
+}
+function statusBarClass(status: number) {
+  if (status === 7) return 'bg-emerald-400'
+  if (status === 8) return 'bg-red-400'
+  if (status === 6) return 'bg-amber-400'
+  return 'bg-slate-300'
 }
 
 // ─── 类型 ─────────────────────────────────────────────────────────────────────
@@ -550,13 +570,14 @@ const historyTotal     = ref(0)
 const historyPage      = ref(1)
 const historyLoading   = ref(false)
 const expandedAttempts = ref(new Set<number>())
-const historyFilter    = ref<'all' | 'ok' | 'warn' | 'err'>('all')
+const historyFilter    = ref<'all' | 'ok' | 'err' | 'run'>('all')
 
 const filteredHistory = computed(() => {
   if (historyFilter.value === 'all') return historyList.value
-  if (historyFilter.value === 'ok')   return historyList.value.filter(i => i.status === 7)
-  if (historyFilter.value === 'warn') return historyList.value.filter(i => i.status === 8)
-  return historyList.value.filter(i => i.status >= 5 && i.status !== 7 && i.status !== 8)
+  if (historyFilter.value === 'ok')  return historyList.value.filter(i => i.status === 7)
+  if (historyFilter.value === 'err') return historyList.value.filter(i => i.status === 8)
+  if (historyFilter.value === 'run') return historyList.value.filter(i => i.status === 6)
+  return historyList.value
 })
 
 // ─── 手动触发 ─────────────────────────────────────────────────────────────────
@@ -793,19 +814,15 @@ function resetTaskItem() {
 const historyStats = computed(() => {
   const list = historyList.value
   const total = list.length
-  const ok    = list.filter(i => i.status === 7).length
+  const ok  = list.filter(i => i.status === 7).length
+  const err = list.filter(i => i.status === 8).length
   const durations = list
     .filter(i => i.endtime && i.starttime && i.endtime > i.starttime)
     .map(i => (i.endtime - i.starttime) / 1000)
   const avg = durations.length
     ? (durations.reduce((a, b) => a + b, 0) / durations.length).toFixed(1)
     : '—'
-  return {
-    total,
-    ok,
-    rate: total ? Math.round(ok / total * 100) : 0,
-    avg,
-  }
+  return { total, ok, err, rate: total ? Math.round(ok / total * 100) : 0, avg }
 })
 
 // ─── 展开历史 ─────────────────────────────────────────────────────────────────
