@@ -102,7 +102,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { BookOpen, History, Layers, Zap, BarChart2, Activity, Sliders, Network, Terminal, Radio, ChevronLeft, Gamepad2 } from '@lucide/vue'
+import { BookOpen, History, Layers, Zap, BarChart2, Activity, Sliders, Network, Terminal, Radio, ChevronLeft, Gamepad2, Clock } from '@lucide/vue'
 import type { Component } from 'vue'
 import {
   NConfigProvider, NMessageProvider, NDialogProvider,
@@ -186,6 +186,7 @@ const navItems: NavItem[] = [
   { key: 'shepherd',   label: 'Shepherd',     icon: Network   },
   { key: 'octo',       label: 'Octo RPC',     icon: Terminal  },
   { key: 'mafka',      label: 'Mafka',        icon: Radio     },
+  { key: 'cran',       label: 'Crane 任务',   icon: Clock     },
   { key: 'playground', label: 'Playground',   icon: Gamepad2  },
 ]
 
@@ -201,6 +202,7 @@ const activeMenu = computed(() => {
   if (p.startsWith('/shepherd'))    return 'shepherd'
   if (p.startsWith('/octo'))        return 'octo'
   if (p.startsWith('/mafka'))       return 'mafka'
+  if (p.startsWith('/cran'))        return 'cran'
   if (p.startsWith('/playground'))  return 'playground'
   return 'dicts'
 })

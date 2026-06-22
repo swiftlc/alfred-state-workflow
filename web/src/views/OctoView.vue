@@ -54,7 +54,7 @@
             <span class="octo-chip octo-chip--emerald">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
               <span class="font-mono">{{ currentNode.ip }}:{{ currentNode.port }}</span>
-              <span class="text-emerald-500">{{ currentNode.name }}</span>
+              <span class="text-slate-400">{{ currentNode.name }}</span>
             </span>
           </ContextItem>
         </template>
@@ -211,7 +211,7 @@
             >{{ schemaOpen[i] ? '▾' : '▸' }} Schema</button>
             <button
               v-if="!hasPreset(i)"
-              class="text-[10px] text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded transition-colors"
+              class="text-[10px] text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 px-1.5 py-0.5 rounded transition-colors"
               @click="fillEmpty(i)"
             >填充 {}</button>
           </div>
@@ -242,7 +242,7 @@
 
         <!-- 调用按钮 -->
         <div class="flex items-center gap-2 mb-4">
-          <n-button type="primary" :loading="invoking" title="⌘↵" @click="doInvoke">
+          <n-button :loading="invoking" title="⌘↵" @click="doInvoke">
             调用
             <span class="octo-kbd" style="margin-left:6px">⌘↵</span>
           </n-button>
@@ -1079,11 +1079,11 @@ onDeactivated(() => {
 .octo-chip--slate:hover { background: #e8ecf2; border-color: #c8d0db; }
 
 .octo-chip--emerald {
-  background: #ecfdf5;
-  border-color: #a7f3d0;
-  color: #065f46;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
 }
-.octo-chip--emerald:hover { background: #d1fae5; border-color: #6ee7b7; }
+.octo-chip--emerald:hover { background: #e8ecf2; border-color: #c8d0db; }
 
 .octo-chip--indigo {
   background: #eef2ff;
@@ -1116,13 +1116,13 @@ onDeactivated(() => {
   flex-shrink: 0;
 }
 
-/* 琥珀色 chip（traceId） */
+/* traceId chip（改为中性灰） */
 .octo-chip--amber {
-  background: #fffbeb;
-  border-color: #fcd34d;
-  color: #92400e;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
 }
-.octo-chip--amber:hover { background: #fef3c7; border-color: #f59e0b; }
+.octo-chip--amber:hover { background: #e8ecf2; border-color: #c8d0db; }
 
 
 /* 泳道 badge（内联于右侧元信息区） */
@@ -1133,14 +1133,14 @@ onDeactivated(() => {
   font-size: 11px;
   padding: 1px 8px 1px 5px;
   border-radius: 10px;
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  color: #4338ca;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  color: #64748b;
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s;
   white-space: nowrap;
 }
-.octo-swim-badge:hover { background: #e0e7ff; border-color: #a5b4fc; }
+.octo-swim-badge:hover { background: #e8ecf2; border-color: #c8d0db; }
 .octo-swim-badge--empty {
   border-style: dashed;
   border-color: #e2e8f0;
@@ -1152,7 +1152,7 @@ onDeactivated(() => {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #818cf8;
+  background: #94a3b8;
   flex-shrink: 0;
 }
 
@@ -1341,10 +1341,10 @@ onDeactivated(() => {
   user-select: none;
   overflow: hidden;
   flex-shrink: 0;
-  border: 1px solid #a7f3d0;
+  border: 1px solid #e2e8f0;
 }
-.param-preset-badge--collapsed { background: #ecfdf5; color: #065f46; }
-.param-preset-badge--open      { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+.param-preset-badge--collapsed { background: #f1f5f9; color: #64748b; }
+.param-preset-badge--open      { background: #f8fafc; color: #475569; border-color: #e2e8f0; }
 
 .param-preset-badge__left {
   padding: 1px 6px 1px 7px;
