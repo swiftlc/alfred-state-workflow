@@ -109,6 +109,7 @@ onMounted(() => {
     fontSize:         isPlayground ? 13 : 12,
     lineHeight:       isPlayground ? 22 : 20,
     minimap:          { enabled: false },
+    guides:           { indentation: false, highlightActiveIndentation: false, bracketPairs: false },
     scrollBeyondLastLine: false,
     wordWrap:         'on',
     automaticLayout:  true,

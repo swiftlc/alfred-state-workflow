@@ -193,7 +193,7 @@
                   </span>
                 </div>
                 <div v-else class="rounded-lg overflow-hidden border border-slate-100 mt-2">
-                  <MonacoPreview :content="formatJson(drawer.task.routeRules!)" height="80px" compact />
+                  <MonacoPreview :content="formatJson(drawer.task.routeRules!)" height="160px" compact />
                 </div>
               </div>
 
@@ -201,7 +201,7 @@
               <div v-if="drawer.task.taskitem">
                 <div class="cran-section-label mb-2">任务参数</div>
                 <div class="rounded-xl overflow-hidden border border-slate-100">
-                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="200px" compact />
+                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="400px" compact />
                 </div>
               </div>
             </div>
@@ -240,7 +240,7 @@
                           @click="resetTaskItem">重置</button>
                 </div>
                 <div class="rounded-xl overflow-hidden border border-slate-200">
-                  <LcMonacoEditor v-model="execTaskItem" language="json" height="160px" compact />
+                  <LcMonacoEditor v-model="execTaskItem" language="json" height="320px" compact />
                 </div>
               </div>
 

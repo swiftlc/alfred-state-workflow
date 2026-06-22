@@ -156,6 +156,7 @@ function initEditor() {
     readOnly:             true,
     automaticLayout:      true,
     minimap:              { enabled: false },
+    guides:               { indentation: false, highlightActiveIndentation: false, bracketPairs: false },
     scrollBeyondLastLine: false,
     fontFamily:           '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
     fontSize:             12,
