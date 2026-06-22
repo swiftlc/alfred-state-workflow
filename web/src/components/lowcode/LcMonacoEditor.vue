@@ -83,6 +83,8 @@ const props = defineProps<{
   readonly?: boolean
   /** 'lowcode'（默认）注册 $set/$vars/$page；'playground' 注册 $sql/$http/$octo/$ctx/$openUrl */
   context?: 'lowcode' | 'playground'
+  /** 紧凑模式：隐藏行号、禁止折叠、禁止右键菜单（适用于抽屉/小面板中的编辑器） */
+  compact?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -114,9 +116,14 @@ onMounted(() => {
     padding:          { top: 8, bottom: 8 },
     scrollbar:        { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
     overviewRulerLanes: 0,
-    folding:          isPlayground,
+    folding:          isPlayground && !props.compact,
     lineNumbersMinChars: 3,
     formatOnPaste:    isPlayground,
+    ...(props.compact ? {
+      lineNumbers:  'off' as const,
+      contextmenu:  false,
+      lineDecorationsWidth: 4,
+    } : {}),
   })
 
   editor.onDidChangeModelContent(() => {

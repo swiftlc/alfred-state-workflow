@@ -34,6 +34,8 @@ if (!self.MonacoEnvironment) {
 const props = defineProps<{
   content: string
   height?: string
+  /** 紧凑模式：隐藏行号、禁止折叠、禁止右键菜单 */
+  compact?: boolean
 }>()
 
 const container = ref<HTMLElement | null>(null)
@@ -157,11 +159,13 @@ function initEditor() {
     scrollBeyondLastLine: false,
     fontFamily:           '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
     fontSize:             12,
-    lineNumbers:          'on',
+    lineNumbers:          props.compact ? 'off' : 'on',
     padding:              { top: 10, bottom: 10 },
     renderOverviewRuler:  false,
     wordWrap:             'off',
-    folding:              true,
+    folding:              !props.compact,
+    contextmenu:          !props.compact,
+    ...(props.compact ? { lineDecorationsWidth: 4 } : {}),
   })
 }
 

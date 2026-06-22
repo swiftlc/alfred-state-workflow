@@ -107,7 +107,7 @@
 
             <!-- ────── 任务信息 ────── -->
             <n-tab-pane name="info" tab="任务信息">
-            <div class="flex flex-col gap-6 pt-5">
+            <div class="flex flex-col gap-4 pt-4">
 
               <!-- ① MMC stat 卡：状态 / 创建人 / 超时（紧凑横排） -->
               <div class="grid grid-cols-3 gap-3">
@@ -166,7 +166,7 @@
 
               <!-- ③ 路由规则 -->
               <div v-if="parsedRouteRules.length">
-                <div class="cran-section-label mb-3">路由规则</div>
+                <div class="cran-section-label mb-2">路由规则</div>
                 <div v-if="parsedRouteRules.length === 1"
                      class="flex items-center gap-2.5 flex-wrap">
                   <ContextItem
@@ -193,15 +193,15 @@
                   </span>
                 </div>
                 <div v-else class="rounded-lg overflow-hidden border border-slate-100 mt-2">
-                  <MonacoPreview :content="formatJson(drawer.task.routeRules!)" height="80px" />
+                  <MonacoPreview :content="formatJson(drawer.task.routeRules!)" height="80px" compact />
                 </div>
               </div>
 
               <!-- ④ 任务参数 -->
               <div v-if="drawer.task.taskitem">
-                <div class="cran-section-label mb-3">任务参数</div>
+                <div class="cran-section-label mb-2">任务参数</div>
                 <div class="rounded-xl overflow-hidden border border-slate-100">
-                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="200px" />
+                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="200px" compact />
                 </div>
               </div>
             </div>
@@ -209,7 +209,7 @@
 
             <!-- ────── 手动触发 ────── -->
             <n-tab-pane name="trigger" tab="手动触发">
-            <div class="flex flex-col gap-5 pt-5">
+            <div class="flex flex-col gap-4 pt-4">
 
               <!-- 触发结果 Banner -->
               <div v-if="execResult"
@@ -235,17 +235,18 @@
               <div>
                 <div class="flex items-center justify-between mb-3">
                   <div class="cran-section-label">任务参数</div>
-                  <button class="text-[11px] text-slate-400 hover:text-indigo-500 transition-colors"
+                  <button class="text-[11px] text-slate-400 hover:text-indigo-500 transition-colors
+                                 border-0 bg-transparent outline-none cursor-pointer p-0"
                           @click="resetTaskItem">重置</button>
                 </div>
                 <div class="rounded-xl overflow-hidden border border-slate-200">
-                  <LcMonacoEditor v-model="execTaskItem" language="json" height="160px" />
+                  <LcMonacoEditor v-model="execTaskItem" language="json" height="160px" compact />
                 </div>
               </div>
 
               <!-- 路由规则 编辑 -->
               <div>
-                <div class="cran-section-label mb-3">路由规则</div>
+                <div class="cran-section-label mb-2">路由规则</div>
                 <div class="cran-route-card">
                   <!-- 泳道 -->
                   <div class="cran-route-row">
@@ -266,7 +267,8 @@
                       </span>
                     </ContextItem>
                     <button v-if="execRule.swimlane"
-                            class="ml-2 text-[11px] text-slate-400 hover:text-red-400 transition-colors"
+                            class="ml-2 text-[11px] text-slate-400 hover:text-red-400 transition-colors
+                                   border-0 bg-transparent outline-none cursor-pointer p-0"
                             @click="execRule.swimlane = ''">清空</button>
                   </div>
                   <!-- cell -->
@@ -328,7 +330,7 @@
               </div>
 
               <!-- 状态筛选 + 刷新 -->
-              <div class="flex items-center gap-1.5 mb-4 flex-wrap">
+              <div class="flex items-center gap-1.5 mb-3 flex-wrap">
                 <button v-for="f in [
                   { key: 'all',  label: '全部' },
                   { key: 'ok',   label: '成功' },
