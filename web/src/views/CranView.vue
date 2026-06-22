@@ -289,7 +289,7 @@
 
                   <div class="flex-1 min-w-0">
 
-                    <!-- ① 主行：状态 + attemptid ContextItem + 展开 + 重执行 -->
+                    <!-- ① 主行：状态 + attemptid(自适应宽) + 弹性空白 + 重执行 + ▸ -->
                     <div class="flex items-center gap-2 min-w-0">
                       <span class="cran-status-pill flex-shrink-0"
                             :class="item.status === 7 ? 'cran-status-pill--ok'
@@ -298,7 +298,7 @@
                                    : 'cran-status-pill--idle'">
                         {{ STATUS_MAP[item.status] ?? `状态${item.status}` }}
                       </span>
-                      <!-- attemptid：ContextItem（复制 + 在 Raptor 查看） -->
+                      <!-- attemptid：内容自适应宽，不再 flex-1 撑满 -->
                       <ContextItem
                         context-key="attemptid"
                         :value="item.attemptid"
@@ -306,23 +306,25 @@
                         :editable="false"
                         :extra-actions="RAPTOR_ACTION"
                         bare
-                        class="flex-1 min-w-0"
+                        class="min-w-0 flex-shrink"
                         @action="key => handleAttemptAction(key, item)"
                       >
                         <span class="cran-chip-mono">{{ item.attemptid }}</span>
                       </ContextItem>
-                      <!-- 展开 toggle -->
-                      <button class="cran-expand-btn" @click.stop="toggleAttempt(item.id)">
-                        {{ expandedAttempts.has(item.id) ? '▾' : '▸' }}
-                      </button>
+                      <!-- 弹性空白把右侧操作推到末尾 -->
+                      <div class="flex-1" />
                       <n-button size="tiny" ghost class="flex-shrink-0" @click.stop="rerunAttempt(item)">
                         重执行
                       </n-button>
+                      <!-- 展开 toggle 放最右 -->
+                      <button class="cran-expand-btn" @click.stop="toggleAttempt(item.id)">
+                        {{ expandedAttempts.has(item.id) ? '▾' : '▸' }}
+                      </button>
                     </div>
 
-                    <!-- ② 路由信息：泳道 ContextItem + cell + grouptags -->
+                    <!-- ② 路由信息：泳道 + cell + grouptags -->
                     <template v-if="parseRouteRules(item.routeRules)?.[0]">
-                      <div class="flex items-center gap-2 flex-wrap mt-2">
+                      <div class="flex items-center gap-2 flex-wrap mt-1">
                         <ContextItem
                           context-key="swimlane"
                           :value="parseRouteRules(item.routeRules)![0].swimlane || ''"
@@ -348,8 +350,8 @@
                       </div>
                     </template>
 
-                    <!-- ③ 时间行：时间 · 耗时 · 机器 ContextItem -->
-                    <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-1.5">
+                    <!-- ③ 时间行：时间 · 耗时 · 机器（纯文字，去掉 chip） -->
+                    <div class="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
                       <span>{{ formatTs(item.starttime) }}</span>
                       <template v-if="item.endtime && item.starttime && item.endtime > item.starttime">
                         <span class="text-slate-200">·</span>
@@ -363,7 +365,9 @@
                         :editable="false"
                         bare
                       >
-                        <span class="cran-chip-host">{{ item.exechost }}</span>
+                        <span class="font-mono hover:text-indigo-500 transition-colors cursor-pointer">
+                          {{ item.exechost }}
+                        </span>
                       </ContextItem>
                     </div>
 
@@ -592,7 +596,7 @@ async function fetchAllTasks(forceRefresh = false) {
   fromCache.value = false
   tasks.value     = []
 
-  const PAGE_SIZE = 50
+  const PAGE_SIZE = 150
   let page = 1
   try {
     while (true) {
@@ -765,21 +769,12 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
   display: inline-flex; align-items: center;
   font-family: monospace; font-size: 11.5px; color: #475569;
   background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px;
-  padding: 2px 8px; max-width: 100%;
+  padding: 2px 8px; max-width: 300px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   transition: background 0.1s, border-color 0.1s;
 }
 .cran-chip-mono:hover { background: #e8ecf4; border-color: #c8d2de; }
 
-/* ── exechost chip ── */
-.cran-chip-host {
-  display: inline-flex; align-items: center;
-  font-family: monospace; font-size: 11px; color: #64748b;
-  background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 5px;
-  padding: 1px 7px;
-  transition: background 0.1s, border-color 0.1s, color 0.1s;
-}
-.cran-chip-host:hover { background: #eef2ff; border-color: #c7d2fe; color: #4f46e5; }
 
 /* ── 泳道 chip（触发表单内） ── */
 .cran-swim-chip {
