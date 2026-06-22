@@ -106,46 +106,56 @@
                   pane-style="padding-top:0">
 
             <!-- ────── 任务信息 ────── -->
-            <n-tab-pane name="info" tab="任务信息" class="space-y-5 pt-4">
+            <n-tab-pane name="info" tab="任务信息" class="space-y-4 pt-4">
 
-              <!-- 元信息：横排轻量行 -->
-              <div class="space-y-2.5">
-                <div class="cran-info-row">
-                  <span class="cran-info-key">创建人</span>
-                  <span class="cran-info-val">{{ drawer.task.creator || '—' }}</span>
+              <!-- ① MMC stat 卡：状态 / 创建人 / 超时 -->
+              <div class="grid grid-cols-3 gap-2.5">
+                <!-- 状态 -->
+                <div class="cran-stat-card">
+                  <div class="cran-stat-icon"
+                       :class="drawer.task.status === 2 ? 'bg-emerald-50' : 'bg-slate-100'">
+                    <CheckCircle2 v-if="drawer.task.status === 2" :size="15" class="text-emerald-500" />
+                    <XCircle v-else :size="15" class="text-slate-400" />
+                  </div>
+                  <div class="cran-stat-value mt-2"
+                       :class="drawer.task.status === 2 ? 'text-emerald-600' : 'text-slate-400'">
+                    {{ drawer.task.status === 2 ? '已启用' : '已禁用' }}
+                  </div>
+                  <div class="cran-stat-label">运行状态</div>
                 </div>
-                <div class="cran-info-row">
-                  <span class="cran-info-key">执行超时</span>
-                  <span class="cran-info-val">
+                <!-- 创建人 -->
+                <div class="cran-stat-card">
+                  <div class="cran-stat-icon bg-indigo-50">
+                    <User :size="15" class="text-indigo-400" />
+                  </div>
+                  <div class="cran-stat-value mt-2">{{ drawer.task.creator || '—' }}</div>
+                  <div class="cran-stat-label">创建人</div>
+                </div>
+                <!-- 超时 -->
+                <div class="cran-stat-card">
+                  <div class="cran-stat-icon bg-amber-50">
+                    <Timer :size="15" class="text-amber-400" />
+                  </div>
+                  <div class="cran-stat-value mt-2">
                     {{ drawer.task.executiontimeout ? `${drawer.task.executiontimeout}s` : '—' }}
-                  </span>
-                </div>
-                <div class="cran-info-row items-start">
-                  <span class="cran-info-key mt-0.5">任务类</span>
-                  <span class="font-mono text-[11px] text-slate-600 break-all cursor-pointer
-                               hover:text-indigo-600 transition-colors leading-relaxed"
-                        title="点击复制" @click="copyText(drawer.task.name)">
-                    {{ drawer.task.name }}
-                  </span>
+                  </div>
+                  <div class="cran-stat-label">执行超时</div>
                 </div>
               </div>
 
-              <!-- 分隔 -->
-              <div class="border-t border-slate-100" />
-
-              <!-- taskItem 只读 -->
-              <div v-if="drawer.task.taskitem">
-                <div class="cran-section-label">任务参数</div>
-                <div class="rounded-lg overflow-hidden border border-slate-100 mt-2">
-                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="160px" />
-                </div>
+              <!-- ② 任务类名 -->
+              <div class="cran-code-block" @click="copyText(drawer.task.name)" title="点击复制">
+                <GitBranch :size="12" class="text-slate-300 flex-shrink-0 mt-0.5" />
+                <span class="font-mono text-[11px] text-slate-500 break-all leading-relaxed">
+                  {{ drawer.task.name }}
+                </span>
               </div>
 
-              <!-- 路由规则：inline chip 展示 -->
+              <!-- ③ 路由规则 -->
               <div v-if="parsedRouteRules.length">
-                <div class="cran-section-label">路由规则</div>
+                <div class="cran-section-label mb-2">路由规则</div>
                 <div v-if="parsedRouteRules.length === 1"
-                     class="flex items-center gap-2.5 flex-wrap mt-2">
+                     class="flex items-center gap-2.5 flex-wrap">
                   <ContextItem
                     context-key="swimlane"
                     :value="parsedRouteRules[0].swimlane ?? ''"
@@ -170,7 +180,15 @@
                   </span>
                 </div>
                 <div v-else class="rounded-lg overflow-hidden border border-slate-100 mt-2">
-                  <MonacoPreview :content="formatJson(drawer.task.routeRules!)" height="100px" />
+                  <MonacoPreview :content="formatJson(drawer.task.routeRules!)" height="80px" />
+                </div>
+              </div>
+
+              <!-- ④ 任务参数 -->
+              <div v-if="drawer.task.taskitem">
+                <div class="cran-section-label mb-2">任务参数</div>
+                <div class="rounded-xl overflow-hidden border border-slate-100">
+                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="160px" />
                 </div>
               </div>
             </n-tab-pane>
@@ -262,30 +280,66 @@
             </n-tab-pane>
 
             <!-- ────── 执行历史 ────── -->
-            <n-tab-pane name="history" tab="执行历史" class="pt-4">
-              <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center gap-2">
-                  <span class="text-[12px] font-medium text-slate-600">执行记录</span>
-                  <span v-if="historyList.length"
-                        class="text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
-                    {{ historyList.length }}
-                  </span>
+            <n-tab-pane name="history" tab="执行历史" class="pt-3">
+
+              <!-- KPI strip（MMC 风格横向指标卡） -->
+              <div v-if="historyList.length" class="grid grid-cols-4 gap-2 mb-3">
+                <div class="cran-kpi-card">
+                  <div class="cran-kpi-val">{{ historyStats.total }}</div>
+                  <div class="cran-kpi-label">总执行次数</div>
                 </div>
-                <n-button size="tiny" :loading="historyLoading" text @click="fetchHistory(1)">
-                  刷新
-                </n-button>
+                <div class="cran-kpi-card">
+                  <div class="cran-kpi-val"
+                       :class="historyStats.rate >= 90 ? 'text-emerald-600'
+                              : historyStats.rate >= 70 ? 'text-amber-500'
+                              : 'text-red-500'">
+                    {{ historyStats.rate }}%
+                  </div>
+                  <div class="cran-kpi-label">成功率</div>
+                </div>
+                <div class="cran-kpi-card">
+                  <div class="cran-kpi-val">{{ historyStats.avg }}<span v-if="historyStats.avg !== '—'" class="text-[11px] font-normal text-slate-400 ml-0.5">s</span></div>
+                  <div class="cran-kpi-label">平均耗时</div>
+                </div>
+                <div class="cran-kpi-card">
+                  <div class="cran-kpi-val"
+                       :class="historyStats.total - historyStats.ok > 0 ? 'text-amber-500' : 'text-slate-700'">
+                    {{ historyStats.total - historyStats.ok }}
+                  </div>
+                  <div class="cran-kpi-label">非成功次数</div>
+                </div>
+              </div>
+
+              <!-- 状态筛选 + 刷新 -->
+              <div class="flex items-center gap-1.5 mb-3 flex-wrap">
+                <button v-for="f in [
+                  { key: 'all',  label: '全部' },
+                  { key: 'ok',   label: '成功' },
+                  { key: 'warn', label: '超时' },
+                  { key: 'err',  label: '失败' },
+                ]" :key="f.key"
+                  class="cran-filter-chip"
+                  :class="historyFilter === f.key && 'cran-filter-chip--active'"
+                  @click="historyFilter = f.key as any">
+                  {{ f.label }}
+                </button>
+                <div class="flex-1" />
+                <n-button size="tiny" text :loading="historyLoading" @click="fetchHistory(1)">刷新</n-button>
               </div>
 
               <div v-if="historyLoading && !historyList.length" class="flex justify-center py-10">
                 <n-spin :size="18" />
               </div>
-              <div v-else-if="!historyList.length" class="flex flex-col items-center py-14 select-none">
+              <div v-else-if="!historyList.length" class="flex flex-col items-center py-12 select-none">
                 <Clock :size="28" class="mb-2 text-slate-200" />
                 <div class="text-xs text-slate-400">暂无执行记录</div>
               </div>
+              <div v-else-if="!filteredHistory.length" class="flex flex-col items-center py-8 select-none">
+                <div class="text-xs text-slate-400">当前筛选无结果</div>
+              </div>
 
               <div v-else class="space-y-2">
-                <div v-for="item in historyList" :key="item.id"
+                <div v-for="item in filteredHistory" :key="item.id"
                      class="cran-attempt"
                      :class="expandedAttempts.has(item.id) && 'cran-attempt--expanded'">
                   <!-- 左侧状态色条 -->
@@ -416,7 +470,7 @@
 
 <script setup lang="ts">
 import { ref, computed, h, watch, reactive } from 'vue'
-import { Clock } from '@lucide/vue'
+import { Clock, User, Timer, CheckCircle2, XCircle, GitBranch, Zap, TrendingUp } from '@lucide/vue'
 import {
   NDataTable, NInput, NPagination, NButton, NSpin,
   NDrawer, NDrawerContent, NTabs, NTabPane, useMessage,
@@ -476,6 +530,14 @@ const historyTotal     = ref(0)
 const historyPage      = ref(1)
 const historyLoading   = ref(false)
 const expandedAttempts = ref(new Set<number>())
+const historyFilter    = ref<'all' | 'ok' | 'warn' | 'err'>('all')
+
+const filteredHistory = computed(() => {
+  if (historyFilter.value === 'all') return historyList.value
+  if (historyFilter.value === 'ok')   return historyList.value.filter(i => i.status === 7)
+  if (historyFilter.value === 'warn') return historyList.value.filter(i => i.status === 8)
+  return historyList.value.filter(i => i.status >= 5 && i.status !== 7 && i.status !== 8)
+})
 
 // ─── 手动触发 ─────────────────────────────────────────────────────────────────
 const execTaskItem = ref('')
@@ -680,6 +742,25 @@ function resetTaskItem() {
   if (drawer.value.task) execTaskItem.value = formatJson(drawer.value.task.taskitem || '{}')
 }
 
+// ─── 历史 KPI 统计 ────────────────────────────────────────────────────────────
+const historyStats = computed(() => {
+  const list = historyList.value
+  const total = list.length
+  const ok    = list.filter(i => i.status === 7).length
+  const durations = list
+    .filter(i => i.endtime && i.starttime && i.endtime > i.starttime)
+    .map(i => (i.endtime - i.starttime) / 1000)
+  const avg = durations.length
+    ? (durations.reduce((a, b) => a + b, 0) / durations.length).toFixed(1)
+    : '—'
+  return {
+    total,
+    ok,
+    rate: total ? Math.round(ok / total * 100) : 0,
+    avg,
+  }
+})
+
 // ─── 展开历史 ─────────────────────────────────────────────────────────────────
 function toggleAttempt(id: number) {
   const s = new Set(expandedAttempts.value)
@@ -808,16 +889,53 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
 }
 .cran-swim-tag--clickable:hover { background: #e0e7ff; border-color: #a5b4fc; }
 
-/* ── 信息行（任务信息 tab）── */
+/* ── 信息行 ── */
 .cran-info-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.cran-info-key { font-size: 11.5px; color: #94a3b8; flex-shrink: 0; width: 56px; }
+.cran-info-key { font-size: 11px; color: #94a3b8; flex-shrink: 0; }
 .cran-info-val { font-size: 12.5px; color: #374151; font-weight: 500; }
 
 /* ── 分区标题 ── */
-.cran-section-label {
-  font-size: 11px; font-weight: 600; color: #64748b;
-  letter-spacing: 0.02em;
+.cran-section-label { font-size: 11px; font-weight: 600; color: #64748b; letter-spacing: 0.02em; }
+
+/* ── MMC stat 卡（任务信息 3 格）── */
+.cran-stat-card {
+  background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 12px;
+  padding: 12px 12px 10px;
 }
+.cran-stat-icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cran-stat-value { font-size: 14px; font-weight: 700; color: #1e293b; line-height: 1.2; }
+.cran-stat-label { font-size: 10.5px; color: #94a3b8; margin-top: 3px; }
+
+/* ── 任务类 code block ── */
+.cran-code-block {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 10px;
+  padding: 8px 12px; cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.cran-code-block:hover { background: #f1f5f9; border-color: #c7d2fe; }
+
+/* ── KPI strip（执行历史顶部）── */
+.cran-kpi-card {
+  background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 10px;
+  padding: 10px 12px; text-align: center;
+}
+.cran-kpi-val { font-size: 18px; font-weight: 700; color: #1e293b; line-height: 1.2; }
+.cran-kpi-label { font-size: 10px; color: #94a3b8; margin-top: 2px; white-space: nowrap; }
+
+/* ── 状态筛选 pill chip ── */
+.cran-filter-chip {
+  display: inline-flex; align-items: center;
+  font-size: 11.5px; color: #94a3b8;
+  padding: 3px 12px; border-radius: 999px;
+  border: 1px solid #e8ecf4; background: transparent;
+  cursor: pointer; transition: all 0.12s; outline: none;
+}
+.cran-filter-chip:hover { color: #5b6af0; border-color: #c7d2fe; background: #eef2ff; }
+.cran-filter-chip--active { color: #4f46e5; border-color: #a5b4fc; background: #eef2ff; font-weight: 600; }
 
 /* ── 路由规则卡片 ── */
 .cran-route-card { background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 8px; overflow: hidden; }
