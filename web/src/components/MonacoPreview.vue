@@ -157,6 +157,8 @@ function initEditor() {
     automaticLayout:      true,
     minimap:              { enabled: false },
     guides:               { indentation: false, highlightActiveIndentation: false, bracketPairs: false },
+    renderLineHighlight:  'none',
+    matchBrackets:        'never',
     scrollBeyondLastLine: false,
     fontFamily:           '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
     fontSize:             12,
@@ -166,10 +168,7 @@ function initEditor() {
     wordWrap:             'off',
     folding:              !props.compact,
     contextmenu:          !props.compact,
-    ...(props.compact ? {
-      lineDecorationsWidth: 4,
-      scrollbar: { vertical: 'hidden' as const, horizontalScrollbarSize: 4 },
-    } : {}),
+    ...(props.compact ? { lineDecorationsWidth: 4 } : {}),
   })
 }
 
