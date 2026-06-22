@@ -106,10 +106,10 @@
                   pane-style="padding-top:0">
 
             <!-- ────── 任务信息 ────── -->
-            <n-tab-pane name="info" tab="任务信息" class="space-y-4 pt-4">
+            <n-tab-pane name="info" tab="任务信息" class="space-y-6 pt-5">
 
               <!-- ① MMC stat 卡：状态 / 创建人 / 超时（紧凑横排） -->
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-3 gap-3">
                 <!-- 状态 -->
                 <div class="cran-stat-card">
                   <div class="flex items-center gap-2">
@@ -165,7 +165,7 @@
 
               <!-- ③ 路由规则 -->
               <div v-if="parsedRouteRules.length">
-                <div class="cran-section-label mb-2">路由规则</div>
+                <div class="cran-section-label mb-3">路由规则</div>
                 <div v-if="parsedRouteRules.length === 1"
                      class="flex items-center gap-2.5 flex-wrap">
                   <ContextItem
@@ -198,7 +198,7 @@
 
               <!-- ④ 任务参数 -->
               <div v-if="drawer.task.taskitem">
-                <div class="cran-section-label mb-2">任务参数</div>
+                <div class="cran-section-label mb-3">任务参数</div>
                 <div class="rounded-xl overflow-hidden border border-slate-100">
                   <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="200px" />
                 </div>
@@ -206,7 +206,7 @@
             </n-tab-pane>
 
             <!-- ────── 手动触发 ────── -->
-            <n-tab-pane name="trigger" tab="手动触发" class="space-y-4 pt-4">
+            <n-tab-pane name="trigger" tab="手动触发" class="space-y-5 pt-5">
 
               <!-- 触发结果 Banner -->
               <div v-if="execResult"
@@ -230,7 +230,7 @@
 
               <!-- taskItem 编辑 -->
               <div>
-                <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center justify-between mb-3">
                   <div class="cran-section-label">任务参数</div>
                   <button class="text-[11px] text-slate-400 hover:text-indigo-500 transition-colors"
                           @click="resetTaskItem">重置</button>
@@ -242,7 +242,7 @@
 
               <!-- 路由规则 编辑 -->
               <div>
-                <div class="cran-section-label mb-2">路由规则</div>
+                <div class="cran-section-label mb-3">路由规则</div>
                 <div class="cran-route-card">
                   <!-- 泳道 -->
                   <div class="cran-route-row">
@@ -292,10 +292,10 @@
             </n-tab-pane>
 
             <!-- ────── 执行历史 ────── -->
-            <n-tab-pane name="history" tab="执行历史" class="pt-3">
+            <n-tab-pane name="history" tab="执行历史" class="pt-4">
 
               <!-- KPI strip（MMC 风格横向指标卡） -->
-              <div v-if="historyList.length" class="grid grid-cols-4 gap-2 mb-3">
+              <div v-if="historyList.length" class="grid grid-cols-4 gap-3 mb-4">
                 <div class="cran-kpi-card">
                   <div class="cran-kpi-val">{{ historyStats.total }}</div>
                   <div class="cran-kpi-label">总执行次数</div>
@@ -323,7 +323,7 @@
               </div>
 
               <!-- 状态筛选 + 刷新 -->
-              <div class="flex items-center gap-1.5 mb-3 flex-wrap">
+              <div class="flex items-center gap-1.5 mb-4 flex-wrap">
                 <button v-for="f in [
                   { key: 'all',  label: '全部' },
                   { key: 'ok',   label: '成功' },
@@ -350,7 +350,7 @@
                 <div class="text-xs text-slate-400">当前筛选无结果</div>
               </div>
 
-              <div v-else class="space-y-2">
+              <div v-else class="space-y-2.5">
                 <div v-for="item in filteredHistory" :key="item.id"
                      class="cran-attempt"
                      :class="expandedAttempts.has(item.id) && 'cran-attempt--expanded'">
@@ -980,7 +980,7 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
 /* ── 执行历史条目 ── */
 .cran-attempt {
   display: flex; align-items: flex-start; gap: 10px;
-  padding: 10px 12px; border-radius: 8px;
+  padding: 12px 14px; border-radius: 8px;
   border: 1px solid #f1f5f9; background: #f8fafc;
   transition: border-color 0.12s, background 0.12s;
 }
