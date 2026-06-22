@@ -106,7 +106,8 @@
                   pane-style="padding-top:0">
 
             <!-- ────── 任务信息 ────── -->
-            <n-tab-pane name="info" tab="任务信息" class="space-y-6 pt-5">
+            <n-tab-pane name="info" tab="任务信息">
+            <div class="space-y-6 pt-5">
 
               <!-- ① MMC stat 卡：状态 / 创建人 / 超时（紧凑横排） -->
               <div class="grid grid-cols-3 gap-3">
@@ -203,10 +204,12 @@
                   <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="200px" />
                 </div>
               </div>
+            </div>
             </n-tab-pane>
 
             <!-- ────── 手动触发 ────── -->
-            <n-tab-pane name="trigger" tab="手动触发" class="space-y-5 pt-5">
+            <n-tab-pane name="trigger" tab="手动触发">
+            <div class="space-y-5 pt-5">
 
               <!-- 触发结果 Banner -->
               <div v-if="execResult"
@@ -289,10 +292,12 @@
                 </n-button>
                 <span class="text-[11px] text-slate-400">触发成功后自动跳转历史记录</span>
               </div>
+            </div>
             </n-tab-pane>
 
             <!-- ────── 执行历史 ────── -->
-            <n-tab-pane name="history" tab="执行历史" class="pt-4">
+            <n-tab-pane name="history" tab="执行历史">
+            <div class="pt-4">
 
               <!-- KPI strip（MMC 风格横向指标卡） -->
               <div v-if="historyList.length" class="grid grid-cols-4 gap-3 mb-4">
@@ -469,6 +474,7 @@
                   />
                 </div>
               </div>
+            </div>
             </n-tab-pane>
 
           </n-tabs>
