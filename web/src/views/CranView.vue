@@ -444,11 +444,11 @@
                         :value="item.exechost"
                         label="执行机器"
                         :editable="false"
+                        :extra-actions="MACHINE_ACTION"
                         bare
+                        @action="key => handleMachineAction(key, item.exechost)"
                       >
-                        <span class="font-mono hover:text-indigo-500 transition-colors cursor-pointer">
-                          {{ item.exechost }}
-                        </span>
+                        <span class="cran-chip-host">{{ item.exechost }}</span>
                       </ContextItem>
                     </div>
 
@@ -659,16 +659,43 @@ function rowProps(row: CranTask) {
 const CRANE_BASE    = 'https://crane.mws-test.sankuai.com'
 const CRANE_HEADERS = { 'x-requested-with': 'XMLHttpRequest' }
 
-// Raptor 执行详情链接（以 attemptId 作为查询条件）
-// TODO: 若 Raptor 是独立系统，请替换为实际 URL，如 https://raptor.sankuai.com/trace?q=xxx
-function raptorUrl(attemptid: string) {
-  return `${CRANE_BASE}/attempt/detail?attemptId=${encodeURIComponent(attemptid)}`
+// ─── Raptor 日志跳转（appkey + attemptid + 时间窗口） ─────────────────────────
+const RAPTOR_BASE = 'https://raptor.mws-test.sankuai.com/log/topic/view'
+
+function raptorUrl(item: CranAttempt) {
+  const appkey = appkeyInput.value ?? ''
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+  // 以 attempt 开始时间为中心，前 2min / 后 15min 作为时间窗口
+  const ts = item.starttime ? new Date(item.starttime) : new Date()
+  const start = fmt(new Date(ts.getTime() - 2  * 60 * 1000))
+  const end   = fmt(new Date(ts.getTime() + 15 * 60 * 1000))
+  const params = new URLSearchParams({
+    searchType: 'expert', searchGrammar: 'dsl',
+    condition:  `"${item.attemptid}"`,
+    timeType:   '5m~0m', startDate: start, endDate: end,
+    iSLimit: '100', globalCityId: '1', pageNum: '1', pageSize: '50',
+  })
+  return `${RAPTOR_BASE}/${encodeURIComponent(appkey)}?${params.toString()}`
 }
 
-// attemptid ContextItem 的扩展操作
+// ─── 机器跳转（IP:Port → 内部 Falcon 或 web-ssh） ────────────────────────────
+// TODO: 替换为实际机器跳转 URL（如 https://falcon.sankuai.com/host/{ip}）
+function machineUrl(exechost: string) {
+  return `http://${exechost}` // 占位：直连机器端口，可按需改为 Falcon 等
+}
+
+// attemptid 操作
 const RAPTOR_ACTION = [{ key: 'raptor', label: '在 Raptor 查看' }]
 function handleAttemptAction(key: string, item: CranAttempt) {
-  if (key === 'raptor') window.open(raptorUrl(item.attemptid), '_blank')
+  if (key === 'raptor') window.open(raptorUrl(item), '_blank')
+}
+
+// 机器操作
+const MACHINE_ACTION = [{ key: 'machine', label: '跳转机器' }]
+function handleMachineAction(key: string, host: string) {
+  if (key === 'machine') window.open(machineUrl(host), '_blank')
 }
 
 // ─── 全量拉取（翻页 + 缓存） ──────────────────────────────────────────────────
@@ -821,10 +848,6 @@ async function fetchHistory(page = historyPage.value) {
   historyLoading.value = false
 }
 
-// ─── exechost 机器操作（待实现） ──────────────────────────────────────────────
-function onExecHost(host: string) {
-  message.info(`机器登录功能待实现：${host}`)
-}
 
 // ─── 手动触发 ─────────────────────────────────────────────────────────────────
 async function doExecute() {
@@ -872,6 +895,16 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
 .cran-chip--slate  { background: #f1f5f9; border-color: #e2e8f0; color: #475569; }
 .cran-chip--slate:hover { background: #e8ecf2; border-color: #c8d0db; }
 .cran-chip--empty  { background: transparent; border-style: dashed; border-color: #cbd5e1; color: #94a3b8; cursor: default; }
+
+/* ── exechost chip（服务器 IP:Port）── */
+.cran-chip-host {
+  display: inline-flex; align-items: center;
+  font-family: monospace; font-size: 11px; color: #475569;
+  background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px;
+  padding: 1px 7px;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.cran-chip-host:hover { background: #eef2ff; border-color: #c7d2fe; color: #4f46e5; }
 
 /* ── attemptid chip ── */
 .cran-chip-mono {
