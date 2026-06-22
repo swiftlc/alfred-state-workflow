@@ -106,72 +106,70 @@
                   pane-style="padding-top:0">
 
             <!-- ────── 任务信息 ────── -->
-            <n-tab-pane name="info" tab="任务信息" class="space-y-4 pt-4">
+            <n-tab-pane name="info" tab="任务信息" class="space-y-5 pt-4">
 
-              <!-- 元信息 -->
-              <div class="grid grid-cols-2 gap-2">
-                <div class="cran-kv">
-                  <div class="cran-kv__label">创建人</div>
-                  <div class="cran-kv__value">{{ drawer.task.creator || '—' }}</div>
+              <!-- 元信息：横排轻量行 -->
+              <div class="space-y-2.5">
+                <div class="cran-info-row">
+                  <span class="cran-info-key">创建人</span>
+                  <span class="cran-info-val">{{ drawer.task.creator || '—' }}</span>
                 </div>
-                <div class="cran-kv">
-                  <div class="cran-kv__label">执行超时</div>
-                  <div class="cran-kv__value">{{ drawer.task.executiontimeout ? `${drawer.task.executiontimeout}s` : '—' }}</div>
+                <div class="cran-info-row">
+                  <span class="cran-info-key">执行超时</span>
+                  <span class="cran-info-val">
+                    {{ drawer.task.executiontimeout ? `${drawer.task.executiontimeout}s` : '—' }}
+                  </span>
                 </div>
-                <div class="cran-kv col-span-2">
-                  <div class="cran-kv__label">任务类</div>
-                  <div class="cran-kv__value font-mono text-[11px] break-all cursor-pointer hover:text-indigo-600 transition-colors"
-                       title="点击复制"
-                       @click="copyText(drawer.task.name)">
+                <div class="cran-info-row items-start">
+                  <span class="cran-info-key mt-0.5">任务类</span>
+                  <span class="font-mono text-[11px] text-slate-600 break-all cursor-pointer
+                               hover:text-indigo-600 transition-colors leading-relaxed"
+                        title="点击复制" @click="copyText(drawer.task.name)">
                     {{ drawer.task.name }}
-                  </div>
+                  </span>
                 </div>
               </div>
+
+              <!-- 分隔 -->
+              <div class="border-t border-slate-100" />
 
               <!-- taskItem 只读 -->
               <div v-if="drawer.task.taskitem">
-                <div class="cran-label mb-1.5">任务参数（taskItem）</div>
-                <div class="rounded-lg overflow-hidden border border-slate-100">
-                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="180px" />
+                <div class="cran-section-label">任务参数</div>
+                <div class="rounded-lg overflow-hidden border border-slate-100 mt-2">
+                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="160px" />
                 </div>
               </div>
 
-              <!-- 路由规则 只读（泳道支持交互点选） -->
+              <!-- 路由规则：inline chip 展示 -->
               <div v-if="parsedRouteRules.length">
-                <div class="cran-label mb-2">路由规则</div>
-                <div v-if="parsedRouteRules.length === 1" class="cran-route-card">
-                  <div class="cran-route-row">
-                    <span class="cran-route-key">泳道</span>
-                    <ContextItem
-                      context-key="swimlane"
-                      :value="parsedRouteRules[0].swimlane ?? ''"
-                      label="泳道"
-                      :fetch-items="fetchSwimlaneItems"
-                      custom-edit
-                      bare
-                      @edit="item => onInfoSwimlaneEdit(item)"
-                    >
-                      <span v-if="parsedRouteRules[0].swimlane"
-                            class="cran-swim-tag cran-swim-tag--clickable"
-                            title="点击切换泳道（同步到触发表单）">
-                        {{ parsedRouteRules[0].swimlane }}
-                      </span>
-                      <span v-else class="text-xs text-slate-400 cursor-pointer hover:text-slate-600 transition-colors"
-                            title="点击选择泳道（同步到触发表单）">
-                        主干（点击选择）
-                      </span>
-                    </ContextItem>
-                  </div>
-                  <div class="cran-route-row">
-                    <span class="cran-route-key">cell</span>
-                    <span class="text-xs font-mono text-slate-600">{{ parsedRouteRules[0].cell }}</span>
-                  </div>
-                  <div class="cran-route-row">
-                    <span class="cran-route-key">grouptags</span>
-                    <span class="text-xs font-mono text-slate-600">{{ parsedRouteRules[0].grouptags }}</span>
-                  </div>
+                <div class="cran-section-label">路由规则</div>
+                <div v-if="parsedRouteRules.length === 1"
+                     class="flex items-center gap-2.5 flex-wrap mt-2">
+                  <ContextItem
+                    context-key="swimlane"
+                    :value="parsedRouteRules[0].swimlane ?? ''"
+                    label="泳道"
+                    :fetch-items="fetchSwimlaneItems"
+                    custom-edit
+                    bare
+                    @edit="item => onInfoSwimlaneEdit(item)"
+                  >
+                    <span class="cran-swim-chip"
+                          :class="parsedRouteRules[0].swimlane
+                            ? 'cran-swim-chip--active' : 'cran-swim-chip--empty'"
+                          title="点击切换泳道（同步到触发表单）">
+                      <span class="cran-swim-chip__dot" />
+                      {{ parsedRouteRules[0].swimlane || '主干' }}
+                    </span>
+                  </ContextItem>
+                  <span class="text-[11.5px] font-mono text-slate-500">{{ parsedRouteRules[0].cell }}</span>
+                  <span v-if="parsedRouteRules[0].grouptags"
+                        class="text-[11px] font-mono text-slate-400">
+                    {{ parsedRouteRules[0].grouptags }}
+                  </span>
                 </div>
-                <div v-else class="rounded-lg overflow-hidden border border-slate-100">
+                <div v-else class="rounded-lg overflow-hidden border border-slate-100 mt-2">
                   <MonacoPreview :content="formatJson(drawer.task.routeRules!)" height="100px" />
                 </div>
               </div>
@@ -180,20 +178,21 @@
             <!-- ────── 手动触发 ────── -->
             <n-tab-pane name="trigger" tab="手动触发" class="space-y-4 pt-4">
 
-              <!-- 触发结果 -->
-              <div v-if="execResult" class="flex items-start gap-2.5 px-3 py-2.5 rounded-lg text-xs"
+              <!-- 触发结果 Banner -->
+              <div v-if="execResult"
+                   class="flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-medium"
                    :class="execResult.ok
-                     ? 'bg-emerald-50 border border-emerald-100'
-                     : 'bg-red-50 border border-red-100'">
-                <span class="font-semibold mt-0.5 flex-shrink-0"
-                      :class="execResult.ok ? 'text-emerald-500' : 'text-red-500'">
+                     ? 'bg-emerald-50 border border-emerald-200'
+                     : 'bg-red-50 border border-red-200'">
+                <span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                      :class="execResult.ok ? 'bg-emerald-400' : 'bg-red-400'">
                   {{ execResult.ok ? '✓' : '✗' }}
                 </span>
-                <div>
-                  <div class="font-medium" :class="execResult.ok ? 'text-emerald-700' : 'text-red-600'">
+                <div class="min-w-0">
+                  <div :class="execResult.ok ? 'text-emerald-700' : 'text-red-600'">
                     {{ execResult.ok ? '触发成功' : '触发失败' }}
                   </div>
-                  <div class="font-mono text-[11px] mt-0.5 text-slate-500">
+                  <div class="font-mono text-[10.5px] mt-0.5 text-slate-500 truncate">
                     {{ execResult.ok ? execResult.attemptId : execResult.msg }}
                   </div>
                 </div>
@@ -201,21 +200,21 @@
 
               <!-- taskItem 编辑 -->
               <div>
-                <div class="flex items-center justify-between mb-1.5">
-                  <div class="cran-label">任务参数（taskItem）</div>
-                  <button class="text-[11px] text-slate-400 hover:text-slate-600 transition-colors"
+                <div class="flex items-center justify-between mb-2">
+                  <div class="cran-section-label">任务参数</div>
+                  <button class="text-[11px] text-slate-400 hover:text-indigo-500 transition-colors"
                           @click="resetTaskItem">重置</button>
                 </div>
-                <div class="rounded-lg overflow-hidden border border-slate-200">
+                <div class="rounded-xl overflow-hidden border border-slate-200">
                   <LcMonacoEditor v-model="execTaskItem" language="json" height="160px" />
                 </div>
               </div>
 
               <!-- 路由规则 编辑 -->
               <div>
-                <div class="cran-label mb-2">路由规则（执行泳道）</div>
+                <div class="cran-section-label mb-2">路由规则</div>
                 <div class="cran-route-card">
-                  <!-- 泳道 - ContextItem -->
+                  <!-- 泳道 -->
                   <div class="cran-route-row">
                     <span class="cran-route-key">泳道</span>
                     <ContextItem
@@ -234,38 +233,47 @@
                       </span>
                     </ContextItem>
                     <button v-if="execRule.swimlane"
-                            class="ml-1 text-[11px] text-slate-400 hover:text-slate-600 transition-colors"
+                            class="ml-2 text-[11px] text-slate-400 hover:text-red-400 transition-colors"
                             @click="execRule.swimlane = ''">清空</button>
                   </div>
                   <!-- cell -->
                   <div class="cran-route-row">
                     <span class="cran-route-key">cell</span>
                     <n-input v-model:value="execRule.cell" size="tiny"
-                             class="max-w-36" style="font-family:monospace;font-size:12px" />
+                             class="max-w-40" style="font-family:monospace;font-size:12px" />
                   </div>
                   <!-- grouptags -->
                   <div class="cran-route-row">
                     <span class="cran-route-key">grouptags</span>
                     <n-input v-model:value="execRule.grouptags" size="tiny"
-                             class="max-w-44" style="font-family:monospace;font-size:12px" />
+                             class="max-w-48" style="font-family:monospace;font-size:12px" />
                   </div>
                 </div>
               </div>
 
               <!-- 触发按钮 -->
-              <div class="flex items-center gap-3 pt-1">
-                <n-button type="primary" size="small" :loading="executing" :disabled="executing" @click="doExecute">
+              <div class="flex items-center justify-between pt-1">
+                <n-button type="primary" size="medium" :loading="executing" :disabled="executing"
+                          @click="doExecute">
                   触发执行
                 </n-button>
-                <span class="text-[11px] text-slate-400">成功后自动跳转历史记录</span>
+                <span class="text-[11px] text-slate-400">触发成功后自动跳转历史记录</span>
               </div>
             </n-tab-pane>
 
             <!-- ────── 执行历史 ────── -->
             <n-tab-pane name="history" tab="执行历史" class="pt-4">
               <div class="flex items-center justify-between mb-3">
-                <span class="text-xs text-slate-400">最近 {{ historyList.length }} 条</span>
-                <n-button size="tiny" ghost :loading="historyLoading" @click="fetchHistory(1)">刷新</n-button>
+                <div class="flex items-center gap-2">
+                  <span class="text-[12px] font-medium text-slate-600">执行记录</span>
+                  <span v-if="historyList.length"
+                        class="text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                    {{ historyList.length }}
+                  </span>
+                </div>
+                <n-button size="tiny" :loading="historyLoading" text @click="fetchHistory(1)">
+                  刷新
+                </n-button>
               </div>
 
               <div v-if="historyLoading && !historyList.length" class="flex justify-center py-10">
@@ -800,13 +808,16 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
 }
 .cran-swim-tag--clickable:hover { background: #e0e7ff; border-color: #a5b4fc; }
 
-/* ── 键值对 ── */
-.cran-kv { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 8px; padding: 8px 12px; }
-.cran-kv__label { font-size: 10px; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
-.cran-kv__value { font-size: 12px; color: #374151; font-weight: 500; }
+/* ── 信息行（任务信息 tab）── */
+.cran-info-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cran-info-key { font-size: 11.5px; color: #94a3b8; flex-shrink: 0; width: 56px; }
+.cran-info-val { font-size: 12.5px; color: #374151; font-weight: 500; }
 
-/* ── label ── */
-.cran-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; }
+/* ── 分区标题 ── */
+.cran-section-label {
+  font-size: 11px; font-weight: 600; color: #64748b;
+  letter-spacing: 0.02em;
+}
 
 /* ── 路由规则卡片 ── */
 .cran-route-card { background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 8px; overflow: hidden; }
