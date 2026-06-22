@@ -107,7 +107,7 @@
 
             <!-- ────── 任务信息 ────── -->
             <n-tab-pane name="info" tab="任务信息">
-            <div class="space-y-6 pt-5">
+            <div class="flex flex-col gap-6 pt-5">
 
               <!-- ① MMC stat 卡：状态 / 创建人 / 超时（紧凑横排） -->
               <div class="grid grid-cols-3 gap-3">
@@ -209,7 +209,7 @@
 
             <!-- ────── 手动触发 ────── -->
             <n-tab-pane name="trigger" tab="手动触发">
-            <div class="space-y-5 pt-5">
+            <div class="flex flex-col gap-5 pt-5">
 
               <!-- 触发结果 Banner -->
               <div v-if="execResult"
@@ -355,7 +355,7 @@
                 <div class="text-xs text-slate-400">当前筛选无结果</div>
               </div>
 
-              <div v-else class="space-y-2.5">
+              <div v-else class="flex flex-col gap-2.5">
                 <div v-for="item in filteredHistory" :key="item.id"
                      class="cran-attempt"
                      :class="expandedAttempts.has(item.id) && 'cran-attempt--expanded'">
