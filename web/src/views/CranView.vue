@@ -108,44 +108,56 @@
             <!-- ────── 任务信息 ────── -->
             <n-tab-pane name="info" tab="任务信息" class="space-y-4 pt-4">
 
-              <!-- ① MMC stat 卡：状态 / 创建人 / 超时 -->
-              <div class="grid grid-cols-3 gap-2.5">
+              <!-- ① MMC stat 卡：状态 / 创建人 / 超时（紧凑横排） -->
+              <div class="grid grid-cols-3 gap-2">
                 <!-- 状态 -->
                 <div class="cran-stat-card">
-                  <div class="cran-stat-icon"
-                       :class="drawer.task.status === 2 ? 'bg-emerald-50' : 'bg-slate-100'">
-                    <CheckCircle2 v-if="drawer.task.status === 2" :size="15" class="text-emerald-500" />
-                    <XCircle v-else :size="15" class="text-slate-400" />
+                  <div class="flex items-center gap-2">
+                    <div class="cran-stat-icon"
+                         :class="drawer.task.status === 2 ? 'bg-emerald-50' : 'bg-slate-100'">
+                      <CheckCircle2 v-if="drawer.task.status === 2" :size="14" class="text-emerald-500" />
+                      <XCircle v-else :size="14" class="text-slate-400" />
+                    </div>
+                    <div>
+                      <div class="cran-stat-value"
+                           :class="drawer.task.status === 2 ? 'text-emerald-600' : 'text-slate-400'">
+                        {{ drawer.task.status === 2 ? '已启用' : '已禁用' }}
+                      </div>
+                      <div class="cran-stat-label">运行状态</div>
+                    </div>
                   </div>
-                  <div class="cran-stat-value mt-2"
-                       :class="drawer.task.status === 2 ? 'text-emerald-600' : 'text-slate-400'">
-                    {{ drawer.task.status === 2 ? '已启用' : '已禁用' }}
-                  </div>
-                  <div class="cran-stat-label">运行状态</div>
                 </div>
                 <!-- 创建人 -->
                 <div class="cran-stat-card">
-                  <div class="cran-stat-icon bg-indigo-50">
-                    <User :size="15" class="text-indigo-400" />
+                  <div class="flex items-center gap-2">
+                    <div class="cran-stat-icon bg-indigo-50">
+                      <User :size="14" class="text-indigo-400" />
+                    </div>
+                    <div class="min-w-0">
+                      <div class="cran-stat-value truncate">{{ drawer.task.creator || '—' }}</div>
+                      <div class="cran-stat-label">创建人</div>
+                    </div>
                   </div>
-                  <div class="cran-stat-value mt-2">{{ drawer.task.creator || '—' }}</div>
-                  <div class="cran-stat-label">创建人</div>
                 </div>
                 <!-- 超时 -->
                 <div class="cran-stat-card">
-                  <div class="cran-stat-icon bg-amber-50">
-                    <Timer :size="15" class="text-amber-400" />
+                  <div class="flex items-center gap-2">
+                    <div class="cran-stat-icon bg-amber-50">
+                      <Timer :size="14" class="text-amber-400" />
+                    </div>
+                    <div>
+                      <div class="cran-stat-value">
+                        {{ drawer.task.executiontimeout ? `${drawer.task.executiontimeout}s` : '—' }}
+                      </div>
+                      <div class="cran-stat-label">执行超时</div>
+                    </div>
                   </div>
-                  <div class="cran-stat-value mt-2">
-                    {{ drawer.task.executiontimeout ? `${drawer.task.executiontimeout}s` : '—' }}
-                  </div>
-                  <div class="cran-stat-label">执行超时</div>
                 </div>
               </div>
 
               <!-- ② 任务类名 -->
               <div class="cran-code-block" @click="copyText(drawer.task.name)" title="点击复制">
-                <GitBranch :size="12" class="text-slate-300 flex-shrink-0 mt-0.5" />
+                <Code2 :size="12" class="text-slate-300 flex-shrink-0 mt-0.5" />
                 <span class="font-mono text-[11px] text-slate-500 break-all leading-relaxed">
                   {{ drawer.task.name }}
                 </span>
@@ -188,7 +200,7 @@
               <div v-if="drawer.task.taskitem">
                 <div class="cran-section-label mb-2">任务参数</div>
                 <div class="rounded-xl overflow-hidden border border-slate-100">
-                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="160px" />
+                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="200px" />
                 </div>
               </div>
             </n-tab-pane>
@@ -470,7 +482,7 @@
 
 <script setup lang="ts">
 import { ref, computed, h, watch, reactive } from 'vue'
-import { Clock, User, Timer, CheckCircle2, XCircle, GitBranch, Zap, TrendingUp } from '@lucide/vue'
+import { Clock, User, Timer, CheckCircle2, XCircle, Code2, TrendingUp } from '@lucide/vue'
 import {
   NDataTable, NInput, NPagination, NButton, NSpin,
   NDrawer, NDrawerContent, NTabs, NTabPane, useMessage,
@@ -897,17 +909,17 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
 /* ── 分区标题 ── */
 .cran-section-label { font-size: 11px; font-weight: 600; color: #64748b; letter-spacing: 0.02em; }
 
-/* ── MMC stat 卡（任务信息 3 格）── */
+/* ── MMC stat 卡（任务信息 3 格，横排紧凑）── */
 .cran-stat-card {
-  background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 12px;
-  padding: 12px 12px 10px;
+  background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 10px;
+  padding: 10px 12px;
 }
 .cran-stat-icon {
-  width: 28px; height: 28px; border-radius: 8px;
+  width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.cran-stat-value { font-size: 14px; font-weight: 700; color: #1e293b; line-height: 1.2; }
-.cran-stat-label { font-size: 10.5px; color: #94a3b8; margin-top: 3px; }
+.cran-stat-value { font-size: 13px; font-weight: 700; color: #1e293b; line-height: 1.3; }
+.cran-stat-label { font-size: 10px; color: #94a3b8; margin-top: 1px; }
 
 /* ── 任务类 code block ── */
 .cran-code-block {
