@@ -124,6 +124,7 @@ onMounted(() => {
       lineNumbers:  'off' as const,
       contextmenu:  false,
       lineDecorationsWidth: 4,
+      scrollbar:    { vertical: 'hidden' as const, horizontalScrollbarSize: 4 },
     } : {}),
   })
 
