@@ -38,8 +38,8 @@
     </div>
 
     <!-- 空状态 -->
-    <div v-if="!appkeyInput" class="flex-1 flex flex-col items-center justify-center text-slate-300 select-none">
-      <Clock :size="40" class="mb-3 text-slate-200" />
+    <div v-if="!appkeyInput" class="flex-1 flex flex-col items-center justify-center select-none">
+      <Clock :size="36" class="mb-3 text-slate-200" />
       <div class="text-sm text-slate-400">输入 Appkey 查询定时任务</div>
     </div>
 
@@ -67,40 +67,28 @@
       />
     </template>
 
-    <!-- ── DictPicker：泳道 ── -->
-    <DictPicker
-      :show="swimlanePickerShow"
-      dict-key="swimlane"
-      dict-name="泳道"
-      :fetch-items="fetchSwimlaneItems"
-      allow-input
-      placeholder="搜索或输入泳道标识…"
-      @update:show="swimlanePickerShow = $event"
-      @select="onSwimlaneSelect"
-    />
-
     <!-- ── 任务详情抽屉 ── -->
-    <n-drawer v-model:show="drawer.show" :width="620" placement="right">
-      <n-drawer-content :native-scrollbar="false" closable class="cran-drawer">
+    <n-drawer v-model:show="drawer.show" :width="600" placement="right">
+      <n-drawer-content :native-scrollbar="false" closable>
         <template #header>
           <div class="flex items-start gap-3 pr-2 min-w-0">
-            <span class="w-2 h-2 rounded-full block mt-1 flex-shrink-0"
+            <span class="w-2 h-2 rounded-full block mt-[5px] flex-shrink-0"
                   :class="drawer.task?.status === 2 ? 'bg-emerald-400' : 'bg-slate-300'" />
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
               <div class="text-sm font-semibold text-slate-800 leading-snug break-all">
                 {{ drawer.task?.description || drawer.task?.name?.split('.').pop() || drawer.task?.taskid }}
               </div>
-              <div class="flex items-center gap-2 mt-1 flex-wrap">
-                <span class="font-mono text-[11px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
+              <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span class="font-mono text-[11px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
                   {{ drawer.task?.taskid }}
                 </span>
-                <span class="font-mono text-[11px] text-indigo-500 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                <span class="font-mono text-[11px] text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">
                   {{ drawer.task?.crontab }}
                 </span>
                 <span class="text-[11px] font-medium px-1.5 py-0.5 rounded"
                       :class="drawer.task?.status === 2
-                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                        : 'bg-slate-100 text-slate-400'">
+                        ? 'text-emerald-600 bg-emerald-50'
+                        : 'text-slate-400 bg-slate-100'">
                   {{ drawer.task?.status === 2 ? '已启用' : '已禁用' }}
                 </span>
               </div>
@@ -109,156 +97,157 @@
         </template>
 
         <div v-if="drawer.loading" class="flex flex-col items-center justify-center py-16 gap-3">
-          <n-spin :size="24" />
+          <n-spin :size="20" />
           <div class="text-xs text-slate-400">加载任务详情…</div>
         </div>
 
         <template v-else-if="drawer.task">
-          <n-tabs v-model:value="drawerTab" type="line" size="small" class="cran-tabs">
+          <n-tabs v-model:value="drawerTab" type="line" size="small" animated
+                  pane-style="padding-top:0">
 
-            <!-- ── 任务信息 ── -->
-            <n-tab-pane name="info" tab="任务信息">
-              <div class="grid grid-cols-2 gap-3 mb-4">
-                <div class="cran-meta-item">
-                  <div class="cran-meta-label">创建人</div>
-                  <div class="cran-meta-value">{{ drawer.task.creator || '—' }}</div>
-                </div>
-                <div class="cran-meta-item">
-                  <div class="cran-meta-label">所属 AppKey</div>
-                  <div class="cran-meta-value font-mono text-[11px]">{{ drawer.task.appname || '—' }}</div>
-                </div>
-                <div v-if="drawer.task.executiontimeout" class="cran-meta-item">
-                  <div class="cran-meta-label">执行超时</div>
-                  <div class="cran-meta-value">{{ drawer.task.executiontimeout }}s</div>
-                </div>
-                <div v-if="drawer.task.waittimeout" class="cran-meta-item">
-                  <div class="cran-meta-label">等待超时</div>
-                  <div class="cran-meta-value">{{ drawer.task.waittimeout }}s</div>
-                </div>
-              </div>
+            <!-- ────── 任务信息 ────── -->
+            <n-tab-pane name="info" tab="任务信息" class="space-y-4 pt-4">
 
-              <!-- 任务类名 -->
-              <div class="mb-4">
-                <div class="cran-section-title mb-1.5">任务类</div>
-                <div class="cran-code-block break-all" @click="copyText(drawer.task.name)" title="点击复制">
-                  {{ drawer.task.name }}
+              <!-- 元信息 -->
+              <div class="grid grid-cols-2 gap-2">
+                <div class="cran-kv">
+                  <div class="cran-kv__label">创建人</div>
+                  <div class="cran-kv__value">{{ drawer.task.creator || '—' }}</div>
+                </div>
+                <div class="cran-kv">
+                  <div class="cran-kv__label">执行超时</div>
+                  <div class="cran-kv__value">{{ drawer.task.executiontimeout ? `${drawer.task.executiontimeout}s` : '—' }}</div>
+                </div>
+                <div class="cran-kv col-span-2">
+                  <div class="cran-kv__label">任务类</div>
+                  <div class="cran-kv__value font-mono text-[11px] break-all cursor-pointer hover:text-indigo-600 transition-colors"
+                       title="点击复制"
+                       @click="copyText(drawer.task.name)">
+                    {{ drawer.task.name }}
+                  </div>
                 </div>
               </div>
 
               <!-- taskItem 只读 -->
-              <div v-if="drawer.task.taskitem" class="mb-4">
-                <div class="cran-section-title mb-1.5">任务参数（taskItem）</div>
-                <div class="border border-slate-100 rounded-lg overflow-hidden">
-                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="200px" />
+              <div v-if="drawer.task.taskitem">
+                <div class="cran-label mb-1.5">任务参数（taskItem）</div>
+                <div class="rounded-lg overflow-hidden border border-slate-100">
+                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="180px" />
                 </div>
               </div>
 
-              <!-- 路由规则只读 -->
+              <!-- 路由规则 只读 -->
               <div v-if="parsedRouteRules.length">
-                <div class="cran-section-title mb-2">路由规则</div>
-                <!-- 单条 → 表单展示 -->
-                <div v-if="parsedRouteRules.length === 1" class="cran-route-form cran-route-form--readonly">
+                <div class="cran-label mb-2">路由规则</div>
+                <div v-if="parsedRouteRules.length === 1" class="cran-route-card">
                   <div class="cran-route-row">
-                    <span class="cran-route-label">泳道</span>
-                    <span class="cran-route-value cran-swimlane-tag">
-                      {{ parsedRouteRules[0].swimlane || '（主干）' }}
+                    <span class="cran-route-key">泳道</span>
+                    <span v-if="parsedRouteRules[0].swimlane" class="cran-swim-tag">
+                      {{ parsedRouteRules[0].swimlane }}
                     </span>
+                    <span v-else class="text-xs text-slate-400">主干</span>
                   </div>
                   <div class="cran-route-row">
-                    <span class="cran-route-label">cell</span>
-                    <span class="cran-route-value font-mono text-slate-600">{{ parsedRouteRules[0].cell }}</span>
+                    <span class="cran-route-key">cell</span>
+                    <span class="text-xs font-mono text-slate-600">{{ parsedRouteRules[0].cell }}</span>
                   </div>
                   <div class="cran-route-row">
-                    <span class="cran-route-label">grouptags</span>
-                    <span class="cran-route-value font-mono text-slate-600">{{ parsedRouteRules[0].grouptags }}</span>
+                    <span class="cran-route-key">grouptags</span>
+                    <span class="text-xs font-mono text-slate-600">{{ parsedRouteRules[0].grouptags }}</span>
                   </div>
                 </div>
-                <!-- 多条 → JSON -->
-                <div v-else class="border border-slate-100 rounded-lg overflow-hidden">
-                  <MonacoPreview :content="formatJson(drawer.task.routeRules!)" height="120px" />
+                <div v-else class="rounded-lg overflow-hidden border border-slate-100">
+                  <MonacoPreview :content="formatJson(drawer.task.routeRules!)" height="100px" />
                 </div>
               </div>
             </n-tab-pane>
 
-            <!-- ── 手动触发 ── -->
-            <n-tab-pane name="trigger" tab="手动触发">
-              <div class="space-y-4">
+            <!-- ────── 手动触发 ────── -->
+            <n-tab-pane name="trigger" tab="手动触发" class="space-y-4 pt-4">
 
-                <!-- 触发结果 banner -->
-                <div v-if="execResult" class="flex items-start gap-2 px-3 py-2.5 rounded-lg text-xs"
-                     :class="execResult.ok
-                       ? 'bg-emerald-50 border border-emerald-100 text-emerald-700'
-                       : 'bg-red-50 border border-red-100 text-red-600'">
-                  <span class="flex-shrink-0 mt-0.5 font-bold">{{ execResult.ok ? '✓' : '✗' }}</span>
-                  <div>
-                    <div class="font-medium">{{ execResult.ok ? '触发成功' : '触发失败' }}</div>
-                    <div class="font-mono text-[11px] mt-0.5 opacity-80">
-                      {{ execResult.ok ? execResult.attemptId : execResult.msg }}
-                    </div>
-                  </div>
-                </div>
-
-                <!-- taskItem 编辑 -->
+              <!-- 触发结果 -->
+              <div v-if="execResult" class="flex items-start gap-2.5 px-3 py-2.5 rounded-lg text-xs"
+                   :class="execResult.ok
+                     ? 'bg-emerald-50 border border-emerald-100'
+                     : 'bg-red-50 border border-red-100'">
+                <span class="font-semibold mt-0.5 flex-shrink-0"
+                      :class="execResult.ok ? 'text-emerald-500' : 'text-red-500'">
+                  {{ execResult.ok ? '✓' : '✗' }}
+                </span>
                 <div>
-                  <div class="flex items-center justify-between mb-1.5">
-                    <div class="cran-section-title">任务参数（taskItem）</div>
-                    <button class="text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
-                            @click="resetTaskItem">重置</button>
+                  <div class="font-medium" :class="execResult.ok ? 'text-emerald-700' : 'text-red-600'">
+                    {{ execResult.ok ? '触发成功' : '触发失败' }}
                   </div>
-                  <div class="border border-slate-200 rounded-lg overflow-hidden">
-                    <LcMonacoEditor v-model="execTaskItem" language="json" height="180px" />
+                  <div class="font-mono text-[11px] mt-0.5 text-slate-500">
+                    {{ execResult.ok ? execResult.attemptId : execResult.msg }}
                   </div>
                 </div>
+              </div>
 
-                <!-- 路由规则 - 表单 -->
-                <div>
-                  <div class="cran-section-title mb-2">路由规则（执行泳道）</div>
-                  <div class="cran-route-form">
-                    <!-- 泳道 - DictPicker -->
-                    <div class="cran-route-row">
-                      <span class="cran-route-label">泳道</span>
-                      <div class="flex items-center gap-2 flex-1">
-                        <button
-                          class="flex items-center gap-1.5 text-xs border border-slate-200 rounded-md px-2.5 py-1
-                                 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors text-slate-700 cursor-pointer"
-                          @click="openSwimlanePicker"
-                        >
-                          <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                :class="execRule.swimlane ? 'bg-indigo-400' : 'bg-slate-300'" />
-                          <span :class="execRule.swimlane ? '' : 'text-slate-400'">
-                            {{ execRule.swimlane || '主干（不指定泳道）' }}
-                          </span>
-                        </button>
-                        <button v-if="execRule.swimlane"
-                                class="text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
-                                @click="execRule.swimlane = ''">清空</button>
-                      </div>
-                    </div>
-                    <!-- cell -->
-                    <div class="cran-route-row">
-                      <span class="cran-route-label">cell</span>
-                      <n-input v-model:value="execRule.cell" size="tiny" class="flex-1 max-w-40" />
-                    </div>
-                    <!-- grouptags -->
-                    <div class="cran-route-row">
-                      <span class="cran-route-label">grouptags</span>
-                      <n-input v-model:value="execRule.grouptags" size="tiny" class="flex-1 max-w-48" />
-                    </div>
+              <!-- taskItem 编辑 -->
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <div class="cran-label">任务参数（taskItem）</div>
+                  <button class="text-[11px] text-slate-400 hover:text-slate-600 transition-colors"
+                          @click="resetTaskItem">重置</button>
+                </div>
+                <div class="rounded-lg overflow-hidden border border-slate-200">
+                  <LcMonacoEditor v-model="execTaskItem" language="json" height="160px" />
+                </div>
+              </div>
+
+              <!-- 路由规则 编辑 -->
+              <div>
+                <div class="cran-label mb-2">路由规则（执行泳道）</div>
+                <div class="cran-route-card">
+                  <!-- 泳道 - ContextItem -->
+                  <div class="cran-route-row">
+                    <span class="cran-route-key">泳道</span>
+                    <ContextItem
+                      context-key="swimlane"
+                      :value="execRule.swimlane ?? ''"
+                      label="泳道"
+                      :fetch-items="fetchSwimlaneItems"
+                      custom-edit
+                      bare
+                      @edit="item => execRule.swimlane = item.value ?? ''"
+                    >
+                      <span class="cran-swim-chip"
+                            :class="execRule.swimlane ? 'cran-swim-chip--active' : 'cran-swim-chip--empty'">
+                        <span class="cran-swim-chip__dot" />
+                        {{ execRule.swimlane || '主干（不指定）' }}
+                      </span>
+                    </ContextItem>
+                    <button v-if="execRule.swimlane"
+                            class="ml-1 text-[11px] text-slate-400 hover:text-slate-600 transition-colors"
+                            @click="execRule.swimlane = ''">清空</button>
+                  </div>
+                  <!-- cell -->
+                  <div class="cran-route-row">
+                    <span class="cran-route-key">cell</span>
+                    <n-input v-model:value="execRule.cell" size="tiny"
+                             class="max-w-36" style="font-family:monospace;font-size:12px" />
+                  </div>
+                  <!-- grouptags -->
+                  <div class="cran-route-row">
+                    <span class="cran-route-key">grouptags</span>
+                    <n-input v-model:value="execRule.grouptags" size="tiny"
+                             class="max-w-44" style="font-family:monospace;font-size:12px" />
                   </div>
                 </div>
+              </div>
 
-                <!-- 触发按钮 -->
-                <div class="flex items-center gap-3 pt-1">
-                  <n-button :loading="executing" :disabled="executing" size="small" @click="doExecute">
-                    触发执行
-                  </n-button>
-                  <span class="text-[11px] text-slate-400">触发后约 1s 自动跳到历史记录</span>
-                </div>
+              <!-- 触发按钮 -->
+              <div class="flex items-center gap-3">
+                <n-button size="small" :loading="executing" :disabled="executing" @click="doExecute">
+                  触发执行
+                </n-button>
+                <span class="text-[11px] text-slate-400">成功后自动跳转历史记录</span>
               </div>
             </n-tab-pane>
 
-            <!-- ── 执行历史 ── -->
-            <n-tab-pane name="history" tab="执行历史">
+            <!-- ────── 执行历史 ────── -->
+            <n-tab-pane name="history" tab="执行历史" class="pt-4">
               <div class="flex items-center justify-between mb-3">
                 <span class="text-xs text-slate-400">最近 {{ historyList.length }} 条</span>
                 <n-button size="tiny" ghost :loading="historyLoading" @click="fetchHistory(1)">刷新</n-button>
@@ -267,86 +256,89 @@
               <div v-if="historyLoading && !historyList.length" class="flex justify-center py-10">
                 <n-spin :size="18" />
               </div>
-              <div v-else-if="!historyList.length" class="flex flex-col items-center py-12 text-slate-300 select-none">
-                <Clock :size="28" class="mb-2" />
+              <div v-else-if="!historyList.length" class="flex flex-col items-center py-14 select-none">
+                <Clock :size="28" class="mb-2 text-slate-200" />
                 <div class="text-xs text-slate-400">暂无执行记录</div>
               </div>
 
               <div v-else class="space-y-2">
-                <div
-                  v-for="item in historyList"
-                  :key="item.id"
-                  class="cran-attempt"
-                  :class="{ 'cran-attempt--open': expandedAttempts.has(item.id) }"
-                >
-                  <!-- 色条 -->
+                <div v-for="item in historyList" :key="item.id" class="cran-attempt">
+                  <!-- 左侧状态色条 -->
                   <div class="cran-attempt__bar"
-                       :class="item.status === 7 ? 'bg-emerald-400' : item.status === 6 ? 'bg-red-400' : 'bg-amber-400'" />
+                       :class="item.status === 7 ? 'bg-emerald-400'
+                              : item.status === 8 ? 'bg-amber-400'
+                              : item.status >= 5 ? 'bg-red-400'
+                              : 'bg-slate-300'" />
 
                   <div class="flex-1 min-w-0">
-                    <!-- 头部行 -->
-                    <div class="flex items-center justify-between">
-                      <button class="flex items-center gap-1.5 min-w-0 text-left hover:opacity-70 transition-opacity"
-                              @click="toggleAttempt(item.id)">
-                        <span class="font-mono text-[11px] text-slate-500 truncate">{{ item.attemptid }}</span>
+                    <!-- 主行 -->
+                    <div class="flex items-center gap-2">
+                      <!-- attempt ID，点击展开 -->
+                      <button
+                        class="flex items-center gap-1 font-mono text-[11.5px] text-slate-600 hover:text-indigo-500 transition-colors min-w-0 flex-1 text-left"
+                        @click="toggleAttempt(item.id)"
+                      >
+                        <span class="truncate">{{ item.attemptid }}</span>
                         <span class="text-[10px] text-slate-300 flex-shrink-0">
                           {{ expandedAttempts.has(item.id) ? '▾' : '▸' }}
                         </span>
                       </button>
-                      <div class="flex items-center gap-2 flex-shrink-0 ml-2">
-                        <span class="text-[11px] font-semibold"
-                              :class="item.status === 7 ? 'text-emerald-600' : item.status === 6 ? 'text-red-500' : 'text-amber-500'">
-                          {{ STATUS_MAP[item.status] ?? `状态${item.status}` }}
-                        </span>
-                        <!-- 重复执行 -->
-                        <button class="text-[10px] text-slate-400 hover:text-indigo-500 transition-colors border border-slate-200 hover:border-indigo-200 rounded px-1.5 py-0.5"
-                                title="使用此次参数重新执行"
-                                @click.stop="rerunAttempt(item)">
-                          重执行
-                        </button>
-                      </div>
+                      <!-- 状态 + 重执行 -->
+                      <span class="text-[11.5px] font-semibold flex-shrink-0"
+                            :class="item.status === 7 ? 'text-emerald-500'
+                                   : item.status === 8 ? 'text-amber-500'
+                                   : item.status >= 5 ? 'text-red-500'
+                                   : 'text-slate-500'">
+                        {{ STATUS_MAP[item.status] ?? `状态${item.status}` }}
+                      </span>
+                      <n-button size="tiny" ghost @click.stop="rerunAttempt(item)">重执行</n-button>
                     </div>
 
-                    <!-- 元信息 -->
-                    <div class="flex items-center gap-2 mt-1 text-[11px] text-slate-400 flex-wrap">
+                    <!-- 次行：时间 + 耗时 + 机器 -->
+                    <div class="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
                       <span>{{ formatTs(item.starttime) }}</span>
-                      <template v-if="item.endtime && item.starttime">
+                      <template v-if="item.endtime && item.starttime && item.endtime > item.starttime">
                         <span class="text-slate-200">·</span>
                         <span>{{ ((item.endtime - item.starttime) / 1000).toFixed(1) }}s</span>
                       </template>
                       <span class="text-slate-200">·</span>
-                      <!-- exechost - 可交互 -->
-                      <button class="font-mono hover:text-slate-600 transition-colors"
-                              title="点击查看机器操作"
-                              @click.stop="onExecHost(item.exechost)">
+                      <span class="font-mono hover:text-indigo-500 transition-colors cursor-pointer"
+                            title="登录机器（待实现）"
+                            @click.stop="onExecHost(item.exechost)">
                         {{ item.exechost }}
-                      </button>
+                      </span>
                     </div>
 
-                    <!-- 展开详情 -->
+                    <!-- 展开：执行参数详情 -->
                     <template v-if="expandedAttempts.has(item.id)">
-                      <!-- 执行路由规则 -->
-                      <div v-if="parseRouteRules(item.routeRuleOrList)" class="mt-3">
-                        <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">执行路由规则</div>
-                        <div v-if="parseRouteRules(item.routeRuleOrList)!.length === 1" class="cran-route-form cran-route-form--compact cran-route-form--readonly">
-                          <div class="cran-route-row">
-                            <span class="cran-route-label">泳道</span>
-                            <span class="cran-route-value cran-swimlane-tag">
-                              {{ parseRouteRules(item.routeRuleOrList)![0].swimlane || '（主干）' }}
-                            </span>
+                      <div class="mt-3 space-y-3 border-t border-slate-100 pt-3">
+                        <!-- 执行路由规则 -->
+                        <div v-if="parseRouteRules(item.routeRuleOrList)" >
+                          <div class="cran-label mb-1.5">执行路由规则</div>
+                          <div v-if="parseRouteRules(item.routeRuleOrList)!.length === 1"
+                               class="cran-route-card cran-route-card--compact">
+                            <div class="cran-route-row">
+                              <span class="cran-route-key">泳道</span>
+                              <span v-if="parseRouteRules(item.routeRuleOrList)![0].swimlane"
+                                    class="cran-swim-tag">
+                                {{ parseRouteRules(item.routeRuleOrList)![0].swimlane }}
+                              </span>
+                              <span v-else class="text-xs text-slate-400">主干</span>
+                            </div>
+                            <div class="cran-route-row">
+                              <span class="cran-route-key">cell</span>
+                              <span class="text-xs font-mono text-slate-500">
+                                {{ parseRouteRules(item.routeRuleOrList)![0].cell }}
+                              </span>
+                            </div>
                           </div>
-                          <div class="cran-route-row">
-                            <span class="cran-route-label">cell</span>
-                            <span class="cran-route-value font-mono">{{ parseRouteRules(item.routeRuleOrList)![0].cell }}</span>
-                          </div>
+                          <pre v-else class="text-[10px] font-mono text-slate-500 bg-slate-50 rounded-lg px-3 py-2 overflow-x-auto">{{ formatJson(item.routeRuleOrList!) }}</pre>
                         </div>
-                        <pre v-else class="cran-code-block text-[10px]">{{ formatJson(JSON.stringify(parseRouteRules(item.routeRuleOrList))) }}</pre>
-                      </div>
-
-                      <!-- 执行参数 -->
-                      <div v-if="item.taskItem" class="mt-3">
-                        <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">执行参数（taskItem）</div>
-                        <pre class="cran-code-block text-[10px] max-h-32 overflow-y-auto">{{ formatJson(item.taskItem) }}</pre>
+                        <!-- 执行参数 -->
+                        <div v-if="item.taskItem">
+                          <div class="cran-label mb-1.5">执行参数（taskItem）</div>
+                          <pre class="text-[10px] font-mono text-slate-500 bg-slate-50 rounded-lg px-3 py-2 overflow-x-auto max-h-28">{{ formatJson(item.taskItem) }}</pre>
+                        </div>
                       </div>
                     </template>
                   </div>
@@ -383,7 +375,6 @@ import {
 import type { DataTableColumns } from 'naive-ui'
 import ContextItem from '@/components/ContextItem.vue'
 import ContextGroup from '@/components/ContextGroup.vue'
-import DictPicker from '@/components/DictPicker.vue'
 import LcMonacoEditor from '@/components/lowcode/LcMonacoEditor.vue'
 import MonacoPreview from '@/components/MonacoPreview.vue'
 import { matchQuery } from '@/utils/search'
@@ -402,16 +393,15 @@ const STATUS_MAP: Record<number, string> = {
 // ─── 类型 ─────────────────────────────────────────────────────────────────────
 interface RouteRule { swimlane: string; cell: string; grouptags: string }
 interface CranTask {
-  taskid:    string; name: string; description: string
-  crontab:   string; status: number; appname: string
-  creator:   string; taskitem: string; routeRules?: string
-  executiontimeout?: number; waittimeout?: number
+  taskid: string; name: string; description: string; crontab: string
+  status: number; appname: string; creator: string; taskitem: string
+  routeRules?: string; executiontimeout?: number; waittimeout?: number
 }
 interface CranAttempt {
-  id:        number; attemptid: string; taskid: string
+  id: number; attemptid: string; taskid: string
   starttime: number; endtime: number; status: number
-  exechost:  string; taskItem: string
-  routeRuleOrList?: string   // 执行时的路由规则，字段名按实际 API 返回
+  exechost: string; taskItem: string
+  routeRuleOrList?: string
 }
 
 // ─── 状态 ─────────────────────────────────────────────────────────────────────
@@ -422,7 +412,7 @@ const loadingMsg  = ref('加载任务…')
 const fromCache   = ref(false)
 const searchText  = ref('')
 
-// ✦ 任务缓存：appKey → CranTask[]（无限期，手动刷新清除）
+// ✦ 缓存：appKey → CranTask[]（无限期，手动刷新清除）
 const taskCache = ref(new Map<string, CranTask[]>())
 
 // ─── 抽屉 ─────────────────────────────────────────────────────────────────────
@@ -444,14 +434,8 @@ const execRule     = reactive<RouteRule>({ swimlane: '', cell: 'default', groupt
 const executing    = ref(false)
 const execResult   = ref<{ ok: boolean; attemptId?: string; msg?: string } | null>(null)
 
-// ─── 泳道 DictPicker ──────────────────────────────────────────────────────────
-const swimlanePickerShow = ref(false)
+// ─── 泳道 ContextItem ─────────────────────────────────────────────────────────
 const fetchSwimlaneItems = makeFetchItems('swimlane')
-
-function openSwimlanePicker() { swimlanePickerShow.value = true }
-function onSwimlaneSelect(item: ContextDataItem) {
-  execRule.swimlane = item.value ?? ''
-}
 
 // ─── localStorage 持久化 ──────────────────────────────────────────────────────
 const LS_KEY = 'cran_appkey'
@@ -482,18 +466,17 @@ function parseRouteRules(raw: string | undefined): RouteRule[] | null {
   if (!raw) return null
   try {
     const p = JSON.parse(raw)
-    if (Array.isArray(p)) return p as RouteRule[]
-    if (typeof p === 'object') return [p as RouteRule]
-    return null
-  } catch { return null }
+    if (Array.isArray(p) && p.length) return p as RouteRule[]
+    if (typeof p === 'object' && p !== null) return [p as RouteRule]
+  } catch {}
+  return null
 }
 
-// ─── 解析当前任务路由规则（只读展示） ────────────────────────────────────────
-const parsedRouteRules = computed<RouteRule[]>(() => {
-  return parseRouteRules(drawer.value.task?.routeRules) ?? []
-})
+// ─── 计算 ─────────────────────────────────────────────────────────────────────
+const parsedRouteRules = computed<RouteRule[]>(() =>
+  parseRouteRules(drawer.value.task?.routeRules) ?? []
+)
 
-// ─── 过滤 ─────────────────────────────────────────────────────────────────────
 const filteredTasks = computed(() => {
   const q = searchText.value.trim()
   if (!q) return tasks.value
@@ -539,12 +522,11 @@ function rowProps(row: CranTask) {
 const CRANE_BASE    = 'https://crane.mws-test.sankuai.com'
 const CRANE_HEADERS = { 'x-requested-with': 'XMLHttpRequest' }
 
-// ─── 全量拉取（自动翻页，带缓存） ─────────────────────────────────────────────
+// ─── 全量拉取（翻页 + 缓存） ──────────────────────────────────────────────────
 async function fetchAllTasks(forceRefresh = false) {
   if (!appkeyInput.value) return
   const appkey = appkeyInput.value
 
-  // 命中缓存
   if (!forceRefresh && taskCache.value.has(appkey)) {
     tasks.value = taskCache.value.get(appkey)!
     fromCache.value = true
@@ -554,12 +536,12 @@ async function fetchAllTasks(forceRefresh = false) {
   loading.value   = true
   fromCache.value = false
   tasks.value     = []
+
   const PAGE_SIZE = 50
   let page = 1
-
   try {
     while (true) {
-      loadingMsg.value = `加载第 ${page} 页…`
+      loadingMsg.value = page > 1 ? `加载第 ${page} 页…` : '加载任务…'
       const url  = `${CRANE_BASE}/task/getTaskSlice?appKey=${encodeURIComponent(appkey)}&pageNum=${page}&pageSize=${PAGE_SIZE}`
       const json = await proxyGet<{
         status: string
@@ -567,24 +549,20 @@ async function fetchAllTasks(forceRefresh = false) {
       }>(url, CRANE_HEADERS)
 
       if (json.status !== 'success' || !json.result) break
-
       const items = json.result.items ?? []
       tasks.value = [...tasks.value, ...items]
-
       if (page >= json.result.pages || items.length < PAGE_SIZE) break
       page++
     }
-    // 写入缓存
     taskCache.value.set(appkey, [...tasks.value])
   } catch (e: any) {
-    message.error(`加载任务失败：${e.message}`)
+    message.error(`加载失败：${e.message}`)
   } finally {
     loadingMsg.value = '加载任务…'
     loading.value = false
   }
 }
 
-// 手动刷新：清除当前 appKey 缓存
 function refreshTasks() {
   if (appkeyInput.value) {
     taskCache.value.delete(appkeyInput.value)
@@ -592,7 +570,7 @@ function refreshTasks() {
   }
 }
 
-// ─── Appkey 回调 ──────────────────────────────────────────────────────────────
+// ─── Appkey ────────────────────────────────────────────────────────────────────
 const fetchAppkeyItems = makeFetchItems('appkey')
 
 function onAppkeyEdit(item: ContextDataItem) {
@@ -603,25 +581,22 @@ function onAppkeyEdit(item: ContextDataItem) {
 
 // ─── 打开详情抽屉 ──────────────────────────────────────────────────────────────
 async function openDrawer(task: CranTask) {
-  execResult.value        = null
-  historyList.value       = []
-  historyTotal.value      = 0
-  historyPage.value       = 1
-  drawerTab.value         = 'info'
-  expandedAttempts.value  = new Set()
+  execResult.value       = null
+  historyList.value      = []
+  historyTotal.value     = 0
+  historyPage.value      = 1
+  drawerTab.value        = 'info'
+  expandedAttempts.value = new Set()
 
   drawer.value = { show: true, task, loading: true }
-
-  // 初始化编辑区
   execTaskItem.value = formatJson(task.taskitem || '{}')
 
-  // 拉取详情（含 routeRules）
   try {
     const url  = `${CRANE_BASE}/task/detail?taskid=${encodeURIComponent(task.taskid)}`
     const json = await proxyGet<{ status: string; result?: CranTask }>(url, CRANE_HEADERS)
     if (json.status === 'success' && json.result) {
       drawer.value.task = { ...task, ...json.result }
-      // 初始化执行路由规则
+      // 初始化路由规则编辑
       const rules = parseRouteRules(json.result.routeRules)
       if (rules?.length) {
         execRule.swimlane  = rules[0].swimlane  ?? ''
@@ -638,25 +613,22 @@ function resetTaskItem() {
   if (drawer.value.task) execTaskItem.value = formatJson(drawer.value.task.taskitem || '{}')
 }
 
-// ─── 展开/折叠历史 ────────────────────────────────────────────────────────────
+// ─── 展开历史 ─────────────────────────────────────────────────────────────────
 function toggleAttempt(id: number) {
-  if (expandedAttempts.value.has(id)) expandedAttempts.value.delete(id)
-  else expandedAttempts.value.add(id)
-  expandedAttempts.value = new Set(expandedAttempts.value) // 触发响应
+  const s = new Set(expandedAttempts.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  expandedAttempts.value = s
 }
 
-// ─── 基于历史重复执行 ─────────────────────────────────────────────────────────
+// ─── 基于历史重执行 ───────────────────────────────────────────────────────────
 function rerunAttempt(item: CranAttempt) {
-  // 填入历史参数
   execTaskItem.value = formatJson(item.taskItem || '{}')
-
   const rules = parseRouteRules(item.routeRuleOrList)
   if (rules?.length) {
     execRule.swimlane  = rules[0].swimlane  ?? ''
     execRule.cell      = rules[0].cell      ?? 'default'
     execRule.grouptags = rules[0].grouptags ?? 'La:default'
   }
-
   execResult.value = null
   drawerTab.value  = 'trigger'
   message.info('已填入历史参数，确认后点击触发执行')
@@ -681,7 +653,7 @@ async function fetchHistory(page = historyPage.value) {
   historyLoading.value = false
 }
 
-// ─── 机器交互（待实现） ────────────────────────────────────────────────────────
+// ─── exechost 机器操作（待实现） ──────────────────────────────────────────────
 function onExecHost(host: string) {
   message.info(`机器登录功能待实现：${host}`)
 }
@@ -693,12 +665,10 @@ async function doExecute() {
   executing.value  = true
   execResult.value = null
 
-  // 构造路由规则
-  const routeRuleList = [{ ...execRule }]
-
-  // 压缩 taskItem
   let taskItemStr = execTaskItem.value.trim()
   try { taskItemStr = JSON.stringify(JSON.parse(taskItemStr)) } catch {}
+
+  const routeRuleList = [{ ...execRule }]
 
   try {
     const url  = `${CRANE_BASE}/attempt/executeJob/${encodeURIComponent(task.taskid)}`
@@ -709,10 +679,7 @@ async function doExecute() {
     )
     if (json.status === 'success') {
       execResult.value = { ok: true, attemptId: json.result }
-      setTimeout(() => {
-        drawerTab.value = 'history'
-        fetchHistory(1)
-      }, 1200)
+      setTimeout(() => { drawerTab.value = 'history'; fetchHistory(1) }, 1200)
     } else {
       execResult.value = { ok: false, msg: json.message || '触发失败' }
     }
@@ -727,7 +694,7 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
 </script>
 
 <style scoped>
-/* ── chip ──────────────────────────────────────────────────────────────────── */
+/* ── chip ── */
 .cran-chip {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 3px 10px; border-radius: 6px; font-size: 12px; line-height: 1.6;
@@ -738,59 +705,48 @@ watch(appkeyInput, v => { if (v) fetchAllTasks() }, { immediate: true })
 .cran-chip--slate:hover { background: #e8ecf2; border-color: #c8d0db; }
 .cran-chip--empty  { background: transparent; border-style: dashed; border-color: #cbd5e1; color: #94a3b8; cursor: default; }
 
-/* ── 抽屉 tab ──────────────────────────────────────────────────────────────── */
-.cran-tabs :deep(.n-tabs-nav) { margin-bottom: 16px; }
-
-/* ── 元信息卡片 ─────────────────────────────────────────────────────────────── */
-.cran-meta-item { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 8px; padding: 8px 12px; }
-.cran-meta-label { font-size: 10px; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
-.cran-meta-value  { font-size: 12px; color: #374151; font-weight: 500; }
-
-/* ── section title ─────────────────────────────────────────────────────────── */
-.cran-section-title { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; }
-
-/* ── 只读代码块 ─────────────────────────────────────────────────────────────── */
-.cran-code-block {
-  background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 8px;
-  padding: 8px 12px; font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 11px; color: #475569; cursor: pointer; transition: background 0.12s;
-}
-.cran-code-block:hover { background: #f1f5f9; }
-
-/* ── 路由规则表单 ────────────────────────────────────────────────────────────── */
-.cran-route-form {
-  background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 8px;
-  overflow: hidden;
-}
-.cran-route-form--compact { background: transparent; border: 1px solid #f1f5f9; }
-.cran-route-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 7px 12px; border-bottom: 1px solid #f1f5f9;
-}
-.cran-route-row:last-child { border-bottom: none; }
-.cran-route-label {
-  width: 64px; flex-shrink: 0; font-size: 11px; color: #94a3b8;
-  font-weight: 500; font-family: monospace;
-}
-.cran-route-value  { font-size: 12px; color: #374151; flex: 1; }
-.cran-route-form--readonly .cran-route-row { padding: 6px 12px; }
-
-/* ── 泳道标签 ────────────────────────────────────────────────────────────────── */
-.cran-swimlane-tag {
+/* ── 泳道 chip（触发表单内） ── */
+.cran-swim-chip {
   display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 5px; font-size: 12px;
+  border: 1px solid; cursor: pointer; user-select: none;
+  transition: all 0.1s;
+}
+.cran-swim-chip--active  { background: #eef2ff; border-color: #c7d2fe; color: #4338ca; }
+.cran-swim-chip--active:hover { background: #e0e7ff; border-color: #a5b4fc; }
+.cran-swim-chip--empty   { background: transparent; border-style: dashed; border-color: #e2e8f0; color: #94a3b8; }
+.cran-swim-chip__dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: currentColor; opacity: 0.5; }
+
+/* ── 泳道标签（只读）── */
+.cran-swim-tag {
+  display: inline-flex; align-items: center; gap: 4px;
   font-size: 11px; font-family: monospace;
   color: #4f46e5; background: #eef2ff; border: 1px solid #c7d2fe;
-  padding: 1px 8px; border-radius: 6px;
+  padding: 1px 7px; border-radius: 5px;
 }
 
-/* ── 执行历史条目 ────────────────────────────────────────────────────────────── */
+/* ── 键值对 ── */
+.cran-kv { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 8px; padding: 8px 12px; }
+.cran-kv__label { font-size: 10px; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
+.cran-kv__value { font-size: 12px; color: #374151; font-weight: 500; }
+
+/* ── label ── */
+.cran-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ── 路由规则卡片 ── */
+.cran-route-card { background: #f8fafc; border: 1px solid #e8ecf4; border-radius: 8px; overflow: hidden; }
+.cran-route-card--compact { background: transparent; border: 1px solid #f1f5f9; }
+.cran-route-row { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid #f1f5f9; }
+.cran-route-row:last-child { border-bottom: none; }
+.cran-route-key { width: 60px; flex-shrink: 0; font-size: 11px; color: #94a3b8; font-weight: 500; font-family: monospace; }
+
+/* ── 执行历史条目 ── */
 .cran-attempt {
   display: flex; align-items: flex-start; gap: 10px;
-  background: #f8fafc; border: 1px solid #f1f5f9;
-  border-radius: 8px; padding: 9px 12px;
+  padding: 10px 12px; border-radius: 8px;
+  border: 1px solid #f1f5f9; background: #f8fafc;
   transition: border-color 0.12s, background 0.12s;
 }
 .cran-attempt:hover { background: #f1f5f9; border-color: #e2e8f0; }
-.cran-attempt--open { background: #fff; border-color: #e2e8f0; }
-.cran-attempt__bar  { width: 3px; border-radius: 2px; flex-shrink: 0; align-self: stretch; min-height: 24px; }
+.cran-attempt__bar { width: 3px; border-radius: 2px; flex-shrink: 0; align-self: stretch; min-height: 20px; margin-top: 2px; }
 </style>
