@@ -47,7 +47,7 @@
     <template v-else>
       <n-input
         v-model:value="searchText"
-        placeholder="搜索任务名称 / 描述 / Cron 表达式…"
+        placeholder="搜索任务名称 / 描述 / 创建人 / Cron…"
         clearable
         class="shrink-0 mb-3"
         :disabled="loading"
@@ -580,7 +580,7 @@ const parsedRouteRules = computed<RouteRule[]>(() =>
 const filteredTasks = computed(() => {
   const q = searchText.value.trim()
   if (!q) return tasks.value
-  return tasks.value.filter(t => matchQuery(q, t.taskid, t.name, t.description, t.crontab))
+  return tasks.value.filter(t => matchQuery(q, t.name, t.description, t.creator, t.crontab))
 })
 
 // ─── 表格列 ──────────────────────────────────────────────────────────────────
