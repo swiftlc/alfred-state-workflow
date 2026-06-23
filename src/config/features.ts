@@ -689,6 +689,7 @@ const builtInFeatures: Feature[] = [
       return swimlane ? `部署未提交 Java 变更 → 泳道 ${swimlane}` : '部署未提交 Java 变更 → 主干';
     },
     requiredKeys: ['appkey', 'swimlane'],
+    showAlways: true,   // 缺少依赖时也展示，引导配置
     icon: icon('task'),
     // 无 requiredInputs：全自动，不弹表单
     action: 'sonic_hot_deploy',
