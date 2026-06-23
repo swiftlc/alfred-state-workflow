@@ -105,13 +105,12 @@
           <n-tabs v-model:value="drawerTab" type="line" size="small" animated
                   pane-style="padding-top:0">
 
-            <!-- ────── 任务信息 ────── -->
+            <!-- ────── 任务信息 & 执行 ────── -->
             <n-tab-pane name="info" tab="任务信息">
             <div class="flex flex-col gap-4 pt-4">
 
-              <!-- ① MMC stat 卡：状态 / 创建人 / 超时（紧凑横排） -->
+              <!-- ① stat 卡：状态 / 创建人 / 超时 -->
               <div class="grid grid-cols-3 gap-3">
-                <!-- 状态 -->
                 <div class="cran-stat-card">
                   <div class="flex items-center gap-2">
                     <div class="cran-stat-icon"
@@ -128,7 +127,6 @@
                     </div>
                   </div>
                 </div>
-                <!-- 创建人 -->
                 <div class="cran-stat-card">
                   <div class="flex items-center gap-2">
                     <div class="cran-stat-icon bg-indigo-50">
@@ -140,7 +138,6 @@
                     </div>
                   </div>
                 </div>
-                <!-- 超时 -->
                 <div class="cran-stat-card">
                   <div class="flex items-center gap-2">
                     <div class="cran-stat-icon bg-amber-50">
@@ -164,56 +161,9 @@
                 </span>
               </div>
 
-              <!-- ③ 路由规则 -->
-              <div v-if="parsedRouteRules.length">
-                <div class="cran-section-label mb-2">路由规则</div>
-                <div v-if="parsedRouteRules.length === 1"
-                     class="flex items-center gap-2.5 flex-wrap">
-                  <ContextItem
-                    context-key="swimlane"
-                    :value="parsedRouteRules[0].swimlane ?? ''"
-                    label="泳道"
-                    :fetch-items="fetchSwimlaneItems"
-                    custom-edit
-                    bare
-                    @edit="item => onInfoSwimlaneEdit(item)"
-                  >
-                    <span class="cran-swim-chip"
-                          :class="parsedRouteRules[0].swimlane
-                            ? 'cran-swim-chip--active' : 'cran-swim-chip--empty'"
-                          title="点击切换泳道（同步到触发表单）">
-                      <span class="cran-swim-chip__dot" />
-                      {{ parsedRouteRules[0].swimlane || '主干' }}
-                    </span>
-                  </ContextItem>
-                  <span class="text-[11.5px] font-mono text-slate-500">{{ parsedRouteRules[0].cell }}</span>
-                  <span v-if="parsedRouteRules[0].grouptags"
-                        class="text-[11px] font-mono text-slate-400">
-                    {{ parsedRouteRules[0].grouptags }}
-                  </span>
-                </div>
-                <div v-else class="rounded-lg overflow-hidden border border-slate-100 mt-2">
-                  <MonacoPreview :content="formatJson(drawer.task.routeRules!)" height="160px" compact />
-                </div>
-              </div>
-
-              <!-- ④ 任务参数 -->
-              <div v-if="drawer.task.taskitem">
-                <div class="cran-section-label mb-2">任务参数</div>
-                <div class="rounded-xl overflow-hidden border border-slate-100">
-                  <MonacoPreview :content="formatJson(drawer.task.taskitem)" height="400px" compact />
-                </div>
-              </div>
-            </div>
-            </n-tab-pane>
-
-            <!-- ────── 手动触发 ────── -->
-            <n-tab-pane name="trigger" tab="手动触发">
-            <div class="flex flex-col gap-4 pt-4">
-
-              <!-- 触发结果 Banner -->
+              <!-- ③ 触发结果 Banner（执行后显示） -->
               <div v-if="execResult"
-                   class="flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-medium"
+                   class="flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs"
                    :class="execResult.ok
                      ? 'bg-emerald-50 border border-emerald-200'
                      : 'bg-red-50 border border-red-200'">
@@ -221,8 +171,8 @@
                       :class="execResult.ok ? 'bg-emerald-400' : 'bg-red-400'">
                   {{ execResult.ok ? '✓' : '✗' }}
                 </span>
-                <div class="min-w-0">
-                  <div :class="execResult.ok ? 'text-emerald-700' : 'text-red-600'">
+                <div class="min-w-0 flex-1">
+                  <div class="font-medium" :class="execResult.ok ? 'text-emerald-700' : 'text-red-600'">
                     {{ execResult.ok ? '触发成功' : '触发失败' }}
                   </div>
                   <div class="font-mono text-[10.5px] mt-0.5 text-slate-500 truncate">
@@ -231,24 +181,10 @@
                 </div>
               </div>
 
-              <!-- taskItem 编辑 -->
-              <div>
-                <div class="flex items-center justify-between mb-3">
-                  <div class="cran-section-label">任务参数</div>
-                  <button class="text-[11px] text-slate-400 hover:text-indigo-500 transition-colors
-                                 border-0 bg-transparent outline-none cursor-pointer p-0"
-                          @click="resetTaskItem">重置</button>
-                </div>
-                <div class="rounded-xl overflow-hidden border border-slate-200">
-                  <LcMonacoEditor v-model="execTaskItem" language="json" height="320px" compact />
-                </div>
-              </div>
-
-              <!-- 路由规则 编辑 -->
+              <!-- ④ 路由规则（可编辑：泳道 + cell + grouptags） -->
               <div>
                 <div class="cran-section-label mb-2">路由规则</div>
                 <div class="cran-route-card">
-                  <!-- 泳道 -->
                   <div class="cran-route-row">
                     <span class="cran-route-key">泳道</span>
                     <ContextItem
@@ -271,13 +207,11 @@
                                    border-0 bg-transparent outline-none cursor-pointer p-0"
                             @click="execRule.swimlane = ''">清空</button>
                   </div>
-                  <!-- cell -->
                   <div class="cran-route-row">
                     <span class="cran-route-key">cell</span>
                     <n-input v-model:value="execRule.cell" size="tiny"
                              class="max-w-40" style="font-family:monospace;font-size:12px" />
                   </div>
-                  <!-- grouptags -->
                   <div class="cran-route-row">
                     <span class="cran-route-key">grouptags</span>
                     <n-input v-model:value="execRule.grouptags" size="tiny"
@@ -286,14 +220,28 @@
                 </div>
               </div>
 
-              <!-- 触发按钮 -->
-              <div class="flex items-center justify-between pt-1">
+              <!-- ⑤ 任务参数（可编辑 Monaco + 重置） -->
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <div class="cran-section-label">任务参数</div>
+                  <button class="text-[11px] text-slate-400 hover:text-indigo-500 transition-colors
+                                 border-0 bg-transparent outline-none cursor-pointer p-0"
+                          @click="resetTaskItem">重置</button>
+                </div>
+                <div class="rounded-xl overflow-hidden border border-slate-200">
+                  <LcMonacoEditor v-model="execTaskItem" language="json" height="280px" compact />
+                </div>
+              </div>
+
+              <!-- ⑥ 触发动作条 -->
+              <div class="flex items-center justify-between pt-1 border-t border-slate-100">
                 <n-button type="primary" size="medium" :loading="executing" :disabled="executing"
                           @click="doExecute">
                   触发执行
                 </n-button>
-                <span class="text-[11px] text-slate-400">触发成功后自动跳转历史记录</span>
+                <span class="text-[11px] text-slate-400">成功后自动跳转历史记录</span>
               </div>
+
             </div>
             </n-tab-pane>
 
@@ -562,7 +510,7 @@ const taskCache = ref(new Map<string, CranTask[]>())
 const drawer    = ref<{ show: boolean; task: CranTask | null; loading: boolean }>({
   show: false, task: null, loading: false,
 })
-const drawerTab = ref<'info' | 'trigger' | 'history'>('info')
+const drawerTab = ref<'info' | 'history'>('info')
 
 // ─── 执行历史 ─────────────────────────────────────────────────────────────────
 const historyList      = ref<CranAttempt[]>([])
@@ -588,12 +536,6 @@ const execResult   = ref<{ ok: boolean; attemptId?: string; msg?: string } | nul
 
 // ─── 泳道 ContextItem ─────────────────────────────────────────────────────────
 const fetchSwimlaneItems = makeFetchItems('swimlane')
-
-// 任务信息 tab 的泳道点选 → 同步到触发表单
-function onInfoSwimlaneEdit(item: ContextDataItem) {
-  execRule.swimlane = item.value ?? ''
-  message.info(item.value ? `泳道已同步：${item.value}` : '已清空泳道（主干）')
-}
 
 // ─── localStorage 持久化 ──────────────────────────────────────────────────────
 const LS_KEY = 'cran_appkey'
@@ -842,7 +784,7 @@ function rerunAttempt(item: CranAttempt) {
     execRule.grouptags = rules[0].grouptags ?? 'La:default'
   }
   execResult.value = null
-  drawerTab.value  = 'trigger'
+  drawerTab.value  = 'info'
   message.info('已填入历史参数，确认后点击触发执行')
 }
 
