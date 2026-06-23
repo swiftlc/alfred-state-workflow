@@ -110,8 +110,6 @@ onMounted(() => {
     lineHeight:       isPlayground ? 22 : 20,
     minimap:          { enabled: false },
     guides:           { indentation: false, highlightActiveIndentation: false, bracketPairs: false },
-    renderLineHighlight: 'none' as const,
-    matchBrackets:    'never' as const,
     scrollBeyondLastLine: false,
     wordWrap:         'on',
     automaticLayout:  true,

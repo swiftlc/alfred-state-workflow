@@ -113,6 +113,17 @@ export const FIELD_RELOAD_LOADING_KEY = '_reloadLoadingKey';
 export const TASK_LOGIN = 'login_task';
 /** 租户 base 登录后台任务名 */
 export const TASK_LOGIN_ENV = 'login_env_task';
+/** Sonic 热部署后台任务名 */
+export const TASK_SONIC_DEPLOY = 'sonic_deploy_task';
+
+// ─── Sonic 热部署内部字段 ─────────────────────────────────────────────────────
+
+/** 热部署选中的目标机器 IP（'_all_' 表示当前泳道全部机器） */
+export const FIELD_SONIC_MACHINE     = '_sonicMachine';
+/** 热部署 Java 项目根目录（用户输入，持久化到 SonicConfigManager） */
+export const FIELD_SONIC_PROJECT_ROOT = '_sonicProjectRoot';
+/** 热部署 Maven 子模块名（可为空，空表示全量编译） */
+export const FIELD_SONIC_MODULE      = '_sonicModule';
 
 // ─── 业务配置 ─────────────────────────────────────────────────────────────────
 

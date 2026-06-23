@@ -5,7 +5,8 @@ import Logger from '../core/Logger';
 import CacheManager from '../core/CacheManager';
 import {copyToClipboard, openUrl, sendNotification, encodeContext} from '../core/utils';
 import {icon} from '../core/icons';
-import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS, STATE_KAFKA_CONSUMERS, STATE_KAFKA_MESSAGES, FIELD_MSG_CACHE_KEY, FIELD_MSG_DATETIME, FIELD_MSG_SWIMLANE, FIELD_MSG_BASE_TOPIC_ID, FIELD_LOGIN_ENV_KEY, FIELD_TOPIC_ID, LOGIN_ENV_CONFIGS, OCTO_BASE_URL, MAFKA_HEADERS, JUMPER_BASE_URL, CARGO_DEV_BASE_URL, OCTO_INVOKE_URL, TENANT_EMPOWER_APPKEY, TASK_LOGIN, TASK_LOGIN_ENV, STATE_SHEPHERD_RESULT, STATE_SHEPHERD_SEARCH, STATE_LION_CONFIG} from './constants';
+import {PROXY_BASE_URL, DEFAULT_STATE, FIELD_CURRENT_DICT, FIELD_CURRENT_SELECTED, STATE_KAFKA_OPS, STATE_KAFKA_CONSUMERS, STATE_KAFKA_MESSAGES, FIELD_MSG_CACHE_KEY, FIELD_MSG_DATETIME, FIELD_MSG_SWIMLANE, FIELD_MSG_BASE_TOPIC_ID, FIELD_LOGIN_ENV_KEY, FIELD_TOPIC_ID, LOGIN_ENV_CONFIGS, OCTO_BASE_URL, MAFKA_HEADERS, JUMPER_BASE_URL, CARGO_DEV_BASE_URL, OCTO_INVOKE_URL, TENANT_EMPOWER_APPKEY, TASK_LOGIN, TASK_LOGIN_ENV, STATE_SHEPHERD_RESULT, STATE_SHEPHERD_SEARCH, STATE_LION_CONFIG, TASK_SONIC_DEPLOY, FIELD_SONIC_MACHINE, FIELD_SONIC_PROJECT_ROOT, FIELD_SONIC_MODULE} from './constants';
+import SonicConfigManager from '../core/SonicConfigManager';
 import {createPersistentQueryHandler} from '../core/persistentQuery';
 import {resolveQueryDatetime} from '../core/timeUtils';
 import dictService, {DictService} from '../services/dictService';
@@ -668,6 +669,37 @@ const builtInFeatures: Feature[] = [
       } catch (err) {
         sendNotification(`发送失败: ${(err as Error).message}`, '发送消息');
       }
+    },
+  },
+
+  // ─── Sonic 热部署（全自动：无表单、无项目目录选择）───────────────────────────
+  //
+  // 逻辑全部封装在 proxy-server /api/deploy/quick：
+  //   ① Finder 路径自动检测项目根目录
+  //   ② git diff 获取未提交 Java 文件
+  //   ③ OCTO 查询泳道全部机器
+  //   ④ 增量 javac 编译
+  //   ⑤ TCP 50666 并发热部署
+
+  {
+    id: 'sonic_hot_deploy',
+    name: (data: ContextData) => {
+      const swimlane = data['swimlane'] as DictItem | undefined;
+      return swimlane?.name
+        ? `🔥 Sonic 热部署 → ${swimlane.name}`
+        : '🔥 Sonic 热部署';
+    },
+    description: (data: ContextData) => {
+      const appkey   = (data['appkey']   as DictItem | undefined)?.value ?? '';
+      const swimlane = (data['swimlane'] as DictItem | undefined)?.value ?? '';
+      return `部署 git 未提交 Java 变更 → ${appkey} 泳道 ${swimlane || '主干'} 全部机器`;
+    },
+    requiredKeys: ['appkey', 'swimlane'],
+    icon: icon('task'),
+    // 无 requiredInputs：全自动，不弹表单
+    action: 'sonic_hot_deploy',
+    actionHandler: async (context, wf) => {
+      await wf.startTask(TASK_SONIC_DEPLOY, context);
     },
   },
 ];

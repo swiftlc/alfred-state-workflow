@@ -1,5 +1,6 @@
 import {execSync} from 'child_process';
 import {copyToClipboard, encodeContext, openUrl, resolveOptions, sendNotification} from '../core/utils';
+import SonicConfigManager from '../core/SonicConfigManager';
 import CacheManager from '../core/CacheManager';
 import DictPinManager from '../core/DictPinManager';
 import DictRecentManager from '../core/DictRecentManager';
@@ -44,6 +45,10 @@ import {
   FIELD_QUERY_CACHE_KEY,
   FIELD_RELOAD_CACHE_KEY,
   FIELD_RELOAD_LOADING_KEY,
+  TASK_SONIC_DEPLOY,
+  FIELD_SONIC_MACHINE,
+  FIELD_SONIC_PROJECT_ROOT,
+  FIELD_SONIC_MODULE,
 } from '../config/constants';
 import type Workflow from '../core/Workflow';
 import type {DictItem} from '../types';
@@ -807,6 +812,81 @@ export default function registerActions(app: Workflow): void {
 
     await CacheManager.set(cacheKey, results);  // 无 TTL，持久缓存
     await task.update(100, results.length > 0 ? `找到 ${results.length} 个接口` : `未找到匹配接口`);
+  });
+
+  // ─── Sonic 热部署（全自动版）──────────────────────────────────────────────────
+  //
+  // 完全委托 proxy-server /api/deploy/quick：
+  //   ① Finder 路径自动检测项目根目录
+  //   ② git diff 获取未提交 Java 文件
+  //   ③ OCTO 查询泳道机器
+  //   ④ 增量 javac 编译
+  //   ⑤ TCP 50666 并发热部署
+  // Alfred workflow 只需从 context 取 appkey + swimlane，零表单输入。
+
+  app.onTask(TASK_SONIC_DEPLOY, async (task, context) => {
+    const data     = context.data ?? {};
+    const appkey   = (data['appkey']   as DictItem | undefined)?.value ?? '';
+    const swimlane = (data['swimlane'] as DictItem | undefined)?.value ?? '';
+
+    if (!appkey)   { await task.update(100, 'context 中缺少 appkey');   return; }
+    if (!swimlane) { await task.update(100, 'context 中缺少 swimlane'); return; }
+
+    await task.update(10, `检测项目 & 扫描变更文件…`);
+
+    interface QuickDeployResult {
+      code: number;
+      data?: {
+        msg?:             string;
+        projectRoot:      string;
+        mavenModule:      string;
+        javaFiles:        string[];
+        deployedClasses:  number;
+        machines:         number;
+        summary:          string;
+        results:          Array<{ host: string; success: boolean; message: string }>;
+      };
+      msg?: string;
+    }
+
+    let resp: QuickDeployResult;
+    try {
+      resp = await http.post<QuickDeployResult>(
+        `${PROXY_BASE_URL}/api/deploy/quick`,
+        { appkey, swimlane },
+        { timeout: 300_000 },   // 最多等 5 分钟
+      );
+    } catch (e) {
+      await task.update(100, `请求失败: ${(e as Error).message}`);
+      return;
+    }
+
+    // 无变更文件
+    if (resp.data?.msg && !resp.data.javaFiles) {
+      await task.update(100, resp.data.msg);
+      return;
+    }
+
+    if (resp.code !== 0) {
+      await task.update(100, `失败: ${resp.msg || '未知错误'}`);
+      return;
+    }
+
+    const { deployedClasses = 0, machines = 0, summary = '', results = [], javaFiles = [] } = resp.data ?? {};
+    await task.update(50, `编译完成，部署 ${deployedClasses} 个 class → ${machines} 台机器…`);
+
+    const ok   = results.filter(r => r.success);
+    const fail = results.filter(r => !r.success);
+
+    if (fail.length === 0) {
+      const msg = `${deployedClasses} class × ${ok.length} 台全部成功（${javaFiles.length} 个文件）`;
+      sendNotification('🔥 Sonic 热部署成功', msg);
+      await task.update(100, `✅ ${msg}`);
+    } else {
+      const failList = fail.map(r => `${r.host}: ${r.message}`).join(' | ');
+      sendNotification('⚠️ Sonic 部分失败', summary);
+      await task.update(100, `⚠️ ${summary} — ${failList}`);
+    }
   });
 }
 
