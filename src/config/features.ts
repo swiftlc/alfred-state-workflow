@@ -683,16 +683,10 @@ const builtInFeatures: Feature[] = [
 
   {
     id: 'sonic_hot_deploy',
-    name: (data: ContextData) => {
-      const swimlane = data['swimlane'] as DictItem | undefined;
-      return swimlane?.name
-        ? `🔥 Sonic 热部署 → ${swimlane.name}`
-        : '🔥 Sonic 热部署';
-    },
+    name: '🔥 Sonic 热部署',
     description: (data: ContextData) => {
-      const appkey   = (data['appkey']   as DictItem | undefined)?.value ?? '';
       const swimlane = (data['swimlane'] as DictItem | undefined)?.value ?? '';
-      return `部署 git 未提交 Java 变更 → ${appkey} 泳道 ${swimlane || '主干'} 全部机器`;
+      return swimlane ? `部署未提交 Java 变更 → 泳道 ${swimlane}` : '部署未提交 Java 变更 → 主干';
     },
     requiredKeys: ['appkey', 'swimlane'],
     icon: icon('task'),

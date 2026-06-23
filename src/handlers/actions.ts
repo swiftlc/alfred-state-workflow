@@ -879,13 +879,13 @@ export default function registerActions(app: Workflow): void {
     const fail = results.filter(r => !r.success);
 
     if (fail.length === 0) {
-      const msg = `${deployedClasses} class × ${ok.length} 台全部成功（${javaFiles.length} 个文件）`;
+      const msg = `${javaFiles.length} 个文件 · ${deployedClasses} class · ${ok.length} 台机器`;
       sendNotification('🔥 Sonic 热部署成功', msg);
-      await task.update(100, `✅ ${msg}`);
+      await task.update(100, msg);
     } else {
       const failList = fail.map(r => `${r.host}: ${r.message}`).join(' | ');
       sendNotification('⚠️ Sonic 部分失败', summary);
-      await task.update(100, `⚠️ ${summary} — ${failList}`);
+      await task.update(100, `${summary} — ${failList}`);
     }
   });
 }
